@@ -1,0 +1,28 @@
+import mongoose from 'mongoose';
+
+export const Price = mongoose.model(
+  'Price',
+  new mongoose.Schema({
+    offerId: { required: true, type: String },
+    currency: { required: true, type: String },
+    country: { required: true, type: String },
+    symbol: { required: true, type: String },
+    totalPrice: {
+      basePayoutCurrencyCode: { required: true, type: String },
+      basePayoutPrice: { required: true, type: Number },
+      convenienceFee: { required: true, type: Number },
+      currencyCode: { required: true, type: String },
+      discount: { required: true, type: Number },
+      discountPrice: { required: true, type: Number },
+      originalPrice: { required: true, type: Number },
+      vat: { required: true, type: Number },
+      voucherDiscount: { required: true, type: Number },
+    },
+    totalPaymentPrice: {
+      paymentCurrencyAmount: { required: true, type: Number },
+      paymentCurrencyCode: { required: true, type: String },
+      paymentCurrencyExchangeRate: { required: true, type: Number },
+      paymentCurrencySymbol: { required: true, type: String },
+    },
+  })
+);
