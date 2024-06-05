@@ -30,13 +30,37 @@ app.get('/', (c) => {
 });
 
 app.get('/offers', async (c) => {
+  const start = new Date();
+  const MAX_LIMIT = 50;
+  const limit = Math.min(
+    Number.parseInt(c.req.query('limit') || '10'),
+    MAX_LIMIT
+  );
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+
   const offers = await Offer.find({}, undefined, {
-    limit: 10,
+    limit,
+    skip: (page - 1) * limit,
     sort: {
       lastModifiedDate: -1,
     },
-  });
-  return c.json(offers);
+  })
+    .hint({ lastModifiedDate: 1 })
+    .allowDiskUse(true);
+
+  return c.json(
+    {
+      elements: offers,
+      page,
+      limit,
+      total: await Offer.countDocuments(),
+    },
+    200,
+    {
+      'Cache-Control': 'public, max-age=60',
+      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    }
+  );
 });
 
 app.get('/offers/:id', async (c) => {
@@ -57,13 +81,27 @@ app.get('/offers/:id', async (c) => {
 });
 
 app.get('/items', async (c) => {
+  const MAX_LIMIT = 50;
+  const limit = Math.min(
+    Number.parseInt(c.req.query('limit') || '10'),
+    MAX_LIMIT
+  );
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+
   const items = await Item.find({}, undefined, {
-    limit: 10,
+    limit,
+    skip: (page - 1) * limit,
     sort: {
       lastModifiedDate: -1,
     },
+  }).hint({ lastModifiedDate: 1 });
+
+  return c.json({
+    elements: items,
+    page,
+    limit,
+    total: await Item.countDocuments(),
   });
-  return c.json(items);
 });
 
 app.get('/items/:id', async (c) => {
