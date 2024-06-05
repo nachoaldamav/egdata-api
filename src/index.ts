@@ -34,8 +34,9 @@ app.get('/offers', async (c) => {
 
 app.get('/offers/:id', async (c) => {
   const { id } = c.req.param();
+
   const offer = await Offer.find({
-    $or: [{ _id: id }, { offerId: id }],
+    $or: [{ _id: id }, { id: id }],
   });
 
   if (!offer || offer.length === 0) {
@@ -61,7 +62,7 @@ app.get('/items', async (c) => {
 app.get('/items/:id', async (c) => {
   const { id } = c.req.param();
   const item = await Item.find({
-    $or: [{ _id: id }, { itemId: id }],
+    $or: [{ _id: id }, { id: id }],
   });
 
   if (!item || item.length === 0) {
@@ -75,6 +76,7 @@ app.get('/items/:id', async (c) => {
 });
 
 app.get('/latest-games', async (c) => {
+  const start = new Date();
   const items = await Offer.find(
     {
       offerType: 'BASE_GAME',
@@ -87,6 +89,8 @@ app.get('/latest-games', async (c) => {
       },
     }
   );
+  const end = new Date();
+
   return c.json(
     items.map((i) => {
       return {
@@ -113,6 +117,7 @@ app.get('/latest-games', async (c) => {
     200,
     {
       'Cache-Control': 'public, max-age=60',
+      'Server-Timing': `db;dur=${end.getTime() - start.getTime()}`,
     }
   );
 });
