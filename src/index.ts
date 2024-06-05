@@ -109,7 +109,11 @@ app.get('/latest-games', async (c) => {
         publisherDisplayName: i.publisherDisplayName,
         seller: i.seller?.name,
       };
-    })
+    }),
+    200,
+    {
+      'Cache-Control': 'public, max-age=60',
+    }
   );
 });
 
