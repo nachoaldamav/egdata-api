@@ -19,6 +19,13 @@ app.get('/', (c) => {
   return c.json({
     app: 'egdata',
     version: '0.0.1-alpha',
+    endpoints: [
+      '/offers',
+      '/offers/:id',
+      '/items',
+      '/items/:id',
+      '/latest-games',
+    ],
   });
 });
 
