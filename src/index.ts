@@ -319,6 +319,68 @@ app.get('/featured', async (c) => {
   });
 });
 
+app.get('/autocomplete', async (c) => {
+  const query = c.req.query('query');
+
+  if (!query) {
+    return c.json({
+      elements: [],
+      total: 0,
+    });
+  }
+
+  const cacheKey = `autocomplete:${Buffer.from(query).toString('base64')}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached));
+  }
+
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '5'), 5);
+
+  if (!query) {
+    c.status(400);
+    return c.json({
+      message: 'Missing query parameter',
+    });
+  }
+
+  const start = new Date();
+  const offers = await Offer.find(
+    {
+      $text: { $search: query.includes('"') ? query : `"${query}"` },
+    },
+    {
+      title: 1,
+      id: 1,
+      namespace: 1,
+      keyImages: 1,
+    },
+    {
+      limit,
+      sort: {
+        score: { $meta: 'textScore' },
+      },
+    }
+  );
+
+  const response = {
+    elements: offers.map((o) => orderOffersObject(o)),
+    total: await Offer.countDocuments({
+      $text: { $search: `"${query}"` },
+    }),
+  };
+
+  await client.set(cacheKey, JSON.stringify(response), {
+    EX: 60,
+  });
+
+  return c.json(response, 200, {
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
+});
+
 interface SearchBody {
   limit?: number;
   page?: number;
