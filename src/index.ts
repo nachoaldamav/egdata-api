@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { createClient } from 'redis';
 import { DB } from './db';
 import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
@@ -7,8 +8,11 @@ import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
+const REDISHOST = process.env.REDISHOST || '127.0.0.1';
+const REDISPORT = process.env.REDISPORT || '6379';
 
 const app = new Hono();
+
 app.use(
   '/*',
   cors({
@@ -27,14 +31,18 @@ app.use(
 );
 
 const db = new DB();
-db.connect()
-  .then(() => {
-    console.log('Connected to database');
-  })
-  .catch((err) => {
-    console.error('Failed to connect to database', err);
-    process.exit(1);
+const client = createClient({
+  url: `redis://${REDISHOST}:${REDISPORT}`,
+});
+
+client.connect();
+db.connect();
+
+app.get('/health', (c) => {
+  return c.json({
+    status: 'ok',
   });
+});
 
 app.get('/', (c) => {
   return c.json({
@@ -257,10 +265,23 @@ app.get('/latest-games', async (c) => {
 
 app.get('/featured', async (c) => {
   const GET_FEATURED_GAMES_START = new Date();
-  const featuredGames = (await getFeaturedGames()) as {
-    id: string;
-    namespace: string;
-  }[];
+  const cacheKey = 'featured-games:cache';
+
+  const cached = await client.get(cacheKey);
+
+  let featuredGames: { id: string; namespace: string }[] = [];
+  let cacheHit = false;
+
+  if (cached) {
+    featuredGames = JSON.parse(cached);
+    cacheHit = true;
+  } else {
+    featuredGames = await getFeaturedGames();
+    await client.set(cacheKey, JSON.stringify(featuredGames), {
+      EX: 3600,
+    });
+  }
+
   const GET_FEATURED_GAMES_END = new Date();
 
   let game = null;
