@@ -46,17 +46,4 @@ const schema = new mongoose.Schema({
   countriesWhitelist: [String],
 });
 
-schema.index({ id: 1, namespace: 1 }, { unique: true });
-schema.index({ title: 'text', description: 'text' });
-schema.index({ 'seller.name': 1 });
-schema.index({ 'tags.name': 1 });
-schema.index({ categories: 1 });
-schema.index({ developerDisplayName: 1 });
-schema.index({ publisherDisplayName: 1 });
-schema.index({ prePurchase: 1 });
-schema.index({ releaseDate: 1 });
-schema.index({ pcReleaseDate: 1 });
-schema.index({ lastModifiedDate: 1 });
-schema.index({ viewableDate: 1 });
-
 export const Offer = mongoose.model('Offer', schema);

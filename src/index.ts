@@ -171,34 +171,56 @@ app.get('/latest-games', async (c) => {
 app.post('/offers', async (c) => {
   const body = await c.req.json();
   const query = body as SearchBody;
+  let sort:
+    | {
+        [key: string]: 1 | -1 | { $meta: 'textScore' };
+      }
+    | undefined = undefined;
 
   let search: any = {};
   if (query.query) {
-    search.$text = { $search: query.query };
+    search.$text = { $search: `"${query.query}"` };
+    if (!sort) {
+      sort = { score: { $meta: 'textScore' } };
+    }
   }
+
+  if (query.namespace) {
+    search.namespace = query.namespace;
+  }
+
   if (query.offerType) {
     search.offerType = query.offerType;
   }
+
   if (query.categories) {
     search.categories = { $in: query.categories };
   }
+
   if (query.sortBy) {
-    let sort: any = {};
-    sort[query.sortBy] = query.sortOrder === 'asc' ? 1 : -1;
-    search.sort = sort;
+    if (!sort) sort = {};
+    sort[query.sortBy] = query.sortOrder === 'asc' ? 1 : -1; // Secondary sort by specified field
   }
 
   const offers = await Offer.find(search, undefined, {
     limit: query.limit || 10,
     skip: query.page ? query.page * (query.limit || 10) : 0,
+    sort,
   });
-  return c.json(offers);
+
+  return c.json({
+    elements: offers,
+    total: await Offer.countDocuments(search),
+    page: query.page || 1,
+    limit: query.limit || 10,
+  });
 });
 
 interface SearchBody {
   limit?: number;
   page?: number;
   query?: string;
+  namespace?: string;
   offerType?: string;
   sortBy?:
     | 'lastModifiedDate'
