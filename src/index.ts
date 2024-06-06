@@ -16,7 +16,7 @@ app.use(
         return origin;
       }
 
-      return origin.includes('egdata.app') ? origin : 'https://egdata.app';
+      return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
     },
     allowHeaders: ['Content-Type', 'Authorization'],
     allowMethods: ['GET', 'POST'],
