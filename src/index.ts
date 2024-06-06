@@ -55,6 +55,9 @@ app.get('/', (c) => {
       '/items',
       '/items/:id',
       '/latest-games',
+      '/featured',
+      '/autocomplete',
+      '/countries',
     ],
   });
 });
