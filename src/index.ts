@@ -167,6 +167,50 @@ app.get('/latest-games', async (c) => {
   );
 });
 
+// POST requests are for search
+app.post('/offers', async (c) => {
+  const body = await c.req.json();
+  const query = body as SearchBody;
+
+  let search: any = {};
+  if (query.query) {
+    search.$text = { $search: query.query };
+  }
+  if (query.offerType) {
+    search.offerType = query.offerType;
+  }
+  if (query.categories) {
+    search.categories = { $in: query.categories };
+  }
+  if (query.sortBy) {
+    let sort: any = {};
+    sort[query.sortBy] = query.sortOrder === 'asc' ? 1 : -1;
+    search.sort = sort;
+  }
+
+  const offers = await Offer.find(search, undefined, {
+    limit: query.limit || 10,
+    skip: query.page ? query.page * (query.limit || 10) : 0,
+  });
+  return c.json(offers);
+});
+
+interface SearchBody {
+  limit?: number;
+  page?: number;
+  query?: string;
+  offerType?: string;
+  sortBy?:
+    | 'lastModifiedDate'
+    | 'creationDate'
+    | 'effectiveDate'
+    | 'releaseDate'
+    | 'pcReleaseDate'
+    | 'currentPrice';
+  sortOrder?: 'asc' | 'desc';
+  categories?: string[];
+}
+
 export default {
   port: 4000,
   fetch: app.fetch,
