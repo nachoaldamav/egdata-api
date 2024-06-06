@@ -1,10 +1,21 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { DB } from './db';
 import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 
 const app = new Hono();
+app.use(
+  '/*',
+  cors({
+    origin: ['https://*.egdata.app', 'http://localhost:5173'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['GET', 'POST'],
+    credentials: true,
+    maxAge: 86400,
+  })
+);
 
 const db = new DB();
 db.connect()
