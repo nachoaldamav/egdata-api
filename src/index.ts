@@ -9,7 +9,7 @@ const app = new Hono();
 app.use(
   '/*',
   cors({
-    origin: ['https://*.egdata.app', 'http://localhost:5173'],
+    origin: ['https://egdata.app', 'http://localhost:5173'],
     allowHeaders: ['Content-Type', 'Authorization'],
     allowMethods: ['GET', 'POST'],
     credentials: true,
