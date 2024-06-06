@@ -4,6 +4,7 @@ import { DB } from './db';
 import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
+import { getFeaturedGames } from './utils/get-featured-games';
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 
@@ -100,6 +101,73 @@ app.get('/offers/:id', async (c) => {
   return c.json(orderOffersObject(offer));
 });
 
+app.post('/offers', async (c) => {
+  const start = new Date();
+  const body = await c.req.json().catch((err) => {
+    c.status(400);
+    return c.json({ message: 'Invalid request body' });
+  });
+
+  const query = body as SearchBody;
+  let sort:
+    | {
+        [key: string]: 1 | -1 | { $meta: 'textScore' };
+      }
+    | undefined = undefined;
+
+  let search: any = {};
+  if (query.query) {
+    search.$text = { $search: `"${query.query}"` };
+    if (!sort) {
+      sort = { score: { $meta: 'textScore' } };
+    }
+  }
+
+  if (query.namespace) {
+    search.namespace = query.namespace;
+  }
+
+  if (query.offerType) {
+    search.offerType = query.offerType;
+  }
+
+  if (query.categories) {
+    search.categories = { $in: query.categories };
+  }
+
+  if (query.sortBy) {
+    if (!sort) sort = {};
+
+    // If the sortBy is "releaseDate", we need to ignore the releases past the current date
+    if (query.sortBy === 'releaseDate') {
+      search.releaseDate = { $lte: new Date() };
+    }
+
+    sort[query.sortBy] = query.sortOrder === 'asc' ? 1 : -1; // Secondary sort by specified field
+  }
+
+  const limit = Math.min(query.limit || 10, 100);
+
+  const offers = await Offer.find(search, undefined, {
+    limit,
+    skip: query.page ? query.page * (query.limit || 10) : 0,
+    sort,
+  });
+
+  return c.json(
+    {
+      elements: offers.map((o) => orderOffersObject(o)),
+      total: await Offer.countDocuments(search),
+      page: query.page || 1,
+      limit,
+    },
+    200,
+    {
+      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    }
+  );
+});
+
 app.get('/items', async (c) => {
   const MAX_LIMIT = 50;
   const limit = Math.min(
@@ -187,71 +255,47 @@ app.get('/latest-games', async (c) => {
   );
 });
 
-app.post('/offers', async (c) => {
+app.get('/featured', async (c) => {
+  const GET_FEATURED_GAMES_START = new Date();
+  const featuredGames = (await getFeaturedGames()) as {
+    id: string;
+    namespace: string;
+  }[];
+  const GET_FEATURED_GAMES_END = new Date();
+
+  let game = null;
+
   const start = new Date();
-  const body = await c.req.json().catch((err) => {
-    c.status(400);
-    return c.json({ message: 'Invalid request body' });
+  // Try to find a game from the featured games list
+  for (let i = 0; i < featuredGames.length; i++) {
+    const randomGame =
+      featuredGames[Math.floor(Math.random() * featuredGames.length)];
+
+    game = await Offer.findOne({
+      id: randomGame.id,
+      namespace: randomGame.namespace,
+    });
+
+    if (game) {
+      break;
+    }
+  }
+
+  if (!game) {
+    c.status(404);
+    return c.json({
+      message: 'No games found in the featured list',
+    });
+  }
+
+  return c.json(orderOffersObject(game), 200, {
+    'Cache-Control': 'public, max-age=3600',
+    'Server-Timing': `db;dur=${
+      new Date().getTime() - start.getTime()
+    }, egsAPI;dur=${
+      GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
+    }`,
   });
-
-  const query = body as SearchBody;
-  let sort:
-    | {
-        [key: string]: 1 | -1 | { $meta: 'textScore' };
-      }
-    | undefined = undefined;
-
-  let search: any = {};
-  if (query.query) {
-    search.$text = { $search: `"${query.query}"` };
-    if (!sort) {
-      sort = { score: { $meta: 'textScore' } };
-    }
-  }
-
-  if (query.namespace) {
-    search.namespace = query.namespace;
-  }
-
-  if (query.offerType) {
-    search.offerType = query.offerType;
-  }
-
-  if (query.categories) {
-    search.categories = { $in: query.categories };
-  }
-
-  if (query.sortBy) {
-    if (!sort) sort = {};
-
-    // If the sortBy is "releaseDate", we need to ignore the releases past the current date
-    if (query.sortBy === 'releaseDate') {
-      search.releaseDate = { $lte: new Date() };
-    }
-
-    sort[query.sortBy] = query.sortOrder === 'asc' ? 1 : -1; // Secondary sort by specified field
-  }
-
-  const limit = Math.min(query.limit || 10, 100);
-
-  const offers = await Offer.find(search, undefined, {
-    limit,
-    skip: query.page ? query.page * (query.limit || 10) : 0,
-    sort,
-  });
-
-  return c.json(
-    {
-      elements: offers.map((o) => orderOffersObject(o)),
-      total: await Offer.countDocuments(search),
-      page: query.page || 1,
-      limit,
-    },
-    200,
-    {
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    }
-  );
 });
 
 interface SearchBody {
