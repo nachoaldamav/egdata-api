@@ -329,15 +329,17 @@ app.get('/autocomplete', async (c) => {
     });
   }
 
-  const cacheKey = `autocomplete:${Buffer.from(query).toString('base64')}`;
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '5'), 5);
+
+  const cacheKey = `autocomplete:${Buffer.from(query).toString(
+    'base64'
+  )}:${limit}`;
 
   const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached));
   }
-
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '5'), 5);
 
   if (!query) {
     c.status(400);
