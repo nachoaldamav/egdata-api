@@ -6,6 +6,7 @@ import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
+import { countries } from './utils/countries';
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 const REDISHOST = process.env.REDISHOST || '127.0.0.1';
@@ -381,6 +382,10 @@ app.get('/autocomplete', async (c) => {
   return c.json(response, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
   });
+});
+
+app.get('/countries', async (c) => {
+  return c.json(countries);
 });
 
 interface SearchBody {
