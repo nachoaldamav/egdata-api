@@ -47,3 +47,4 @@ const schema = new mongoose.Schema({
 });
 
 export const Offer = mongoose.model('Offer', schema);
+export type OfferType = mongoose.InferSchemaType<typeof schema>;

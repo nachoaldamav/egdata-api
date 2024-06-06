@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { DB } from './db';
 import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
+import { orderOffersObject } from './utils/order-offers-object';
 
 const app = new Hono();
 
@@ -50,7 +51,7 @@ app.get('/offers', async (c) => {
 
   return c.json(
     {
-      elements: offers,
+      elements: offers.map((o) => orderOffersObject(o)),
       page,
       limit,
       total: await Offer.countDocuments(),
@@ -66,18 +67,18 @@ app.get('/offers', async (c) => {
 app.get('/offers/:id', async (c) => {
   const { id } = c.req.param();
 
-  const offer = await Offer.find({
+  const offer = await Offer.findOne({
     $or: [{ _id: id }, { id: id }],
   });
 
-  if (!offer || offer.length === 0) {
+  if (!offer) {
     c.status(404);
     return c.json({
       message: 'Offer not found',
     });
   }
 
-  return c.json(offer[0]);
+  return c.json(orderOffersObject(offer));
 });
 
 app.get('/items', async (c) => {
@@ -209,7 +210,7 @@ app.post('/offers', async (c) => {
   });
 
   return c.json({
-    elements: offers,
+    elements: offers.map((o) => orderOffersObject(o)),
     total: await Offer.countDocuments(search),
     page: query.page || 1,
     limit: query.limit || 10,
