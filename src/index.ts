@@ -170,7 +170,11 @@ app.get('/latest-games', async (c) => {
 
 // POST requests are for search
 app.post('/offers', async (c) => {
-  const body = await c.req.json();
+  const body = await c.req.json().catch((err) => {
+    c.status(400);
+    return c.json({ message: 'Invalid request body' });
+  });
+
   const query = body as SearchBody;
   let sort:
     | {
