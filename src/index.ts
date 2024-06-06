@@ -5,11 +5,19 @@ import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 
+const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
+
 const app = new Hono();
 app.use(
   '/*',
   cors({
-    origin: ['https://egdata.app', 'http://localhost:5173'],
+    origin: (origin: string) => {
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return origin;
+      }
+
+      return origin.includes('egdata.app') ? origin : 'https://egdata.app';
+    },
     allowHeaders: ['Content-Type', 'Authorization'],
     allowMethods: ['GET', 'POST'],
     credentials: true,
