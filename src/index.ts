@@ -187,8 +187,8 @@ app.get('/latest-games', async (c) => {
   );
 });
 
-// POST requests are for search
 app.post('/offers', async (c) => {
+  const start = new Date();
   const body = await c.req.json().catch((err) => {
     c.status(400);
     return c.json({ message: 'Invalid request body' });
@@ -240,12 +240,18 @@ app.post('/offers', async (c) => {
     sort,
   });
 
-  return c.json({
-    elements: offers.map((o) => orderOffersObject(o)),
-    total: await Offer.countDocuments(search),
-    page: query.page || 1,
-    limit,
-  });
+  return c.json(
+    {
+      elements: offers.map((o) => orderOffersObject(o)),
+      total: await Offer.countDocuments(search),
+      page: query.page || 1,
+      limit,
+    },
+    200,
+    {
+      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    }
+  );
 });
 
 interface SearchBody {
