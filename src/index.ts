@@ -204,11 +204,19 @@ app.post('/offers', async (c) => {
 
   if (query.sortBy) {
     if (!sort) sort = {};
+
+    // If the sortBy is "releaseDate", we need to ignore the releases past the current date
+    if (query.sortBy === 'releaseDate') {
+      search.releaseDate = { $lte: new Date() };
+    }
+
     sort[query.sortBy] = query.sortOrder === 'asc' ? 1 : -1; // Secondary sort by specified field
   }
 
+  const limit = Math.min(query.limit || 10, 100);
+
   const offers = await Offer.find(search, undefined, {
-    limit: query.limit || 10,
+    limit,
     skip: query.page ? query.page * (query.limit || 10) : 0,
     sort,
   });
@@ -217,7 +225,7 @@ app.post('/offers', async (c) => {
     elements: offers.map((o) => orderOffersObject(o)),
     total: await Offer.countDocuments(search),
     page: query.page || 1,
-    limit: query.limit || 10,
+    limit,
   });
 });
 
