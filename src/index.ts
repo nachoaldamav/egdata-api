@@ -119,11 +119,13 @@ app.get('/offers/:id', async (c) => {
 
   const start = new Date();
 
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
   // Define the queries
   const offerQuery = Offer.findOne({ id }).lean();
   const pricesQuery = Price.findOne({
     offerId: id,
-    country: country ?? cookieCountry ?? 'US',
+    country: selectedCountry === 'EU' ? 'AD' : selectedCountry,
   }).lean();
 
   // Execute both queries in parallel
