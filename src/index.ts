@@ -1,5 +1,12 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import {
+  getCookie,
+  getSignedCookie,
+  setCookie,
+  setSignedCookie,
+  deleteCookie,
+} from 'hono/cookie';
 import { createClient } from 'redis';
 import { DB } from './db';
 import { Offer } from './db/schemas/offer';
@@ -7,6 +14,7 @@ import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries } from './utils/countries';
+import { Price } from './db/schemas/price';
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 const REDISHOST = process.env.REDISHOST || '127.0.0.1';
@@ -99,18 +107,38 @@ app.get('/offers', async (c) => {
 app.get('/offers/:id', async (c) => {
   const { id } = c.req.param();
 
-  const offer = await Offer.findOne({
-    $or: [{ _id: id }, { id: id }],
-  });
-
-  if (!offer) {
-    c.status(404);
+  if (!id) {
+    c.status(400);
     return c.json({
-      message: 'Offer not found',
+      message: 'Missing id parameter',
     });
   }
 
-  return c.json(orderOffersObject(offer));
+  const start = new Date();
+
+  // Define the queries
+  const offerQuery = Offer.findOne({ id }).lean();
+  const pricesQuery = Price.findOne({ offerId: id, country: 'US' }).lean();
+
+  // Execute both queries in parallel
+  const [offer, price] = await Promise.all([offerQuery, pricesQuery]);
+
+  if (!offer || !price) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found or Price not found',
+    });
+  }
+
+  // Combine the offer and price data
+  const result = {
+    ...offer,
+    price: price.totalPrice,
+  };
+
+  return c.json(result, 200, {
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
 });
 
 app.post('/offers', async (c) => {
