@@ -106,6 +106,9 @@ app.get('/offers', async (c) => {
 
 app.get('/offers/:id', async (c) => {
   const { id } = c.req.param();
+  const country = c.req.query('country');
+
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
   if (!id) {
     c.status(400);
@@ -118,7 +121,10 @@ app.get('/offers/:id', async (c) => {
 
   // Define the queries
   const offerQuery = Offer.findOne({ id }).lean();
-  const pricesQuery = Price.findOne({ offerId: id, country: 'US' }).lean();
+  const pricesQuery = Price.findOne({
+    offerId: id,
+    country: country ?? cookieCountry ?? 'US',
+  }).lean();
 
   // Execute both queries in parallel
   const [offer, price] = await Promise.all([offerQuery, pricesQuery]);
