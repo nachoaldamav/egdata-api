@@ -30,6 +30,7 @@ export const orderOffersObject = (offer: OfferType) => {
     viewableDate,
     countriesBlacklist,
     countriesWhitelist,
+    refundType,
   } = offer;
 
   return {
@@ -61,5 +62,6 @@ export const orderOffersObject = (offer: OfferType) => {
     viewableDate,
     countriesBlacklist,
     countriesWhitelist,
+    refundType,
   };
 };

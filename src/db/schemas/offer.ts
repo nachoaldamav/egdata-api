@@ -44,6 +44,7 @@ const schema = new mongoose.Schema({
   viewableDate: Date,
   countriesBlacklist: [String],
   countriesWhitelist: [String],
+  refundType: String,
 });
 
 export const Offer = mongoose.model('Offer', schema);
