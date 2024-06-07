@@ -141,7 +141,7 @@ app.get('/offers/:id', async (c) => {
   // Combine the offer and price data
   const result = {
     ...offer,
-    price: price.totalPrice,
+    price,
   };
 
   return c.json(result, 200, {
