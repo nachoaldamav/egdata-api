@@ -259,15 +259,71 @@ app.get('/items/:id', async (c) => {
 app.get('/items-from-offer/:id', async (c) => {
   const { id } = c.req.param();
 
-  const result = (await Item.aggregate([
+  const result = await Offer.aggregate([
     {
-      $match: {
-        linkedOffers: id,
+      $match: { id: id },
+    },
+    {
+      $unwind: {
+        path: '$items',
+        preserveNullAndEmptyArrays: true,
       },
     },
-  ])) as ItemType[];
+    {
+      $lookup: {
+        from: 'items',
+        localField: 'items.id',
+        foreignField: 'id',
+        as: 'itemDetails',
+      },
+    },
+    {
+      $unwind: {
+        path: '$itemDetails',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $lookup: {
+        from: 'items',
+        let: { offerId: '$id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $isArray: '$linkedOffers' },
+                  { $in: ['$$offerId', '$linkedOffers'] },
+                ],
+              },
+            },
+          },
+        ],
+        as: 'linkedItems',
+      },
+    },
+    {
+      $group: {
+        _id: '$_id',
+        offerItems: { $push: '$itemDetails' },
+        linkedItems: { $first: '$linkedItems' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        items: {
+          $filter: {
+            input: { $concatArrays: ['$offerItems', '$linkedItems'] },
+            as: 'item',
+            cond: { $ne: ['$$item', null] },
+          },
+        },
+      },
+    },
+  ]).exec();
 
-  return c.json(result);
+  return c.json(result.flatMap((r) => r.items));
 });
 
 app.get('/latest-games', async (c) => {
