@@ -131,7 +131,7 @@ app.get('/offers/:id', async (c) => {
   // Execute both queries in parallel
   const [offer, price] = await Promise.all([offerQuery, pricesQuery]);
 
-  if (!offer || !price) {
+  if (!offer) {
     c.status(404);
     return c.json({
       message: 'Offer not found or Price not found',
@@ -141,7 +141,7 @@ app.get('/offers/:id', async (c) => {
   // Combine the offer and price data
   const result = {
     ...offer,
-    price,
+    price: price || null,
   };
 
   return c.json(result, 200, {
