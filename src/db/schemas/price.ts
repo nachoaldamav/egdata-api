@@ -26,3 +26,27 @@ export const Price = mongoose.model(
     },
   })
 );
+
+const PriceHistorySchema = new mongoose.Schema(
+  {
+    price: { required: true, type: Number },
+    date: { required: true, type: Date },
+    metadata: {
+      id: { required: true, type: String },
+      country: { required: true, type: String },
+    },
+  },
+  {
+    timeseries: {
+      timeField: 'date',
+      metaField: 'metadata',
+      granularity: 'hours',
+    },
+  }
+);
+
+export const PriceHistory = mongoose.model(
+  'price-history',
+  PriceHistorySchema,
+  'price-history'
+);
