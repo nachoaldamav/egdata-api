@@ -10,7 +10,7 @@ import {
 import { createClient } from 'redis';
 import { DB } from './db';
 import { Offer } from './db/schemas/offer';
-import { Item } from './db/schemas/item';
+import { Item, ItemType } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries } from './utils/countries';
@@ -254,6 +254,42 @@ app.get('/items/:id', async (c) => {
   }
 
   return c.json(item[0]);
+});
+
+app.get('/items-from-offer/:id', async (c) => {
+  const { id } = c.req.param();
+
+  const result = (await Offer.aggregate([
+    { $match: { id: id } },
+    { $unwind: '$items' },
+    {
+      $lookup: {
+        from: 'items', // collection name in the database
+        localField: 'items.id',
+        foreignField: 'id',
+        as: 'itemDetails',
+      },
+    },
+    { $unwind: '$itemDetails' },
+    {
+      $group: {
+        _id: '$_id',
+        items: { $push: '$itemDetails' },
+      },
+    },
+    { $project: { items: 1, _id: 0 } },
+  ]).exec()) as {
+    items: ItemType[];
+  }[];
+
+  if (!result || result.length === 0) {
+    c.status(404);
+    return c.json({
+      message: 'Items not found',
+    });
+  }
+
+  return c.json(result[0]);
 });
 
 app.get('/latest-games', async (c) => {

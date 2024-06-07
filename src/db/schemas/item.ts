@@ -45,15 +45,5 @@ const ItemSchema = new mongoose.Schema({
   technicalDetails: { type: String },
 });
 
-ItemSchema.index({ id: 1 }, { unique: true });
-ItemSchema.index({ namespace: 1 });
-ItemSchema.index({ title: 1 });
-ItemSchema.index({ categories: 1 });
-ItemSchema.index({ status: 1 });
-ItemSchema.index({ creationDate: 1 });
-ItemSchema.index({ lastModifiedDate: 1 });
-ItemSchema.index({ 'customAttributes.$**': 1 });
-ItemSchema.index({ euiaIds: 1 });
-ItemSchema.index({ unsearchable: 1 });
-
 export const Item = mongoose.model('Item', ItemSchema);
+export type ItemType = mongoose.InferSchemaType<typeof ItemSchema>;
