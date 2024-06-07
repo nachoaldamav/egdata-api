@@ -259,37 +259,15 @@ app.get('/items/:id', async (c) => {
 app.get('/items-from-offer/:id', async (c) => {
   const { id } = c.req.param();
 
-  const result = (await Offer.aggregate([
-    { $match: { id: id } },
-    { $unwind: '$items' },
+  const result = (await Item.aggregate([
     {
-      $lookup: {
-        from: 'items', // collection name in the database
-        localField: 'items.id',
-        foreignField: 'id',
-        as: 'itemDetails',
+      $match: {
+        linkedOffers: id,
       },
     },
-    { $unwind: '$itemDetails' },
-    {
-      $group: {
-        _id: '$_id',
-        items: { $push: '$itemDetails' },
-      },
-    },
-    { $project: { items: 1, _id: 0 } },
-  ]).exec()) as {
-    items: ItemType[];
-  }[];
+  ])) as ItemType[];
 
-  if (!result || result.length === 0) {
-    c.status(404);
-    return c.json({
-      message: 'Items not found',
-    });
-  }
-
-  return c.json(result[0]);
+  return c.json(result);
 });
 
 app.get('/latest-games', async (c) => {
