@@ -512,7 +512,7 @@ type SalesAggregate = {
   currency: string;
   country: string;
   symbol: string;
-  totalPrice: TotalPrice;
+  price: TotalPrice;
   __v: number;
   offer: OfferType;
 };
@@ -580,13 +580,15 @@ app.get('/sales', async (c) => {
     }),
   ]);
 
+  console.log(sales);
+
   const converted = sales.map((s) => {
     return {
       ...s.offer,
       price: {
         currency: s.currency,
         symbol: s.symbol,
-        totalPrice: s.totalPrice,
+        totalPrice: s.price,
       },
     };
   });
