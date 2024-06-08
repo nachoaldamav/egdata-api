@@ -323,7 +323,16 @@ app.get('/items-from-offer/:id', async (c) => {
     },
   ]).exec();
 
-  return c.json(result.flatMap((r) => r.items));
+  const items = result.flatMap((r) => r.items);
+
+  const seen = new Set();
+  const resultItems = items.filter((i) => {
+    const duplicate = seen.has(i.id);
+    seen.add(i.id);
+    return !duplicate;
+  });
+
+  return c.json(resultItems);
 });
 
 app.get('/latest-games', async (c) => {
