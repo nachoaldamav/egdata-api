@@ -1,20 +1,37 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import {
-  getCookie,
-  getSignedCookie,
-  setCookie,
-  setSignedCookie,
-  deleteCookie,
-} from 'hono/cookie';
+import { getCookie } from 'hono/cookie';
 import { createClient } from 'redis';
 import { DB } from './db';
 import { Offer, OfferType } from './db/schemas/offer';
-import { Item, ItemType } from './db/schemas/item';
+import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries } from './utils/countries';
-import { Price, PriceSchema } from './db/schemas/price';
+import { Price } from './db/schemas/price';
+
+type SalesAggregate = {
+  _id: string;
+  offerId: string;
+  currency: string;
+  country: string;
+  symbol: string;
+  price: TotalPrice;
+  __v: number;
+  offer: OfferType;
+};
+
+interface TotalPrice {
+  basePayoutCurrencyCode: string;
+  basePayoutPrice: number;
+  convenienceFee: number;
+  currencyCode: string;
+  discount: number;
+  discountPrice: number;
+  originalPrice: number;
+  vat: number;
+  voucherDiscount: number;
+}
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 const REDISHOST = process.env.REDISHOST || '127.0.0.1';
@@ -506,29 +523,6 @@ app.get('/countries', async (c) => {
   return c.json(countries);
 });
 
-type SalesAggregate = {
-  _id: string;
-  offerId: string;
-  currency: string;
-  country: string;
-  symbol: string;
-  price: TotalPrice;
-  __v: number;
-  offer: OfferType;
-};
-
-interface TotalPrice {
-  basePayoutCurrencyCode: string;
-  basePayoutPrice: number;
-  convenienceFee: number;
-  currencyCode: string;
-  discount: number;
-  discountPrice: number;
-  originalPrice: number;
-  vat: number;
-  voucherDiscount: number;
-}
-
 app.get('/sales', async (c) => {
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
@@ -607,6 +601,24 @@ app.get('/sales', async (c) => {
       'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
     }
   );
+});
+
+app.get('/base-game/:namespace', async (c) => {
+  const { namespace } = c.req.param();
+
+  const game = await Offer.findOne({
+    namespace,
+    offerType: 'BASE_GAME',
+  });
+
+  if (!game) {
+    c.status(404);
+    return c.json({
+      message: 'Game not found',
+    });
+  }
+
+  return c.json(orderOffersObject(game));
 });
 
 interface SearchBody {
