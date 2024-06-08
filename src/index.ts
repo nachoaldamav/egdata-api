@@ -9,12 +9,12 @@ import {
 } from 'hono/cookie';
 import { createClient } from 'redis';
 import { DB } from './db';
-import { Offer } from './db/schemas/offer';
+import { Offer, OfferType } from './db/schemas/offer';
 import { Item, ItemType } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries } from './utils/countries';
-import { Price } from './db/schemas/price';
+import { Price, PriceSchema } from './db/schemas/price';
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 const REDISHOST = process.env.REDISHOST || '127.0.0.1';
@@ -504,6 +504,107 @@ app.get('/autocomplete', async (c) => {
 
 app.get('/countries', async (c) => {
   return c.json(countries);
+});
+
+type SalesAggregate = {
+  _id: string;
+  offerId: string;
+  currency: string;
+  country: string;
+  symbol: string;
+  totalPrice: TotalPrice;
+  __v: number;
+  offer: OfferType;
+};
+
+interface TotalPrice {
+  basePayoutCurrencyCode: string;
+  basePayoutPrice: number;
+  convenienceFee: number;
+  currencyCode: string;
+  discount: number;
+  discountPrice: number;
+  originalPrice: number;
+  vat: number;
+  voucherDiscount: number;
+}
+
+app.get('/sales', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const page = parseInt(c.req.query('page') || '1', 10);
+  const limit = parseInt(c.req.query('limit') || '10', 10);
+  const skip = (page - 1) * limit;
+
+  const start = new Date();
+
+  const [sales, totalCount] = await Promise.all([
+    Price.aggregate<SalesAggregate>([
+      { $match: { country: selectedCountry } },
+      {
+        $match: {
+          $expr: {
+            $ne: ['$totalPrice.originalPrice', '$totalPrice.discountPrice'],
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: 'offers',
+          localField: 'offerId',
+          foreignField: 'id',
+          as: 'offer',
+        },
+      },
+      {
+        $addFields: {
+          price: '$totalPrice',
+          offer: { $arrayElemAt: ['$offer', 0] },
+        },
+      },
+      {
+        $project: {
+          totalPrice: 0,
+          offerId: 0,
+          __v: 0,
+        },
+      },
+      { $skip: skip },
+      { $limit: limit },
+    ]).exec(),
+    db.db.collection('prices').countDocuments({
+      country: selectedCountry,
+      'totalPrice.originalPrice': { $ne: 'totalPrice.discountPrice' },
+    }),
+  ]);
+
+  const converted = sales.map((s) => {
+    return {
+      ...s.offer,
+      price: {
+        currency: s.currency,
+        symbol: s.symbol,
+        totalPrice: s.totalPrice,
+      },
+    };
+  });
+
+  const totalPages = Math.ceil(totalCount / limit);
+
+  return c.json(
+    {
+      elements: converted,
+      page,
+      limit,
+      total: totalCount,
+    },
+    200,
+    {
+      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    }
+  );
 });
 
 interface SearchBody {
