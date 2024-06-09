@@ -8,7 +8,7 @@ import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries } from './utils/countries';
-import { Price } from './db/schemas/price';
+import { Price, PriceHistory, PriceHistoryType } from './db/schemas/price';
 
 type SalesAggregate = {
   _id: string;
@@ -615,6 +615,44 @@ app.get('/base-game/:namespace', async (c) => {
   }
 
   return c.json(orderOffersObject(game));
+});
+
+app.get('/price-history/:id', async (c) => {
+  const { id } = c.req.param();
+
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const prices = await PriceHistory.find({
+    'metadata.id': id,
+    'metadata.country': selectedCountry,
+  }).sort({ lastModifiedDate: -1 });
+
+  return c.json(prices);
+});
+
+app.get('/price/:id', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const price = await Price.findOne({
+    offerId: id,
+    country: selectedCountry,
+  });
+
+  if (!price) {
+    c.status(404);
+    return c.json({
+      message: 'Price not found',
+    });
+  }
+
+  return c.json(price);
 });
 
 interface SearchBody {
