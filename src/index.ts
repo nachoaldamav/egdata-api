@@ -538,11 +538,8 @@ app.get('/sales', async (c) => {
     Price.aggregate<SalesAggregate>([
       { $match: { country: selectedCountry } },
       {
-        $match: {
-          $expr: {
-            $ne: ['$totalPrice.originalPrice', '$totalPrice.discountPrice'],
-          },
-        },
+        // totalPrice.discount is greater than 0
+        $match: { 'totalPrice.discount': { $gt: 0 } },
       },
       {
         $lookup: {
@@ -570,11 +567,9 @@ app.get('/sales', async (c) => {
     ]).exec(),
     db.db.collection('prices').countDocuments({
       country: selectedCountry,
-      'totalPrice.originalPrice': { $ne: 'totalPrice.discountPrice' },
+      'totalPrice.discount': { $gt: 0 },
     }),
   ]);
-
-  console.log(sales);
 
   const converted = sales.map((s) => {
     return {
@@ -595,6 +590,7 @@ app.get('/sales', async (c) => {
       page,
       limit,
       total: totalCount,
+      totalPages,
     },
     200,
     {
