@@ -655,6 +655,27 @@ app.get('/price/:id', async (c) => {
   return c.json(price);
 });
 
+app.get('/sellers', async (c) => {
+  const sellers = await Offer.distinct('seller');
+
+  return c.json(sellers);
+});
+
+app.get('/sellers/:id', async (c) => {
+  const { id } = c.req.param();
+
+  const isSimpleMetadata = c.req.query('full') !== 'true';
+
+  const offers = await Offer.find(
+    { 'seller.id': id },
+    isSimpleMetadata ? { id: 1, title: 1, namespace: 1, offerType: 1 } : {}
+  ).sort({
+    lastModifiedDate: -1,
+  });
+
+  return c.json(offers);
+});
+
 interface SearchBody {
   limit?: number;
   page?: number;
