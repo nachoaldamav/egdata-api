@@ -7,7 +7,7 @@ import { Offer, OfferType } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
-import { countries } from './utils/countries';
+import { countries, regions } from './utils/countries';
 import { Price, PriceHistory, PriceHistoryType } from './db/schemas/price';
 
 type SalesAggregate = {
@@ -625,9 +625,20 @@ app.get('/price-history/:id', async (c) => {
 
   const selectedCountry = country ?? cookieCountry ?? 'US';
 
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
   const prices = await PriceHistory.find({
     'metadata.id': id,
-    'metadata.country': selectedCountry,
+    'metadata.country': regions[region].countries[0],
   }).sort({ lastModifiedDate: -1 });
 
   return c.json(prices);
@@ -640,9 +651,21 @@ app.get('/price/:id', async (c) => {
 
   const selectedCountry = country ?? cookieCountry ?? 'US';
 
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
   const price = await Price.findOne({
     offerId: id,
-    country: selectedCountry,
+    country: regions[region].countries[0],
   });
 
   if (!price) {
