@@ -531,6 +531,17 @@ app.get('/sales', async (c) => {
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
   const selectedCountry = country ?? cookieCountry ?? 'US';
 
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
   const page = parseInt(c.req.query('page') || '1', 10);
   const limit = parseInt(c.req.query('limit') || '10', 10);
   const skip = (page - 1) * limit;
@@ -538,58 +549,58 @@ app.get('/sales', async (c) => {
   const start = new Date();
 
   const [sales, totalCount] = await Promise.all([
-    Price.aggregate<SalesAggregate>([
-      { $match: { country: selectedCountry } },
-      {
-        // totalPrice.discount is greater than 0
-        $match: { 'totalPrice.discount': { $gt: 0 } },
-      },
-      {
-        $lookup: {
-          from: 'offers',
-          localField: 'offerId',
-          foreignField: 'id',
-          as: 'offer',
+    db.db
+      .collection('price-history')
+      .aggregate<SalesAggregate>([
+        {
+          $match: {
+            'metadata.country': regions[region].countries[0],
+          },
         },
-      },
-      {
-        $addFields: {
-          price: '$totalPrice',
-          offer: { $arrayElemAt: ['$offer', 0] },
+        {
+          $sort: {
+            date: -1,
+          },
         },
-      },
-      {
-        $project: {
-          totalPrice: 0,
-          offerId: 0,
-          __v: 0,
+        {
+          $group: {
+            _id: '$metadata.id',
+            lastPrice: { $first: '$totalPrice' },
+            lastPaymentPrice: {
+              $first: '$totalPaymentPrice',
+            },
+          },
         },
-      },
-      { $skip: skip },
-      { $limit: limit },
-    ]).exec(),
+        {
+          $match: {
+            'lastPrice.discount': { $gt: 0 },
+          },
+        },
+        { $skip: skip },
+        { $limit: limit },
+      ])
+      .toArray(),
     db.db.collection('prices').countDocuments({
       country: selectedCountry,
       'totalPrice.discount': { $gt: 0 },
     }),
   ]);
 
-  const converted = sales.map((s) => {
-    return {
-      ...s.offer,
-      price: {
-        currency: s.currency,
-        symbol: s.symbol,
-        totalPrice: s.price,
-      },
-    };
-  });
-
   const totalPages = Math.ceil(totalCount / limit);
+
+  const offersWithPrices = await Offer.find({
+    id: { $in: sales.map((s) => s._id) },
+  });
 
   return c.json(
     {
-      elements: converted,
+      elements: offersWithPrices.map((o) => {
+        const sale = sales.find((s) => s._id === o.id);
+        return {
+          ...orderOffersObject(o),
+          price: sale,
+        };
+      }),
       page,
       limit,
       total: totalCount,
