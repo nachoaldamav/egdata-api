@@ -9,6 +9,7 @@ import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
 import { Price, PriceHistory, PriceHistoryType } from './db/schemas/price';
+import { Tags } from './db/schemas/tags';
 
 type SalesAggregate = {
   _id: string;
@@ -711,6 +712,91 @@ app.get('/sellers/:id', async (c) => {
   });
 
   return c.json(offers);
+});
+
+app.get('/promotions', async (c) => {
+  const events = await Tags.find({
+    groupName: 'event',
+  });
+
+  return c.json(events, 200, {
+    'Cache-Control': 'private, max-age=0',
+  });
+});
+
+app.get('/promotions/:id', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const start = new Date();
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const event = await Tags.findOne({
+    id,
+    groupName: 'event',
+  });
+
+  if (!event) {
+    c.status(404);
+    return c.json({
+      message: 'Event not found',
+    });
+  }
+
+  /**
+   * Tags is Array<{ id: string, name: string }>
+   */
+  const offers = await Offer.find(
+    {
+      tags: { $elemMatch: { id: id } },
+    },
+    undefined,
+    {
+      sort: {
+        lastModifiedDate: -1,
+      },
+      limit: 20,
+    }
+  );
+
+  const prices = await Price.find({
+    offerId: { $in: offers.map((o) => o.id) },
+    country: regions[region].countries[0],
+  });
+
+  return c.json(
+    offers.map((o) => {
+      const price = prices.find((p) => p.offerId === o.id);
+      return {
+        id: o.id,
+        namespace: o.namespace,
+        title: o.title,
+        seller: o.seller,
+        keyImages: o.keyImages,
+        developerDisplayName: o.developerDisplayName,
+        publisherDisplayName: o.publisherDisplayName,
+        price,
+      };
+    }),
+    200,
+    {
+      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+      'Cache-Control': 'public, max-age=3600',
+    }
+  );
 });
 
 interface SearchBody {
