@@ -10,6 +10,7 @@ import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
 import { Price, PriceHistory, PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
+import { attributesToObject } from './utils/attributes-to-object';
 
 type SalesAggregate = {
   _id: string;
@@ -162,6 +163,7 @@ app.get('/offers/:id', async (c) => {
   // Combine the offer and price data
   const result = {
     ...offer,
+    customAttributes: attributesToObject(offer.customAttributes as any),
     price: price || null,
   };
 
@@ -353,7 +355,14 @@ app.get('/items-from-offer/:id', async (c) => {
     return !duplicate;
   });
 
-  return c.json(resultItems);
+  return c.json(
+    resultItems.map((i) => {
+      return {
+        ...i,
+        customAttributes: attributesToObject(i.customAttributes as any),
+      };
+    })
+  );
 });
 
 app.get('/latest-games', async (c) => {
