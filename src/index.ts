@@ -582,7 +582,7 @@ app.get('/sales', async (c) => {
       ])
       .toArray(),
     db.db.collection('prices').countDocuments({
-      country: selectedCountry,
+      country: regions[region].countries[0],
       'totalPrice.discount': { $gt: 0 },
     }),
   ]);
