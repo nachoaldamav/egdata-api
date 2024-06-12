@@ -473,7 +473,7 @@ export const regions: Record<string, any> = {
   GB: {
     currencyCode: 'GBP',
     description: 'United Kingdom',
-    countries: ['GG', 'GI', 'IM', 'JE', 'GB'],
+    countries: ['GB', 'GG', 'GI', 'IM', 'JE'],
   },
   HK2: {
     currencyCode: 'HKD',
