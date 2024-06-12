@@ -8,7 +8,7 @@ type CustomAttributes =
     >
   | Array<{
       key: string;
-      type: string;
+      type?: string;
       value: string;
     }>;
 
@@ -21,7 +21,7 @@ export function attributesToObject(attributes: CustomAttributes): Record<
 > {
   if (Array.isArray(attributes)) {
     return attributes.reduce((acc, { key, type, value }) => {
-      acc[key] = { type, value };
+      acc[key] = { type: type || 'STRING', value };
       return acc;
     }, {} as Record<string, { type: string; value: string }>);
   }
