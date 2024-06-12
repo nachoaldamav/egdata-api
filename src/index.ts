@@ -89,6 +89,48 @@ app.get('/', (c) => {
   });
 });
 
+app.get('/sitemap', async (c) => {
+  const pageSize = 1000;
+  let siteMap = `<?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const offers = await Offer.find(
+      {},
+      { id: 1, lastModifiedDate: 1 },
+      {
+        limit: pageSize,
+        skip: page * pageSize,
+        sort: { lastModifiedDate: -1 },
+      }
+    );
+
+    if (offers.length === 0) {
+      hasMore = false;
+    } else {
+      offers.forEach((offer) => {
+        siteMap += `
+        <url>
+          <loc>https://egdata.app/offers/${offer.id}</loc>
+          <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
+        </url>`;
+      });
+
+      page++;
+    }
+  }
+
+  siteMap += '</urlset>';
+
+  return c.text(siteMap, 200, {
+    'Content-Type': 'application/xml',
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
 app.get('/offers', async (c) => {
   const start = new Date();
   const MAX_LIMIT = 50;
