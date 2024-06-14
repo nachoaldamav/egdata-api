@@ -768,6 +768,7 @@ app.get('/sellers/:id', async (c) => {
 app.get('/promotions', async (c) => {
   const events = await Tags.find({
     groupName: 'event',
+    status: 'ACTIVE',
   });
 
   return c.json(events, 200, {
