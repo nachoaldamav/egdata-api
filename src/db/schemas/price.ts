@@ -1,11 +1,7 @@
 import mongoose from 'mongoose';
 
-export const PriceSchema = new mongoose.Schema({
-  offerId: { required: true, type: String },
-  currency: { required: true, type: String },
-  country: { required: true, type: String },
-  symbol: { required: true, type: String },
-  totalPrice: {
+const totalPriceSchema = new mongoose.Schema(
+  {
     basePayoutCurrencyCode: { required: true, type: String },
     basePayoutPrice: { required: true, type: Number },
     convenienceFee: { required: true, type: Number },
@@ -16,41 +12,48 @@ export const PriceSchema = new mongoose.Schema({
     vat: { required: true, type: Number },
     voucherDiscount: { required: true, type: Number },
   },
-  totalPaymentPrice: {
+  { _id: false }
+);
+
+const totalPaymentPriceSchema = new mongoose.Schema(
+  {
     paymentCurrencyAmount: { required: true, type: Number },
     paymentCurrencyCode: { required: true, type: String },
     paymentCurrencyExchangeRate: { required: true, type: Number },
     paymentCurrencySymbol: { required: true, type: String },
   },
+  { _id: false }
+);
+
+export const Price = mongoose.model(
+  'Price',
+  new mongoose.Schema({
+    offerId: { required: true, type: String },
+    currency: { required: true, type: String },
+    country: { required: true, type: String },
+    symbol: { required: true, type: String },
+    totalPrice: { required: true, type: totalPriceSchema },
+    totalPaymentPrice: { required: true, type: totalPaymentPriceSchema },
+  })
+);
+
+const PriceHistorySchema = new mongoose.Schema({
+  date: { required: true, type: Date },
+  totalPaymentPrice: { required: true, type: totalPaymentPriceSchema },
+  totalPrice: { required: true, type: totalPriceSchema },
+  metadata: {
+    id: { required: true, type: String },
+    country: { required: true, type: String },
+    region: { required: true, type: String },
+  },
 });
 
-export const Price = mongoose.model('Price', PriceSchema);
-
-const PriceHistorySchema = new mongoose.Schema(
-  {
-    price: { required: true, type: Number },
-    date: { required: true, type: Date },
-    metadata: {
-      id: { required: true, type: String },
-      country: { required: true, type: String },
-    },
-  },
-  {
-    timeseries: {
-      timeField: 'date',
-      metaField: 'metadata',
-      granularity: 'hours',
-    },
-  }
-);
-
 export const PriceHistory = mongoose.model(
-  'price-history',
+  'PriceHistory',
   PriceHistorySchema,
-  'price-history'
+  'PriceHistory'
 );
 
-export type PriceType = mongoose.InferSchemaType<typeof PriceSchema>;
 export type PriceHistoryType = mongoose.InferSchemaType<
   typeof PriceHistorySchema
 >;

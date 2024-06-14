@@ -187,10 +187,18 @@ app.get('/offers/:id', async (c) => {
 
   // Define the queries
   const offerQuery = Offer.findOne({ id }).lean();
-  const pricesQuery = Price.findOne({
-    offerId: id,
-    country: region ? regions[region].countries[0] : 'US',
-  }).lean();
+  const pricesQuery = PriceHistory.findOne(
+    {
+      'metadata.id': id,
+      'metadata.region': region,
+    },
+    undefined,
+    {
+      sort: {
+        date: -1,
+      },
+    }
+  ).lean();
 
   // Execute both queries in parallel
   const [offer, price] = await Promise.all([offerQuery, pricesQuery]);
@@ -456,16 +464,23 @@ app.get('/latest-games', async (c) => {
 
 app.get('/featured', async (c) => {
   const GET_FEATURED_GAMES_START = new Date();
-  const cacheKey = 'featured-games:cache';
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  const cacheKey = `featured:${region}`;
 
   const cached = await client.get(cacheKey);
 
   let featuredGames: { id: string; namespace: string }[] = [];
-  let cacheHit = false;
 
   if (cached) {
     featuredGames = JSON.parse(cached);
-    cacheHit = true;
   } else {
     featuredGames = await getFeaturedGames();
     await client.set(cacheKey, JSON.stringify(featuredGames), {
@@ -500,7 +515,20 @@ app.get('/featured', async (c) => {
     });
   }
 
-  return c.json(orderOffersObject(game), 200, {
+  const price = await PriceHistory.findOne(
+    {
+      'metadata.id': game.id,
+      'metadata.region': 'US',
+    },
+    undefined,
+    {
+      sort: {
+        date: -1,
+      },
+    }
+  );
+
+  return c.json({ ...orderOffersObject(game), price }, 200, {
     'Cache-Control': 'public, max-age=3600',
     'Server-Timing': `db;dur=${
       new Date().getTime() - start.getTime()
@@ -602,11 +630,11 @@ app.get('/sales', async (c) => {
 
   const [sales, totalCount] = await Promise.all([
     db.db
-      .collection('price-history')
+      .collection('PriceHistory')
       .aggregate<SalesAggregate>([
         {
           $match: {
-            'metadata.country': regions[region].countries[0],
+            'metadata.region': region,
           },
         },
         {
@@ -617,6 +645,7 @@ app.get('/sales', async (c) => {
         {
           $group: {
             _id: '$metadata.id',
+            date: { $first: '$date' },
             lastPrice: { $first: '$totalPrice' },
             lastPaymentPrice: {
               $first: '$totalPaymentPrice',
@@ -632,7 +661,7 @@ app.get('/sales', async (c) => {
         { $limit: limit },
       ])
       .toArray(),
-    db.db.collection('prices').countDocuments({
+    db.db.collection('PriceHistory').countDocuments({
       country: regions[region].countries[0],
       'totalPrice.discount': { $gt: 0 },
     }),
@@ -704,8 +733,8 @@ app.get('/price-history/:id', async (c) => {
 
   const prices = await PriceHistory.find({
     'metadata.id': id,
-    'metadata.country': regions[region].countries[0],
-  }).sort({ lastModifiedDate: -1 });
+    'metadata.region': region,
+  }).sort({ date: -1 });
 
   return c.json(prices);
 });
@@ -729,10 +758,18 @@ app.get('/price/:id', async (c) => {
     });
   }
 
-  const price = await Price.findOne({
-    offerId: id,
-    country: regions[region].countries[0],
-  });
+  const price = await PriceHistory.findOne(
+    {
+      'metadata.id': id,
+      'metadata.region': region,
+    },
+    undefined,
+    {
+      sort: {
+        date: -1,
+      },
+    }
+  );
 
   if (!price) {
     c.status(404);
@@ -824,14 +861,22 @@ app.get('/promotions/:id', async (c) => {
     }
   );
 
-  const prices = await Price.find({
-    offerId: { $in: offers.map((o) => o.id) },
-    country: regions[region].countries[0],
-  });
+  const prices = await PriceHistory.find(
+    {
+      'metadata.id': { $in: offers.map((o) => o.id) },
+      'metadata.region': region,
+    },
+    undefined,
+    {
+      sort: {
+        date: -1,
+      },
+    }
+  );
 
   return c.json(
     offers.map((o) => {
-      const price = prices.find((p) => p.offerId === o.id);
+      const price = prices.find((p) => p.metadata?.id === o.id);
       return {
         id: o.id,
         namespace: o.namespace,
