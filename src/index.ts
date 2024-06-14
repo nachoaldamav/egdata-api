@@ -941,7 +941,7 @@ app.get('/region', async (c) => {
   }
 
   return c.json({
-    region: regions[region],
+    region: { code: region, ...regions[region] },
   });
 });
 
