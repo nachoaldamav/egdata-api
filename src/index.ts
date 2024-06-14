@@ -923,6 +923,28 @@ app.get('/promotions/:id', async (c) => {
   );
 });
 
+app.get('/region', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  return c.json({
+    region: regions[region],
+  });
+});
+
 interface SearchBody {
   limit?: number;
   page?: number;
