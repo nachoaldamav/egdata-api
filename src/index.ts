@@ -712,7 +712,7 @@ app.get('/base-game/:namespace', async (c) => {
   return c.json(orderOffersObject(game));
 });
 
-app.get('/price-history/:id', async (c) => {
+app.get('/offers/:id/price-history', async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `price-history:${id}`;
