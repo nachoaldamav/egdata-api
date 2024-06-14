@@ -260,7 +260,7 @@ export const regions: Record<string, any> = {
   },
   AFRICA: {
     currencyCode: 'USD',
-    description: 'Africa pricing region',
+    description: 'Africa',
     countries: [
       'LR',
       'TZ',
@@ -319,7 +319,7 @@ export const regions: Record<string, any> = {
   },
   ANZ: {
     currencyCode: 'USD',
-    description: 'Oceania pricing region',
+    description: 'Oceania',
     countries: [
       'CC',
       'TV',
@@ -378,7 +378,7 @@ export const regions: Record<string, any> = {
   },
   CIS: {
     currencyCode: 'USD',
-    description: 'CIS pricing region',
+    description: 'CIS',
     countries: ['UZ', 'TJ', 'MD', 'TM', 'AZ', 'KG', 'AM', 'GE'],
   },
   CL2: {
@@ -413,7 +413,7 @@ export const regions: Record<string, any> = {
   },
   EAST: {
     currencyCode: 'USD',
-    description: 'Middle East/Central Asia pricing region',
+    description: 'Middle East/Central Asia',
     countries: [
       'MN',
       'EG',
@@ -433,7 +433,7 @@ export const regions: Record<string, any> = {
   },
   EURO: {
     currencyCode: 'EUR',
-    description: 'Europe pricing region',
+    description: 'Europe',
     countries: [
       'DE',
       'BE',
@@ -517,7 +517,7 @@ export const regions: Record<string, any> = {
   },
   LATAM: {
     currencyCode: 'USD',
-    description: 'Latin America/Caribbean pricing region',
+    description: 'Latin America/Caribbean',
     countries: [
       'TT',
       'BB',
@@ -557,7 +557,7 @@ export const regions: Record<string, any> = {
   },
   MIDEAST: {
     currencyCode: 'USD',
-    description: 'Bahrain/Kuwait pricing region',
+    description: 'Bahrain/Kuwait',
     countries: ['BH', 'KW'],
   },
   MX2: {
@@ -607,7 +607,7 @@ export const regions: Record<string, any> = {
   },
   ROW: {
     currencyCode: 'USD',
-    description: 'Rest of World pricing region',
+    description: 'Rest of World',
     countries: [
       'RS',
       'BL',
@@ -654,7 +654,7 @@ export const regions: Record<string, any> = {
   },
   SEA: {
     currencyCode: 'USD',
-    description: 'Southeast Asia pricing region',
+    description: 'Southeast Asia',
     countries: ['MM', 'MO', 'NP', 'BD', 'BT', 'LA', 'TL', 'BN', 'KH'],
   },
   SG2: {
