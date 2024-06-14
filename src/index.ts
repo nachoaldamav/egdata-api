@@ -8,7 +8,7 @@ import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
-import { Price, PriceHistory, PriceHistoryType } from './db/schemas/price';
+import { PriceHistory, PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 
@@ -714,6 +714,22 @@ app.get('/base-game/:namespace', async (c) => {
 
 app.get('/offers/:id/price-history', async (c) => {
   const { id } = c.req.param();
+
+  const country = c.req.query('country');
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(country)
+  );
+
+  if (region) {
+    // Show just the prices for the selected region
+    const prices = await PriceHistory.find({
+      'metadata.id': id,
+      'metadata.region': region,
+    }).sort({ date: -1 });
+
+    return c.json(prices);
+  }
 
   const cacheKey = `price-history:${id}`;
   const cached = await client.get(cacheKey);
