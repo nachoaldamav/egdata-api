@@ -715,28 +715,39 @@ app.get('/base-game/:namespace', async (c) => {
 app.get('/price-history/:id', async (c) => {
   const { id } = c.req.param();
 
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const cacheKey = `price-history:${id}`;
+  const cached = await client.get(cacheKey);
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
-
-  if (!region) {
-    c.status(404);
-    return c.json({
-      message: 'Country not found',
-    });
+  if (cached) {
+    return c.json(JSON.parse(cached));
   }
 
   const prices = await PriceHistory.find({
     'metadata.id': id,
-    'metadata.region': region,
+    // get the prices for all regions
+    'metadata.region': { $in: Object.keys(regions) },
   }).sort({ date: -1 });
 
-  return c.json(prices);
+  // Structure the data, Record<string, PriceHistoryType[]>
+  const pricesByRegion = prices.reduce((acc, price) => {
+    if (!price.metadata?.region) return acc;
+
+    if (!acc[price.metadata.region]) {
+      acc[price.metadata.region] = [];
+    }
+
+    acc[price.metadata.region].push(price);
+
+    return acc;
+  }, {} as Record<string, PriceHistoryType[]>);
+
+  await client.set(cacheKey, JSON.stringify(pricesByRegion), {
+    EX: 86400,
+  });
+
+  return c.json(pricesByRegion, 200, {
+    'Cache-Control': 'public, max-age=86400',
+  });
 });
 
 app.get('/price/:id', async (c) => {
