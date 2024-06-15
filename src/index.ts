@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { inspectRoutes } from 'hono/dev'
 import { getCookie } from 'hono/cookie';
 import { createClient } from 'redis';
 import { DB } from './db';
@@ -11,6 +12,9 @@ import { countries, regions } from './utils/countries';
 import { PriceHistory, type PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
+import { Namespace } from './db/schemas/namespace';
+import { AchievementSet } from './db/schemas/achievements';
+import mongoose from 'mongoose';
 
 type SalesAggregate = {
   _id: string;
@@ -76,58 +80,72 @@ app.get('/', (c) => {
   return c.json({
     app: 'egdata',
     version: '0.0.1-alpha',
-    endpoints: [
-      '/offers',
-      '/offers/:id',
-      '/items',
-      '/items/:id',
-      '/latest-games',
-      '/featured',
-      '/autocomplete',
-      '/countries',
-    ],
+    endpoints: inspectRoutes(app)
+      .filter(x => !x.isMiddleware && x.name === '[handler]' && x.path !== '/')
+      .sort((a, b) => {
+        if (a.path !== b.path) {
+          return a.path.localeCompare(b.path)
+        }
+
+        return a.method.localeCompare(b.method);
+      })
+      .map(x => `${x.method} ${x.path}`),
   });
 });
 
-app.get('/sitemap', async (c) => {
-  const pageSize = 1000;
-  let siteMap = `<?xml version="1.0" encoding="UTF-8"?>
+app.get('/sitemap.xml', async (c) => {
+  const cacheKey = 'sitemap';
+  const cacheTimeInSec = 3600 * 24; // 1 day
+  const cacheStaleTimeInSec = cacheTimeInSec * 7; // 7 days
+  const cached = await client.get(cacheKey);
+  let siteMap = '';
+
+  if (cached) {
+    siteMap = cached;
+  } else {
+    siteMap = `<?xml version="1.0" encoding="UTF-8"?>
   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
-  let page = 0;
-  let hasMore = true;
+    const pageSize = 1000;
+    let page = 0;
+    let hasMore = true;
 
-  while (hasMore) {
-    const offers = await Offer.find(
-      {},
-      { id: 1, lastModifiedDate: 1 },
-      {
-        limit: pageSize,
-        skip: page * pageSize,
-        sort: { lastModifiedDate: -1 },
-      }
-    );
+    while (hasMore) {
+      const offers = await Offer.find(
+        {},
+        { id: 1, lastModifiedDate: 1 },
+        {
+          limit: pageSize,
+          skip: page * pageSize,
+          sort: { lastModifiedDate: -1 },
+        }
+      );
 
-    if (offers.length === 0) {
-      hasMore = false;
-    } else {
-      offers.forEach((offer) => {
-        siteMap += `
+      hasMore = offers.length === pageSize;
+
+      if (0 < offers.length) {
+        offers.forEach((offer) => {
+          siteMap += `
         <url>
           <loc>https://egdata.app/offers/${offer.id}</loc>
           <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
         </url>`;
-      });
+        });
 
-      page++;
+        page++;
+      }
     }
-  }
 
-  siteMap += '</urlset>';
+    siteMap += '</urlset>';
+
+    await client.set(cacheKey, siteMap, {
+      EX: cacheTimeInSec,
+    });
+  }
 
   return c.text(siteMap, 200, {
     'Content-Type': 'application/xml',
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
   });
 });
 
@@ -232,8 +250,8 @@ app.post('/offers', async (c) => {
   const query = body as SearchBody;
   let sort:
     | {
-        [key: string]: 1 | -1 | { $meta: 'textScore' };
-      }
+      [key: string]: 1 | -1 | { $meta: 'textScore' };
+    }
     | undefined = undefined;
 
   let search: any = {};
@@ -530,11 +548,9 @@ app.get('/featured', async (c) => {
 
   return c.json({ ...orderOffersObject(game), price }, 200, {
     'Cache-Control': 'public, max-age=3600',
-    'Server-Timing': `db;dur=${
-      new Date().getTime() - start.getTime()
-    }, egsAPI;dur=${
-      GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
-    }`,
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()
+      }, egsAPI;dur=${GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
+      }`,
   });
 });
 
@@ -960,6 +976,52 @@ app.get('/region', async (c) => {
   });
 });
 
+app.get('/sandboxes/:sandboxId/achievements', async (ctx) => {
+  const start = Date.now();
+  const { sandboxId } = ctx.req.param();
+
+  const cacheKey = `sandbox:${sandboxId}:achivement-sets`;
+  const cached = await client.get(cacheKey);
+
+  let achievementSets: mongoose.InferRawDocType<typeof AchievementSet>[] = [];
+
+  if (cached) {
+    achievementSets = JSON.parse(cached);
+  } else {
+    const sandbox = await Namespace.findOne({
+      namespace: sandboxId,
+    });
+
+    if (!sandbox) {
+      ctx.status(404);
+
+      return ctx.json({
+        message: 'Sandbox not found',
+      });
+    }
+
+    achievementSets = await AchievementSet.find({
+      sandboxId
+    }, {
+      _id: false,
+      __v: false,
+    });
+
+    await client.set(cacheKey, JSON.stringify(achievementSets), {
+      EX: 1800, // 30min
+    });
+  }
+
+  return ctx.json({
+    sandboxId,
+    achievementSets,
+  },
+    200,
+    {
+      'Server-Timing': `db;dur=${Date.now() - start}`,
+    });
+});
+
 interface SearchBody {
   limit?: number;
   page?: number;
@@ -967,12 +1029,12 @@ interface SearchBody {
   namespace?: string;
   offerType?: string;
   sortBy?:
-    | 'lastModifiedDate'
-    | 'creationDate'
-    | 'effectiveDate'
-    | 'releaseDate'
-    | 'pcReleaseDate'
-    | 'currentPrice';
+  | 'lastModifiedDate'
+  | 'creationDate'
+  | 'effectiveDate'
+  | 'releaseDate'
+  | 'pcReleaseDate'
+  | 'currentPrice';
   sortOrder?: 'asc' | 'desc';
   categories?: string[];
 }
