@@ -3,12 +3,12 @@ import { cors } from 'hono/cors';
 import { getCookie } from 'hono/cookie';
 import { createClient } from 'redis';
 import { DB } from './db';
-import { Offer, OfferType } from './db/schemas/offer';
+import { Offer, type OfferType } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
-import { PriceHistory, PriceHistoryType } from './db/schemas/price';
+import { PriceHistory, type PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 
@@ -722,13 +722,28 @@ app.get('/offers/:id/price-history', async (c) => {
   );
 
   if (region) {
+    const cacheKey = `price-history:${id}:${region}`;
+    const cached = await client.get(cacheKey);
+
+    if (cached) {
+      return c.json(JSON.parse(cached), 200, {
+        'Cache-Control': 'public, max-age=3600',
+      });
+    }
+
     // Show just the prices for the selected region
     const prices = await PriceHistory.find({
       'metadata.id': id,
       'metadata.region': region,
     }).sort({ date: -1 });
 
-    return c.json(prices);
+    await client.set(cacheKey, JSON.stringify(prices), {
+      EX: 3600,
+    });
+
+    return c.json(prices, 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
   }
 
   const cacheKey = `price-history:${id}`;
