@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { inspectRoutes } from 'hono/dev'
+import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
 import { createClient } from 'redis';
 import { DB } from './db';
@@ -81,15 +81,17 @@ app.get('/', (c) => {
     app: 'egdata',
     version: '0.0.1-alpha',
     endpoints: inspectRoutes(app)
-      .filter(x => !x.isMiddleware && x.name === '[handler]' && x.path !== '/')
+      .filter(
+        (x) => !x.isMiddleware && x.name === '[handler]' && x.path !== '/'
+      )
       .sort((a, b) => {
         if (a.path !== b.path) {
-          return a.path.localeCompare(b.path)
+          return a.path.localeCompare(b.path);
         }
 
         return a.method.localeCompare(b.method);
       })
-      .map(x => `${x.method} ${x.path}`),
+      .map((x) => `${x.method} ${x.path}`),
   });
 });
 
@@ -158,6 +160,16 @@ app.get('/offers', async (c) => {
   );
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
 
+  const cacheKey = `offers:${page}:${limit}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
   const offers = await Offer.find({}, undefined, {
     limit,
     skip: (page - 1) * limit,
@@ -167,6 +179,17 @@ app.get('/offers', async (c) => {
   })
     .hint({ lastModifiedDate: 1 })
     .allowDiskUse(true);
+
+  const result = {
+    elements: offers.map((o) => orderOffersObject(o)),
+    page,
+    limit,
+    total: await Offer.countDocuments(),
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
 
   return c.json(
     {
@@ -250,8 +273,8 @@ app.post('/offers', async (c) => {
   const query = body as SearchBody;
   let sort:
     | {
-      [key: string]: 1 | -1 | { $meta: 'textScore' };
-    }
+        [key: string]: 1 | -1 | { $meta: 'textScore' };
+      }
     | undefined = undefined;
 
   let search: any = {};
@@ -548,9 +571,11 @@ app.get('/featured', async (c) => {
 
   return c.json({ ...orderOffersObject(game), price }, 200, {
     'Cache-Control': 'public, max-age=3600',
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()
-      }, egsAPI;dur=${GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
-      }`,
+    'Server-Timing': `db;dur=${
+      new Date().getTime() - start.getTime()
+    }, egsAPI;dur=${
+      GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
+    }`,
   });
 });
 
@@ -891,6 +916,16 @@ app.get('/promotions/:id', async (c) => {
     });
   }
 
+  const cacheKey = `promotion:${id}:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
   const event = await Tags.findOne({
     id,
     groupName: 'event',
@@ -932,26 +967,28 @@ app.get('/promotions/:id', async (c) => {
     }
   );
 
-  return c.json(
-    offers.map((o) => {
-      const price = prices.find((p) => p.metadata?.id === o.id);
-      return {
-        id: o.id,
-        namespace: o.namespace,
-        title: o.title,
-        seller: o.seller,
-        keyImages: o.keyImages,
-        developerDisplayName: o.developerDisplayName,
-        publisherDisplayName: o.publisherDisplayName,
-        price,
-      };
-    }),
-    200,
-    {
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-      'Cache-Control': 'public, max-age=3600',
-    }
-  );
+  const result = offers.map((o) => {
+    const price = prices.find((p) => p.metadata?.id === o.id);
+    return {
+      id: o.id,
+      namespace: o.namespace,
+      title: o.title,
+      seller: o.seller,
+      keyImages: o.keyImages,
+      developerDisplayName: o.developerDisplayName,
+      publisherDisplayName: o.publisherDisplayName,
+      price,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 86400,
+  });
+
+  return c.json(result, 200, {
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    'Cache-Control': 'public, max-age=3600',
+  });
 });
 
 app.get('/region', async (c) => {
@@ -1000,26 +1037,31 @@ app.get('/sandboxes/:sandboxId/achievements', async (ctx) => {
       });
     }
 
-    achievementSets = await AchievementSet.find({
-      sandboxId
-    }, {
-      _id: false,
-      __v: false,
-    });
+    achievementSets = await AchievementSet.find(
+      {
+        sandboxId,
+      },
+      {
+        _id: false,
+        __v: false,
+      }
+    );
 
     await client.set(cacheKey, JSON.stringify(achievementSets), {
       EX: 1800, // 30min
     });
   }
 
-  return ctx.json({
-    sandboxId,
-    achievementSets,
-  },
+  return ctx.json(
+    {
+      sandboxId,
+      achievementSets,
+    },
     200,
     {
       'Server-Timing': `db;dur=${Date.now() - start}`,
-    });
+    }
+  );
 });
 
 interface SearchBody {
@@ -1029,12 +1071,12 @@ interface SearchBody {
   namespace?: string;
   offerType?: string;
   sortBy?:
-  | 'lastModifiedDate'
-  | 'creationDate'
-  | 'effectiveDate'
-  | 'releaseDate'
-  | 'pcReleaseDate'
-  | 'currentPrice';
+    | 'lastModifiedDate'
+    | 'creationDate'
+    | 'effectiveDate'
+    | 'releaseDate'
+    | 'pcReleaseDate'
+    | 'currentPrice';
   sortOrder?: 'asc' | 'desc';
   categories?: string[];
 }
