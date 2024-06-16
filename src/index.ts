@@ -703,7 +703,7 @@ app.get('/sales', async (c) => {
       ])
       .toArray(),
     db.db.collection('PriceHistory').countDocuments({
-      country: regions[region].countries[0],
+      'metadata.region': region,
       'totalPrice.discount': { $gt: 0 },
     }),
   ]);
