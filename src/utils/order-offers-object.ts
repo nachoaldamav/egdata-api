@@ -1,4 +1,5 @@
 import { OfferType } from '../db/schemas/offer';
+import { attributesToObject } from './attributes-to-object';
 
 export const orderOffersObject = (offer: OfferType) => {
   const {
@@ -52,7 +53,7 @@ export const orderOffersObject = (offer: OfferType) => {
     url,
     tags,
     items,
-    customAttributes,
+    customAttributes: attributesToObject(customAttributes as any),
     categories,
     developerDisplayName,
     publisherDisplayName,
