@@ -219,6 +219,15 @@ app.get('/offers/:id', async (c) => {
     });
   }
 
+  const cacheKey = `offer:${id}`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
   const start = new Date();
 
   const selectedCountry = country ?? cookieCountry ?? 'US';
@@ -257,6 +266,11 @@ app.get('/offers/:id', async (c) => {
     customAttributes: attributesToObject(offer.customAttributes as any),
     price: price || null,
   };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    // 1 day
+    EX: 86400,
+  });
 
   return c.json(result, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -373,6 +387,16 @@ app.get('/items/:id', async (c) => {
 app.get('/items-from-offer/:id', async (c) => {
   const { id } = c.req.param();
 
+  const cacheKey = `items-from-offer:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
   const result = await Offer.aggregate([
     {
       $match: { id: id },
@@ -446,14 +470,21 @@ app.get('/items-from-offer/:id', async (c) => {
     return !duplicate;
   });
 
-  return c.json(
-    resultItems.map((i) => {
-      return {
-        ...i,
-        customAttributes: attributesToObject(i.customAttributes as any),
-      };
-    })
-  );
+  const res = resultItems.map((i) => {
+    return {
+      ...i,
+      customAttributes: attributesToObject(i.customAttributes as any),
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(res), {
+    // 1 week
+    EX: 604800,
+  });
+
+  return c.json(res, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
 });
 
 app.get('/latest-games', async (c) => {
