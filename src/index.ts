@@ -15,6 +15,7 @@ import { attributesToObject } from './utils/attributes-to-object';
 import { Namespace } from './db/schemas/namespace';
 import { AchievementSet } from './db/schemas/achievements';
 import mongoose from 'mongoose';
+import { getGameFeatures } from './utils/game-features';
 
 type SalesAggregate = {
   _id: string;
@@ -820,6 +821,46 @@ app.get('/offers/:id/price-history', async (c) => {
   return c.json(pricesByRegion, 200, {
     'Cache-Control': 'public, max-age=86400',
   });
+});
+
+app.get('/offers/:id/features', async (c) => {
+  const { id } = c.req.param();
+
+  // We need to get the offers and items for that offer
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const items = await Item.find({
+    linkedOffers: { $in: [id] },
+  });
+
+  const customAttributes = items.reduce((acc, item) => {
+    return {
+      ...acc,
+      ...attributesToObject(item.customAttributes as any),
+    };
+  }, attributesToObject([]));
+
+  console.log(customAttributes);
+
+  // Get the game features
+  const gameFeatures = getGameFeatures({
+    attributes: customAttributes,
+    tags: offer.tags.reduce((acc, tag) => {
+      return {
+        ...acc,
+        [tag.id]: tag,
+      };
+    }, {}),
+  });
+
+  return c.json(gameFeatures);
 });
 
 app.get('/price/:id', async (c) => {
