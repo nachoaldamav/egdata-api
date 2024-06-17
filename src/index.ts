@@ -53,6 +53,8 @@ app.use(
         return origin;
       }
 
+      console.log('Origin not allowed:', origin);
+
       return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
     },
     allowHeaders: ['Content-Type', 'Authorization'],
