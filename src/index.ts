@@ -871,8 +871,6 @@ app.get('/offers/:id/features', async (c) => {
     };
   }, attributesToObject([]));
 
-  console.log(customAttributes);
-
   // Get the game features
   const gameFeatures = getGameFeatures({
     attributes: customAttributes,

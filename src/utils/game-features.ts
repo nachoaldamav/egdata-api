@@ -1,4 +1,6 @@
-const known3rdPartyClients = {
+const known3rdPartyClients: {
+  [key: string]: 'ea' | 'ubisoft' | 'eos' | 'epic';
+} = {
   ThirdPartyManagedApp: 'ea',
   MonitorPresense: 'eos',
   PresenceId: 'eos',
@@ -122,7 +124,7 @@ const knownEpicFeatures = [
 ];
 
 type GameFeatures = {
-  launcher: 'epic' | 'ea' | 'ubisoft';
+  launcher: 'epic' | 'ea' | 'ubisoft' | 'eos';
   features: string[];
   epicFeatures: string[];
 };
@@ -131,7 +133,7 @@ export function getGameFeatures({
   attributes,
   tags,
 }: {
-  attributes: Record<string, { type: 'STRING'; value: string }>;
+  attributes: Record<string, { type: string; value: string }>;
   tags: Record<
     string,
     {
@@ -151,8 +153,8 @@ export function getGameFeatures({
   for (const key in known3rdPartyClients) {
     // The value of the key is useless, we only need to check if the key exists
     if (attributes[key]) {
-      if (key === 'eos') {
-        gameFeatures.features.push('Epic Online Services');
+      if (known3rdPartyClients[key] === 'eos') {
+        gameFeatures.epicFeatures.push('Epic Online Services');
         continue;
       }
       gameFeatures.launcher = known3rdPartyClients[key];

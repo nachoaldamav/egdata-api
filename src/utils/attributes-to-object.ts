@@ -13,25 +13,23 @@ type CustomAttributes =
     }>
   | Map<string, { key: string; type: string; value: string }>;
 
-export function attributesToObject(attributes: CustomAttributes): Record<
-  string,
-  {
-    type: string;
-    value: string;
-  }
-> {
-  if (attributes instanceof Map) {
-    const result = Array.from(attributes.values()).reduce(
-      (acc, { key, type, value }) => {
-        console.log(`key: ${key}, type: ${type}, value: ${value}`);
-        acc[key] = { type, value };
-        return acc;
-      },
-      {} as Record<string, { type: string; value: string }>
-    );
+type Result = Record<string, { type: string; value: string }>;
 
-    console.log(result);
-    return result;
+export function attributesToObject(attributes: CustomAttributes): Result {
+  if (attributes instanceof Map) {
+    const res: Result = {};
+    const text = JSON.stringify(Array.from(attributes.values()));
+
+    const parsed = JSON.parse(text);
+    for (const { key, type, value } of parsed) {
+      if (!key) {
+        console.error('Missing key in map item:', { key, type, value });
+        continue;
+      }
+      res[key] = { type: type, value };
+    }
+
+    return res;
   }
 
   if (Array.isArray(attributes)) {
