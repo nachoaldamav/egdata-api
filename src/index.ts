@@ -177,9 +177,7 @@ app.get('/offers', async (c) => {
     sort: {
       lastModifiedDate: -1,
     },
-  })
-    .hint({ lastModifiedDate: 1 })
-    .allowDiskUse(true);
+  }).hint({ lastModifiedDate: 1 });
 
   const result = {
     elements: offers.map((o) => orderOffersObject(o)),
@@ -192,19 +190,10 @@ app.get('/offers', async (c) => {
     EX: 3600,
   });
 
-  return c.json(
-    {
-      elements: offers.map((o) => orderOffersObject(o)),
-      page,
-      limit,
-      total: await Offer.countDocuments(),
-    },
-    200,
-    {
-      'Cache-Control': 'public, max-age=60',
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    }
-  );
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
 });
 
 app.get('/offers/:id', async (c) => {
