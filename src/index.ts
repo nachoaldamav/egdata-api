@@ -209,9 +209,6 @@ app.get('/offers', async (c) => {
 
 app.get('/offers/:id', async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
-
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
   if (!id) {
     c.status(400);
@@ -219,6 +216,8 @@ app.get('/offers/:id', async (c) => {
       message: 'Missing id parameter',
     });
   }
+
+  const start = new Date();
 
   const cacheKey = `offer:${id}`;
   const cached = await client.get(cacheKey);
@@ -229,30 +228,11 @@ app.get('/offers/:id', async (c) => {
     });
   }
 
-  const start = new Date();
-
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
-
   // Define the queries
   const offerQuery = Offer.findOne({ id }).lean();
-  const pricesQuery = PriceHistory.findOne(
-    {
-      'metadata.id': id,
-      'metadata.region': region,
-    },
-    undefined,
-    {
-      sort: {
-        date: -1,
-      },
-    }
-  ).lean();
 
   // Execute both queries in parallel
-  const [offer, price] = await Promise.all([offerQuery, pricesQuery]);
+  const [offer] = await Promise.all([offerQuery]);
 
   if (!offer) {
     c.status(404);
@@ -265,7 +245,6 @@ app.get('/offers/:id', async (c) => {
   const result = {
     ...offer,
     customAttributes: attributesToObject(offer.customAttributes as any),
-    price: price || null,
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
