@@ -393,10 +393,13 @@ app.get('/items-from-offer/:id', async (c) => {
   const cached = await client.get(cacheKey);
 
   if (cached) {
+    console.log(`[CACHE] ${cacheKey} found`);
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=3600',
     });
   }
+
+  console.log(`[CACHE] ${cacheKey} not found`);
 
   const result = await Offer.aggregate([
     {
@@ -571,6 +574,15 @@ app.get('/featured', async (c) => {
     const randomGame =
       featuredGames[Math.floor(Math.random() * featuredGames.length)];
 
+    // Try to find the cache for the offer, as it contains the price
+    const cacheKeyOffer = `offer:${randomGame.id}`;
+    const cachedOffer = await client.get(cacheKeyOffer);
+
+    if (cachedOffer) {
+      game = JSON.parse(cachedOffer);
+      break;
+    }
+
     game = await Offer.findOne({
       id: randomGame.id,
       namespace: randomGame.namespace,
@@ -591,7 +603,7 @@ app.get('/featured', async (c) => {
   const price = await PriceHistory.findOne(
     {
       'metadata.id': game.id,
-      'metadata.region': 'US',
+      'metadata.region': region,
     },
     undefined,
     {
@@ -699,6 +711,16 @@ app.get('/sales', async (c) => {
   const limit = parseInt(c.req.query('limit') || '10', 10);
   const skip = (page - 1) * limit;
 
+  const cacheKey = `sales:${region}:${page}:${limit}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
   const start = new Date();
 
   const [sales, totalCount] = await Promise.all([
@@ -746,25 +768,28 @@ app.get('/sales', async (c) => {
     id: { $in: sales.map((s) => s._id) },
   });
 
-  return c.json(
-    {
-      elements: offersWithPrices.map((o) => {
-        const sale = sales.find((s) => s._id === o.id);
-        return {
-          ...orderOffersObject(o),
-          price: sale,
-        };
-      }),
-      page,
-      limit,
-      total: totalCount,
-      totalPages,
-    },
-    200,
-    {
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    }
-  );
+  const res = {
+    elements: offersWithPrices.map((o) => {
+      const sale = sales.find((s) => s._id === o.id);
+      return {
+        ...orderOffersObject(o),
+        price: sale,
+      };
+    }),
+    page,
+    limit,
+    total: totalCount,
+    totalPages,
+  };
+
+  await client.set(cacheKey, JSON.stringify(res), {
+    EX: 86400,
+  });
+
+  return c.json(res, 200, {
+    'Cache-Control': 'public, max-age=3600',
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
 });
 
 app.get('/base-game/:namespace', async (c) => {
