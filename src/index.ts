@@ -17,6 +17,7 @@ import { AchievementSet } from './db/schemas/achievements';
 import mongoose from 'mongoose';
 import { getGameFeatures } from './utils/game-features';
 import { $ } from 'bun';
+import { Asset } from './db/schemas/assets';
 
 type SalesAggregate = {
   _id: string;
@@ -906,6 +907,41 @@ app.get('/offers/:id/features', async (c) => {
   });
 
   return c.json(gameFeatures);
+});
+
+app.get('/offers/:id/assets', async (c) => {
+  const { id } = c.req.param();
+
+  const offer = await Offer.findOne({ id }).select({ namespace: 1 });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const { namespace } = offer;
+
+  const cacheKey = `assets:${namespace}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const assets = await Asset.find({ namespace });
+
+  await client.set(cacheKey, JSON.stringify(assets), {
+    EX: 3600,
+  });
+
+  return c.json(assets, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
 });
 
 app.get('/offers/:id/price', async (c) => {
