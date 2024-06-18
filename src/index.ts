@@ -1128,6 +1128,60 @@ app.get('/promotions/:id', async (c) => {
   });
 });
 
+app.get('/promotions/:id/cover', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `promotion-cover:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const offers = await Offer.find(
+    {
+      tags: { $elemMatch: { id } },
+    },
+    {
+      namespace: 1,
+      id: 1,
+    }
+  );
+
+  const namespaces = offers.map((o) => o.namespace);
+
+  const baseGame = await Offer.findOne(
+    {
+      namespace: { $in: namespaces },
+      offerType: 'BASE_GAME',
+    },
+    {
+      id: 1,
+      namespace: 1,
+      title: 1,
+      keyImages: 1,
+    }
+  );
+
+  if (!baseGame) {
+    c.status(404);
+    return c.json({
+      message: 'Base game not found',
+    });
+  }
+
+  await client.set(cacheKey, JSON.stringify(baseGame), {
+    EX: 86400,
+  });
+
+  return c.json(baseGame, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
 app.get('/region', async (c) => {
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
