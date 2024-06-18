@@ -701,15 +701,15 @@ app.get('/sales', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 23);
   const skip = (page - 1) * limit;
 
-  // const cacheKey = `sales:${region}:${page}:${limit}`;
+  const cacheKey = `sales:${region}:${page}:${limit}:v0.1`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=3600',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
 
   const start = new Date();
 
@@ -758,7 +758,7 @@ app.get('/sales', async (c) => {
       return {
         ...orderOffersObject(s.offer[0]),
         price: {
-          total: s.totalPrice,
+          totalPrice: s.totalPrice,
           totalPaymentPrice: s.totalPrice,
           metadata: s.metadata,
         },
@@ -769,6 +769,10 @@ app.get('/sales', async (c) => {
     total: totalCount,
     totalPages,
   };
+
+  await client.set(cacheKey, JSON.stringify(res), {
+    EX: 604800,
+  });
 
   return c.json(res, 200, {
     'Cache-Control': 'public, max-age=3600',
