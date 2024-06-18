@@ -885,7 +885,7 @@ app.get('/offers/:id/features', async (c) => {
   return c.json(gameFeatures);
 });
 
-app.get('/price/:id', async (c) => {
+app.get('/offers/:id/price', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
@@ -901,6 +901,15 @@ app.get('/price/:id', async (c) => {
     c.status(404);
     return c.json({
       message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `price:${id}:${region}`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
     });
   }
 
@@ -924,7 +933,13 @@ app.get('/price/:id', async (c) => {
     });
   }
 
-  return c.json(price);
+  await client.set(cacheKey, JSON.stringify(price), {
+    EX: 3600,
+  });
+
+  return c.json(price, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
 });
 
 app.get('/sellers', async (c) => {
