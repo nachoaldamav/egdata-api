@@ -18,6 +18,7 @@ import mongoose from 'mongoose';
 import { getGameFeatures } from './utils/game-features';
 import { $ } from 'bun';
 import { Asset } from './db/schemas/assets';
+import { Changelog } from './db/schemas/changelog';
 
 type SalesAggregate = {
   _id: string;
@@ -1124,6 +1125,68 @@ app.get('/offers/:id/price', async (c) => {
   });
 
   return c.json(price, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/offers/:id/changelog', async (c) => {
+  const { id } = c.req.param();
+
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
+  const cacheKey = `changelog:${id}:${page}:${limit}`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const changelist = await Changelog.find(
+    {
+      'metadata.contextId': id,
+    },
+    undefined,
+    {
+      sort: {
+        timestamp: -1,
+      },
+      limit,
+      skip,
+    }
+  );
+
+  if (!changelist) {
+    c.status(404);
+    return c.json({
+      message: 'Changelist not found',
+    });
+  }
+
+  await client.set(cacheKey, JSON.stringify(changelist), {
+    EX: 3600,
+  });
+
+  return c.json(changelist);
+});
+
+app.get('/changelog', async (c) => {
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
+  const changelist = await Changelog.find({}, undefined, {
+    limit,
+    skip,
+    sort: {
+      timestamp: -1,
+    },
+  });
+
+  return c.json(changelist, 200, {
     'Cache-Control': 'public, max-age=3600',
   });
 });
