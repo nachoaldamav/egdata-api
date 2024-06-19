@@ -1038,6 +1038,10 @@ app.get('/promotions/:id', async (c) => {
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
   const start = new Date();
 
   const selectedCountry = country ?? cookieCountry ?? 'US';
@@ -1053,7 +1057,7 @@ app.get('/promotions/:id', async (c) => {
     });
   }
 
-  const cacheKey = `promotion:${id}:${region}`;
+  const cacheKey = `promotion:${id}:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -1087,7 +1091,8 @@ app.get('/promotions/:id', async (c) => {
       sort: {
         lastModifiedDate: -1,
       },
-      limit: 20,
+      limit,
+      skip,
     }
   );
 
@@ -1104,7 +1109,7 @@ app.get('/promotions/:id', async (c) => {
     }
   );
 
-  const result = offers.map((o) => {
+  const data = offers.map((o) => {
     const price = prices.find((p) => p.metadata?.id === o.id);
     return {
       id: o.id,
@@ -1117,6 +1122,24 @@ app.get('/promotions/:id', async (c) => {
       price,
     };
   });
+
+  const result: {
+    elements: any[];
+    title: string;
+    limit: number;
+    start: number;
+    page: number;
+    count: number;
+  } = {
+    elements: data,
+    title: event.name ?? '',
+    limit,
+    start: skip,
+    page,
+    count: await Offer.countDocuments({
+      tags: { $elemMatch: { id } },
+    }),
+  };
 
   await client.set(cacheKey, JSON.stringify(result), {
     EX: 86400,
