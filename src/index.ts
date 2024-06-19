@@ -198,6 +198,133 @@ app.get('/offers', async (c) => {
   });
 });
 
+app.get('/offers/events', async (c) => {
+  const events = await Tags.find({
+    groupName: 'event',
+    status: 'ACTIVE',
+  });
+
+  return c.json(events, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/offers/events/:id', async (c) => {
+  // Same as the /promotions/:id endpoint
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
+  const start = new Date();
+
+  const cacheKey = `event:${id}:${region}:${page}:${limit}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const event = await Tags.findOne({
+    id,
+    groupName: 'event',
+  });
+
+  if (!event) {
+    c.status(404);
+    return c.json({
+      message: 'Event not found',
+    });
+  }
+
+  const offers = await Offer.find(
+    {
+      tags: { $elemMatch: { id } },
+    },
+    undefined,
+    {
+      sort: {
+        lastModifiedDate: -1,
+      },
+      limit,
+      skip,
+    }
+  );
+
+  const prices = await PriceHistory.find(
+    {
+      'metadata.id': { $in: offers.map((o) => o.id) },
+      'metadata.region': region,
+    },
+    undefined,
+    {
+      sort: {
+        date: -1,
+      },
+    }
+  );
+
+  const data = offers.map((o) => {
+    const price = prices.find((p) => p.metadata?.id === o.id);
+    return {
+      id: o.id,
+      namespace: o.namespace,
+      title: o.title,
+      seller: o.seller,
+      keyImages: o.keyImages,
+      developerDisplayName: o.developerDisplayName,
+      publisherDisplayName: o.publisherDisplayName,
+      price,
+    };
+  });
+
+  const result: {
+    elements: any[];
+    title: string;
+    limit: number;
+    start: number;
+    page: number;
+    count: number;
+  } = {
+    elements: data,
+    title: event.name ?? '',
+    limit,
+    start: skip,
+    page,
+    count: await Offer.countDocuments({
+      tags: { $elemMatch: { id } },
+    }),
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 86400,
+  });
+
+  return c.json(result, 200, {
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
 app.get('/offers/:id', async (c) => {
   const { id } = c.req.param();
 
