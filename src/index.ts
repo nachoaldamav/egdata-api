@@ -9,7 +9,7 @@ import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
-import { PriceHistory, type PriceHistoryType } from './db/schemas/price';
+import { PriceHistory, Sales, type PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 import { Namespace } from './db/schemas/namespace';
@@ -830,7 +830,7 @@ app.get('/sales', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 23);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sales:${region}:${page}:${limit}:v0.1`;
+  const cacheKey = `sales:${region}:${page}:${limit}:v0.2`;
 
   const cached = await client.get(cacheKey);
 
@@ -842,66 +842,72 @@ app.get('/sales', async (c) => {
 
   const start = new Date();
 
-  const [sales, totalCount] = await Promise.all([
-    db.db
-      .collection('PriceHistory')
-      .aggregate<{
-        _id: string;
-        totalPrice: TotalPrice;
-        metadata: {
-          id: string;
-          region: string;
-        };
-        date: Date;
-        offer: OfferType[];
-      }>(
-        [
-          {
-            $match: {
-              'metadata.region': region,
-              'totalPrice.discount': { $gt: 0 },
-            },
-          },
-          { $sort: { date: 1 } },
-          { $skip: skip },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: 'offers',
-              localField: 'metadata.id',
-              foreignField: 'id',
-              as: 'offer',
-            },
-          },
-        ],
-        { maxTimeMS: 60000, allowDiskUse: true }
-      )
-      .toArray(),
-    countSales(region),
-  ]);
+  const sales = await Sales.find(
+    {
+      'metadata.region': region,
+    },
+    undefined,
+    {
+      limit,
+      skip,
+      sort: {
+        date: -1,
+      },
+    }
+  );
 
-  const totalPages = Math.ceil(totalCount / limit);
+  const count = await Sales.countDocuments({
+    'metadata.region': region,
+  });
 
-  const res = {
-    elements: sales.map((s) => {
-      return {
-        ...orderOffersObject(s.offer[0]),
-        price: {
-          totalPrice: s.totalPrice,
-          totalPaymentPrice: s.totalPrice,
-          metadata: s.metadata,
-        },
-      };
-    }),
-    page,
-    limit,
-    total: totalCount,
-    totalPages,
-  };
+  const offers = await Offer.find(
+    {
+      // @ts-expect-error
+      id: { $in: sales.map((s) => s.metadata.id) },
+    },
+    {
+      id: 1,
+      namespace: 1,
+      title: 1,
+      seller: 1,
+      developerDisplayName: 1,
+      publisherDisplayName: 1,
+      keyImages: 1,
+      lastModifiedDate: 1,
+      offerType: 1,
+    }
+  );
+
+  const result = sales.map((s) => {
+    // @ts-expect-error
+    const offer = offers.find((o) => o.id === s.metadata.id);
+
+    const o = offer?.toObject();
+
+    return {
+      id: o?.id,
+      namespace: o?.namespace,
+      title: o?.title,
+      seller: o?.seller,
+      developerDisplayName: o?.developerDisplayName,
+      publisherDisplayName: o?.publisherDisplayName,
+      keyImages: o?.keyImages,
+      lastModifiedDate: o?.lastModifiedDate,
+      offerType: o?.offerType,
+      price: s,
+    };
+  });
 
   await client.set(cacheKey, JSON.stringify(res), {
     EX: 604800,
   });
+
+  const res = {
+    elements: result,
+    page,
+    limit,
+    total: count,
+  };
 
   return c.json(res, 200, {
     'Cache-Control': 'public, max-age=3600',

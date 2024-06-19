@@ -54,6 +54,8 @@ export const PriceHistory = mongoose.model(
   'PriceHistory'
 );
 
+export const Sales = mongoose.model('sales', PriceHistorySchema, 'sales');
+
 export type PriceHistoryType = mongoose.InferSchemaType<
   typeof PriceHistorySchema
 >;
