@@ -789,27 +789,6 @@ app.get('/countries', async (c) => {
   return c.json(countries);
 });
 
-async function countSales(region: string): Promise<number> {
-  const cacheKey = `sales-count:${region}`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return Number.parseInt(cached);
-  }
-
-  const count = await db.db
-    .collection('PriceHistory')
-    .countDocuments({ 'metadata.region': region });
-
-  await client.set(cacheKey, count, {
-    // 1 month
-    EX: 2592000,
-  });
-
-  return count;
-}
-
 app.get('/sales', async (c) => {
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
@@ -1253,7 +1232,7 @@ app.get('/promotions/:id', async (c) => {
     });
   }
 
-  const cacheKey = `promotion:${id}:${region}:v0.1`;
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}`;
 
   const cached = await client.get(cacheKey);
 
