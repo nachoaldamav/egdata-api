@@ -827,7 +827,7 @@ app.get('/sales', async (c) => {
   }
 
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 23);
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 30);
   const skip = (page - 1) * limit;
 
   const cacheKey = `sales:${region}:${page}:${limit}:v0.2`;
