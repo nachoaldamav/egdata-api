@@ -898,16 +898,16 @@ app.get('/sales', async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(res), {
-    EX: 604800,
-  });
-
   const res = {
     elements: result,
     page,
     limit,
     total: count,
   };
+
+  await client.set(cacheKey, JSON.stringify(res), {
+    EX: 604800,
+  });
 
   return c.json(res, 200, {
     'Cache-Control': 'public, max-age=3600',
