@@ -17,7 +17,7 @@ import { AchievementSet } from './db/schemas/achievements';
 import mongoose from 'mongoose';
 import { getGameFeatures } from './utils/game-features';
 import { $ } from 'bun';
-import { Asset } from './db/schemas/assets';
+import { Asset, AssetType } from './db/schemas/assets';
 import { Changelog } from './db/schemas/changelog';
 
 type SalesAggregate = {
@@ -1025,18 +1025,7 @@ app.get('/offers/:id/features', async (c) => {
 app.get('/offers/:id/assets', async (c) => {
   const { id } = c.req.param();
 
-  const offer = await Offer.findOne({ id }).select({ namespace: 1 });
-
-  if (!offer) {
-    c.status(404);
-    return c.json({
-      message: 'Offer not found',
-    });
-  }
-
-  const { namespace } = offer;
-
-  const cacheKey = `assets:${namespace}`;
+  const cacheKey = `assets:offer:${id}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -1046,7 +1035,30 @@ app.get('/offers/:id/assets', async (c) => {
     });
   }
 
-  const assets = await Asset.find({ namespace });
+  const assets = await Item.aggregate<AssetType[]>([
+    {
+      $match: {
+        linkedOffers: id,
+      },
+    },
+    {
+      $lookup: {
+        from: 'assets',
+        localField: 'id',
+        foreignField: 'itemId',
+        as: 'assets',
+      },
+    },
+    {
+      $unwind: '$assets',
+    },
+    {
+      $project: {
+        _id: 0,
+        assets: 1,
+      },
+    },
+  ]);
 
   await client.set(cacheKey, JSON.stringify(assets), {
     EX: 3600,

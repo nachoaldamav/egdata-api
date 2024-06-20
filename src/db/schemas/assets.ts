@@ -10,3 +10,4 @@ const assetSchema = new mongoose.Schema({
 });
 
 export const Asset = mongoose.model('Asset', assetSchema);
+export type AssetType = mongoose.InferSchemaType<typeof assetSchema>;
