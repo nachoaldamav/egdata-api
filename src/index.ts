@@ -1126,6 +1126,78 @@ app.get('/offers/:id/price', async (c) => {
   });
 });
 
+app.get('/offers/:id/regional-price', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  // Iterate over all the regions (faster than aggregating) to get the last price, max and min for each region
+  const prices = await PriceHistory.find(
+    {
+      'metadata.id': id,
+    },
+    undefined,
+    {
+      sort: {
+        date: -1,
+      },
+    }
+  );
+
+  const regionsKeys = Object.keys(regions);
+
+  const result = regionsKeys.reduce(
+    (acc, r) => {
+      const regionPrices = prices.filter((p) => p.metadata?.region === r);
+
+      if (!regionPrices.length) {
+        return acc;
+      }
+
+      const lastPrice = regionPrices[0];
+
+      const allPrices = regionPrices.map(
+        (p) => p.totalPrice.discountPrice ?? 0
+      );
+
+      const maxPrice = Math.max(...allPrices);
+
+      const minPrice = Math.min(...allPrices);
+
+      acc[r] = {
+        currentPrice: lastPrice,
+        maxPrice,
+        minPrice,
+      };
+
+      return acc;
+    },
+    {} as Record<
+      string,
+      {
+        currentPrice: PriceHistoryType;
+        maxPrice: number;
+        minPrice: number;
+      }
+    >
+  );
+
+  return c.json(result);
+});
+
 app.get('/offers/:id/changelog', async (c) => {
   const { id } = c.req.param();
 
@@ -1214,6 +1286,56 @@ app.get('/offers/:id/achievements', async (c) => {
   });
 
   return c.json(achievements);
+});
+
+app.get('/offers/:id/related', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `related-offers:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const offer = await Offer.findOne({ id }, { namespace: 1, id: 1 });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const related = await Offer.find(
+    {
+      namespace: offer.namespace,
+      id: { $ne: offer.id },
+    },
+    {
+      _id: 0,
+      id: 1,
+      namespace: 1,
+      title: 1,
+      keyImages: 1,
+      lastModifiedDate: 1,
+      creationDate: 1,
+      viewableDate: 1,
+      effectiveDate: 1,
+      offerType: 1,
+    }
+  );
+
+  await client.set(cacheKey, JSON.stringify(related), {
+    EX: 3600,
+  });
+
+  return c.json(related, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
 });
 
 app.get('/changelog', async (c) => {
