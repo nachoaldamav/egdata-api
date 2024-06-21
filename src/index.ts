@@ -1025,7 +1025,7 @@ app.get('/offers/:id/features', async (c) => {
 app.get('/offers/:id/assets', async (c) => {
   const { id } = c.req.param();
 
-  const cacheKey = `assets:offer:${id}:v0.1`;
+  const cacheKey = `assets:offer:${id}:v0.2`;
 
   const cached = await client.get(cacheKey);
 
@@ -1035,7 +1035,7 @@ app.get('/offers/:id/assets', async (c) => {
     });
   }
 
-  const assets = await Item.aggregate<AssetType[]>([
+  const assets = await Item.aggregate<{ assets: AssetType[] }>([
     {
       $match: {
         linkedOffers: id,
@@ -1060,11 +1060,13 @@ app.get('/offers/:id/assets', async (c) => {
     },
   ]);
 
+  const result = assets.flatMap((a) => a.assets);
+
   await client.set(cacheKey, JSON.stringify(assets), {
     EX: 3600,
   });
 
-  return c.json(assets, 200, {
+  return c.json(result, 200, {
     'Cache-Control': 'public, max-age=3600',
   });
 });
