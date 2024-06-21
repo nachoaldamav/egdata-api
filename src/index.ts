@@ -1195,7 +1195,7 @@ app.get('/offers/:id/achievements', async (c) => {
     });
   }
 
-  const cacheKey = `achievements:offer:${offer.id}`;
+  const cacheKey = `achievements:offer:${id}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
