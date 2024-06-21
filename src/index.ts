@@ -1170,6 +1170,52 @@ app.get('/offers/:id/changelog', async (c) => {
   return c.json(changelist);
 });
 
+app.get('/offers/:id/achievements', async (c) => {
+  const { id } = c.req.param();
+
+  if (!id) {
+    c.status(400);
+    return c.json({
+      message: 'Missing id parameter',
+    });
+  }
+
+  const offer = await Offer.findOne(
+    { id },
+    {
+      namespace: 1,
+      offerType: 1,
+    }
+  );
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const cacheKey = `achievements:offer:${offer.id}`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const achievements = await AchievementSet.find({
+    sandboxId: offer.namespace,
+    isBase: offer.offerType === 'BASE_GAME',
+  });
+
+  await client.set(cacheKey, JSON.stringify(achievements), {
+    EX: 604800,
+  });
+
+  return c.json(achievements);
+});
+
 app.get('/changelog', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);

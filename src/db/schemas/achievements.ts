@@ -39,3 +39,4 @@ export const AchievementSet = mongoose.model(
     { _id: false }
   )
 );
+export type AchievementType = mongoose.InferSchemaType<typeof Achievement>;
