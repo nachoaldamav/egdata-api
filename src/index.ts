@@ -1635,6 +1635,94 @@ app.get('/sandboxes/:sandboxId/achievements', async (ctx) => {
   );
 });
 
+app.get('/changelist', async (ctx) => {
+  const start = Date.now();
+
+  const limit = Math.min(Number.parseInt(ctx.req.query('limit') || '10'), 50);
+  const page = Math.max(Number.parseInt(ctx.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
+  const cacheKey = `changelist:${page}:${limit}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return ctx.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const changelist = await Changelog.find({}, undefined, {
+    limit,
+    skip,
+    sort: {
+      timestamp: -1,
+    },
+  });
+
+  /**
+   * Returns the affected offer, item, asset for each changelog
+   */
+  const elements = await Promise.all(
+    changelist.map(async (change) => {
+      switch (change.metadata.contextType) {
+        case 'offer':
+          return Offer.findOne(
+            { id: change.metadata.contextId },
+            {
+              id: 1,
+              title: 1,
+              keyImages: 1,
+              offerType: 1,
+            }
+          );
+        case 'item':
+          return Item.findOne(
+            { id: change.metadata.contextId },
+            {
+              id: 1,
+              title: 1,
+              keyImages: 1,
+            }
+          );
+        case 'asset':
+          return Asset.findOne(
+            { id: change.metadata.contextId },
+            {
+              id: 1,
+              artifactId: 1,
+            }
+          );
+        default:
+          return null;
+      }
+    })
+  );
+
+  const result = changelist.map((change) => {
+    const element = elements.find(
+      (e) => e?.toObject().id === change.metadata.contextId
+    );
+
+    return {
+      ...change.toObject(),
+      metadata: {
+        ...change.toObject().metadata,
+        context: element?.toObject(),
+      },
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
+
+  return ctx.json(result, 200, {
+    'Server-Timing': `db;dur=${Date.now() - start}`,
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 interface SearchBody {
   limit?: number;
   page?: number;
