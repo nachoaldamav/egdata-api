@@ -922,7 +922,7 @@ app.get('/offers/:id/price-history', async (c) => {
   );
 
   if (region) {
-    const cacheKey = `price-history:${id}:${region}`;
+    const cacheKey = `price-history:${id}:${region}:v0.1`;
     const cached = await client.get(cacheKey);
 
     if (cached) {
@@ -939,9 +939,13 @@ app.get('/offers/:id/price-history', async (c) => {
       .sort({ date: -1 })
       .hint({ date: 1, 'metadata.id': 1, 'metadata.region': 1 });
 
+    if (!prices) {
+      c.status(200);
+      return c.json({});
+    }
+
     await client.set(cacheKey, JSON.stringify(prices), {
-      // 1 week
-      EX: 604800,
+      EX: 3600,
     });
 
     return c.json(prices, 200, {
@@ -949,7 +953,7 @@ app.get('/offers/:id/price-history', async (c) => {
     });
   }
 
-  const cacheKey = `price-history:${id}`;
+  const cacheKey = `price-history:${id}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -975,12 +979,17 @@ app.get('/offers/:id/price-history', async (c) => {
     return acc;
   }, {} as Record<string, PriceHistoryType[]>);
 
+  if (!pricesByRegion || Object.keys(pricesByRegion).length === 0) {
+    c.status(200);
+    return c.json({});
+  }
+
   await client.set(cacheKey, JSON.stringify(pricesByRegion), {
-    EX: 86400,
+    EX: 3600,
   });
 
   return c.json(pricesByRegion, 200, {
-    'Cache-Control': 'public, max-age=86400',
+    'Cache-Control': 'public, max-age=3600',
   });
 });
 
