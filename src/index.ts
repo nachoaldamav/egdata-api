@@ -638,16 +638,17 @@ app.get('/latest-games', async (c) => {
 
 app.get('/featured', async (c) => {
   const GET_FEATURED_GAMES_START = new Date();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const cacheKey = `featured:v0.1`;
+  const responseCacheKey = `featured-response:v0.1`;
 
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
+  const cachedResponse = await client.get(responseCacheKey);
 
-  const cacheKey = `featured:${region}`;
+  if (cachedResponse) {
+    return c.json(JSON.parse(cachedResponse), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
 
   const cached = await client.get(cacheKey);
 
@@ -658,67 +659,41 @@ app.get('/featured', async (c) => {
   } else {
     featuredGames = await getFeaturedGames();
     await client.set(cacheKey, JSON.stringify(featuredGames), {
-      EX: 3600,
+      EX: 86400,
     });
   }
 
   const GET_FEATURED_GAMES_END = new Date();
 
-  let game = null;
-
-  const start = new Date();
-  // Try to find a game from the featured games list
-  for (let i = 0; i < featuredGames.length; i++) {
-    const randomGame =
-      featuredGames[Math.floor(Math.random() * featuredGames.length)];
-
-    // Try to find the cache for the offer, as it contains the price
-    const cacheKeyOffer = `offer:${randomGame.id}`;
-    const cachedOffer = await client.get(cacheKeyOffer);
-
-    if (cachedOffer) {
-      game = JSON.parse(cachedOffer);
-      break;
-    }
-
-    game = await Offer.findOne({
-      id: randomGame.id,
-      namespace: randomGame.namespace,
-    });
-
-    if (game) {
-      break;
-    }
-  }
-
-  if (!game) {
-    c.status(404);
-    return c.json({
-      message: 'No games found in the featured list',
-    });
-  }
-
-  const price = await PriceHistory.findOne(
+  // Convert the featured games to the offer object
+  const offers = await Offer.find(
     {
-      'metadata.id': game.id,
-      'metadata.region': region,
+      id: { $in: featuredGames.map((f) => f.id) },
     },
     undefined,
     {
       sort: {
-        date: -1,
+        lastModifiedDate: -1,
       },
     }
   );
 
-  return c.json({ ...orderOffersObject(game), price }, 200, {
-    'Cache-Control': 'public, max-age=3600',
-    'Server-Timing': `db;dur=${
-      new Date().getTime() - start.getTime()
-    }, egsAPI;dur=${
-      GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
-    }`,
+  const result = offers.map((o) => orderOffersObject(o));
+
+  await client.set(responseCacheKey, JSON.stringify(result), {
+    EX: 3600,
   });
+
+  return c.json(
+    offers.map((o) => orderOffersObject(o)),
+    200,
+    {
+      'Cache-Control': 'public, max-age=3600',
+      'Server-Timing': `db;dur=${
+        GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
+      }`,
+    }
+  );
 });
 
 app.get('/autocomplete', async (c) => {
