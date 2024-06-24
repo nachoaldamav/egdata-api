@@ -1055,6 +1055,32 @@ app.get('/offers/:id/assets', async (c) => {
   });
 });
 
+app.get('/offers/:id/items', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `items:offer:${id}:v0.1`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const items = await Item.find({
+    linkedOffers: id,
+  });
+
+  await client.set(cacheKey, JSON.stringify(items), {
+    EX: 3600,
+  });
+
+  return c.json(items, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
 app.get('/offers/:id/price', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
