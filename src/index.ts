@@ -70,6 +70,8 @@ app.use(
 const db = new DB();
 const client = createClient({
   url: `redis://${REDISHOST}:${REDISPORT}`,
+  username: process.env.REDISUSER || undefined,
+  password: process.env.REDISPASSWORD || undefined,
 });
 
 client.connect();
@@ -796,6 +798,7 @@ app.get('/sales', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=3600',
+      'X-Cache': 'HIT',
     });
   }
 
