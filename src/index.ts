@@ -915,9 +915,7 @@ app.get('/offers/:id/price-history', async (c) => {
     const prices = await PriceHistory.find({
       'metadata.id': id,
       'metadata.region': region,
-    })
-      .sort({ date: -1 })
-      .hint({ date: 1, 'metadata.id': 1, 'metadata.region': 1 });
+    }).sort({ date: -1 });
 
     if (!prices) {
       c.status(200);
