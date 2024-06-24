@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
+import { etag } from 'hono/etag';
+import { logger } from 'hono/logger';
 import { createClient } from 'redis';
 import { DB } from './db';
 import { Offer, type OfferType } from './db/schemas/offer';
@@ -16,7 +18,6 @@ import { Namespace } from './db/schemas/namespace';
 import { AchievementSet } from './db/schemas/achievements';
 import mongoose from 'mongoose';
 import { getGameFeatures } from './utils/game-features';
-import { $ } from 'bun';
 import { Asset, AssetType } from './db/schemas/assets';
 import { Changelog } from './db/schemas/changelog';
 
@@ -73,6 +74,10 @@ const client = createClient({
 
 client.connect();
 db.connect();
+
+app.use('/*', etag());
+
+app.use(logger());
 
 app.get('/health', (c) => {
   return c.json({
