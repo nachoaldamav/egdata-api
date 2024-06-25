@@ -1285,12 +1285,12 @@ app.get('/offers/:id/achievements', async (c) => {
     });
   }
 
-  const cacheKey = `achievements:offer:${id}`;
+  const cacheKey = `achievements:offer:${id}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -1299,11 +1299,18 @@ app.get('/offers/:id/achievements', async (c) => {
     isBase: offer.offerType === 'BASE_GAME',
   });
 
+  if (achievements.length === 0) {
+    c.status(200);
+    return c.json([]);
+  }
+
   await client.set(cacheKey, JSON.stringify(achievements), {
-    EX: 604800,
+    EX: 3600,
   });
 
-  return c.json(achievements);
+  return c.json(achievements, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
 });
 
 app.get('/offers/:id/related', async (c) => {
