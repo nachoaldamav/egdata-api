@@ -4,9 +4,8 @@ import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
 import { logger } from 'hono/logger';
-import { createClient } from 'redis';
 import { DB } from './db';
-import { Offer, type OfferType } from './db/schemas/offer';
+import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
@@ -20,33 +19,10 @@ import mongoose from 'mongoose';
 import { getGameFeatures } from './utils/game-features';
 import { Asset, AssetType } from './db/schemas/assets';
 import { Changelog } from './db/schemas/changelog';
-
-type SalesAggregate = {
-  _id: string;
-  offerId: string;
-  currency: string;
-  country: string;
-  symbol: string;
-  price: TotalPrice;
-  __v: number;
-  offer: OfferType;
-};
-
-interface TotalPrice {
-  basePayoutCurrencyCode: string;
-  basePayoutPrice: number;
-  convenienceFee: number;
-  currencyCode: string;
-  discount: number;
-  discountPrice: number;
-  originalPrice: number;
-  vat: number;
-  voucherDiscount: number;
-}
+import client from './clients/redis';
+import SandboxRoute from './routes/sandbox';
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
-const REDISHOST = process.env.REDISHOST || '127.0.0.1';
-const REDISPORT = process.env.REDISPORT || '6379';
 
 const app = new Hono();
 
@@ -68,13 +44,7 @@ app.use(
 );
 
 const db = new DB();
-const client = createClient({
-  url: `redis://${REDISHOST}:${REDISPORT}`,
-  username: process.env.REDISUSER || undefined,
-  password: process.env.REDISPASSWORD || undefined,
-});
 
-client.connect();
 db.connect();
 
 app.use('/*', etag());
@@ -649,19 +619,27 @@ app.get('/featured', async (c) => {
   const cacheKey = `featured:v0.1`;
   const responseCacheKey = `featured-response:v0.1`;
 
+  console.log(`[CACHE] ${cacheKey}`);
+
   const cachedResponse = await client.get(responseCacheKey);
 
+  console.log(`[CACHE] ${responseCacheKey}`);
+
   if (cachedResponse) {
+    console.log(`[CACHE] ${responseCacheKey} found`);
     return c.json(JSON.parse(cachedResponse), 200, {
       'Cache-Control': 'public, max-age=3600',
     });
   }
+
+  console.log(`[CACHE] ${responseCacheKey} not found`);
 
   const cached = await client.get(cacheKey);
 
   let featuredGames: { id: string; namespace: string }[] = [];
 
   if (cached) {
+    console.log(`[CACHE] ${cacheKey} found`);
     featuredGames = JSON.parse(cached);
   } else {
     featuredGames = await getFeaturedGames();
@@ -1607,57 +1585,6 @@ app.get('/region', async (c) => {
   });
 });
 
-app.get('/sandboxes/:sandboxId/achievements', async (ctx) => {
-  const start = Date.now();
-  const { sandboxId } = ctx.req.param();
-
-  const cacheKey = `sandbox:${sandboxId}:achivement-sets`;
-  const cached = await client.get(cacheKey);
-
-  let achievementSets: mongoose.InferRawDocType<typeof AchievementSet>[] = [];
-
-  if (cached) {
-    achievementSets = JSON.parse(cached);
-  } else {
-    const sandbox = await Namespace.findOne({
-      namespace: sandboxId,
-    });
-
-    if (!sandbox) {
-      ctx.status(404);
-
-      return ctx.json({
-        message: 'Sandbox not found',
-      });
-    }
-
-    achievementSets = await AchievementSet.find(
-      {
-        sandboxId,
-      },
-      {
-        _id: false,
-        __v: false,
-      }
-    );
-
-    await client.set(cacheKey, JSON.stringify(achievementSets), {
-      EX: 1800, // 30min
-    });
-  }
-
-  return ctx.json(
-    {
-      sandboxId,
-      achievementSets,
-    },
-    200,
-    {
-      'Server-Timing': `db;dur=${Date.now() - start}`,
-    }
-  );
-});
-
 app.get('/changelist', async (ctx) => {
   const start = Date.now();
 
@@ -1745,6 +1672,8 @@ app.get('/changelist', async (ctx) => {
     'Cache-Control': 'public, max-age=60',
   });
 });
+
+app.route('/sandboxes', SandboxRoute);
 
 interface SearchBody {
   limit?: number;
