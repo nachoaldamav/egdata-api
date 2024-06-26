@@ -13,8 +13,9 @@ export class DB {
         authMechanism: 'MONGODB-X509',
         authSource: '$external',
         tlsCAFile: process.env['MONGO_CA'],
-        tls: true,
         tlsCertificateKeyFile: process.env['MONGO_CERT'],
+        tls: true,
+        tlsAllowInvalidCertificates: true,
       }
     );
     console.log('Connected to MongoDB');
