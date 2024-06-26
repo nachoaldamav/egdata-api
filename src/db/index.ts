@@ -7,6 +7,12 @@ export class DB {
   }
 
   async connect() {
+    console.log('Connecting to MongoDB', {
+      url: process.env['MONGO_URL'],
+      ca: process.env['MONGO_CA']?.substring(0, 100),
+      cert: process.env['MONGO_CERT']?.substring(0, 100),
+    });
+
     await mongoose.connect(
       `mongodb://${process.env['MONGO_URL']}:27017/egdata`,
       {
