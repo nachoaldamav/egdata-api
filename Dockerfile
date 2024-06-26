@@ -9,6 +9,8 @@ COPY . /app
 
 RUN pnpm install --frozen-lockfile --prod
 
+RUN pnpm build
+
 EXPOSE 4000
 
 CMD ["pnpm", "start"]
