@@ -10,13 +10,11 @@ export class DB {
     await mongoose.connect(
       `mongodb://${process.env['MONGO_URL']}:27017/egdata`,
       {
-        auth: {
-          username: process.env['MONGO_USER'],
-          password: process.env['MONGO_PASS'],
-        },
-        // tlsCAFile: process.env['MONGO_CA'],
-        // tls: true,
-        // cert: process.env['MONGO_CERT'],
+        authMechanism: 'MONGODB-X509',
+        authSource: '$external',
+        tlsCAFile: process.env['MONGO_CA'],
+        tls: true,
+        tlsCertificateKeyFile: process.env['MONGO_CERT'],
       }
     );
     console.log('Connected to MongoDB');
