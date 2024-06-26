@@ -1,3 +1,4 @@
+import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
@@ -21,6 +22,9 @@ import { Asset, AssetType } from './db/schemas/assets';
 import { Changelog } from './db/schemas/changelog';
 import client from './clients/redis';
 import SandboxRoute from './routes/sandbox';
+import { config } from 'dotenv';
+
+config();
 
 const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 
@@ -700,6 +704,7 @@ app.get('/autocomplete', async (c) => {
   const cached = await client.get(cacheKey);
 
   if (cached) {
+    console.log(`[CACHE] ${cacheKey} found`);
     return c.json(JSON.parse(cached));
   }
 
@@ -1421,7 +1426,7 @@ app.get('/promotions/:id', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -1500,12 +1505,12 @@ app.get('/promotions/:id', async (c) => {
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
-    EX: 86400,
+    EX: 60,
   });
 
   return c.json(result, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -1555,7 +1560,7 @@ app.get('/promotions/:id/cover', async (c) => {
   }
 
   await client.set(cacheKey, JSON.stringify(baseGame), {
-    EX: 86400,
+    EX: 3600,
   });
 
   return c.json(baseGame, 200, {
@@ -1692,7 +1697,12 @@ interface SearchBody {
   categories?: string[];
 }
 
-export default {
-  port: 4000,
-  fetch: app.fetch,
-};
+serve(
+  {
+    fetch: app.fetch,
+    port: 4000,
+  },
+  (info) => {
+    console.log(`Server running at ${info.address}:${info.port}`);
+  }
+);

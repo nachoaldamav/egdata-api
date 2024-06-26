@@ -1,10 +1,14 @@
-FROM oven/bun:1
+FROM node:22-alpine3.19
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 WORKDIR /app
 COPY . /app
 
-RUN bun install
+RUN pnpm install --frozen-lockfile --prod
 
 EXPOSE 4000
 
-CMD ["bun", "start"]
+CMD ["pnpm", "start"]

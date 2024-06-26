@@ -14,8 +14,12 @@ export class DB {
           username: process.env['MONGO_USER'],
           password: process.env['MONGO_PASS'],
         },
+        // tlsCAFile: process.env['MONGO_CA'],
+        // tls: true,
+        // cert: process.env['MONGO_CERT'],
       }
     );
+    console.log('Connected to MongoDB');
   }
 
   async disconnect() {
