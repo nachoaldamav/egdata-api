@@ -13,4 +13,3 @@ helm-charts
 .editorconfig
 .idea
 coverage*
-pnpm-lock.yaml
