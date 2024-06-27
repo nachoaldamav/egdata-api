@@ -600,6 +600,10 @@ app.get('/search/:id/count', async (c) => {
     mongoQuery.refundType = query.refundType;
   }
 
+  if (query.isCodeRedemptionOnly !== undefined) {
+    mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
+  }
+
   try {
     const tagCounts = await Offer.aggregate([
       { $match: mongoQuery },
