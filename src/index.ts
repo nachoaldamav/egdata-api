@@ -54,6 +54,7 @@ interface SearchBody {
   limit?: number;
   page?: number;
   refundType?: string;
+  isCodeRedemptionOnly?: boolean;
 }
 
 config();
@@ -490,6 +491,10 @@ app.post('/offers', async (c) => {
 
   if (query.refundType) {
     mongoQuery.refundType = query.refundType;
+  }
+
+  if (query.isCodeRedemptionOnly !== undefined) {
+    mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
   }
 
   if (
