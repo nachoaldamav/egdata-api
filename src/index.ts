@@ -393,8 +393,14 @@ app.post('/offers', async (c) => {
   const start = new Date();
   const body = await c.req.json().catch((err) => {
     c.status(400);
-    return c.json({ message: 'Invalid request body' });
+    return null;
   });
+
+  if (!body) {
+    return c.json({
+      message: 'Invalid body',
+    });
+  }
 
   const query = body as SearchBody;
 
@@ -617,6 +623,16 @@ app.get('/search/:id/count', async (c) => {
     c.status(500);
     c.json({ message: 'Error while counting tags' });
   }
+});
+
+app.get('/search/tags', async (c) => {
+  const tags = await Tags.find({
+    status: 'ACTIVE',
+  });
+
+  return c.json(tags, 200, {
+    'Cache-Control': 'public, max-age=604800',
+  });
 });
 
 app.get('/items', async (c) => {
