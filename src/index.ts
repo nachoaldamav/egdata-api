@@ -938,7 +938,12 @@ app.get('/autocomplete', async (c) => {
     elements: offers.map((o) => orderOffersObject(o)),
     total: await Offer.countDocuments(
       {
-        title: { $regex: new RegExp(query, 'i') },
+        $text: {
+          $search: query
+            .split(' ')
+            .map((q) => `"${q.trim()}"`)
+            .join(' | '),
+        },
       },
       {
         collation: { locale: 'en', strength: 1 },
