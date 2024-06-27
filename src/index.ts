@@ -506,7 +506,11 @@ app.post('/offers', async (c) => {
     limit,
     skip: (page - 1) * limit,
     sort: {
-      score: { $meta: 'textScore' },
+      ...(query.title
+        ? {
+            score: { $meta: 'textScore' },
+          }
+        : {}),
       [sort]: sortQuery[sort],
     },
     collation: {
@@ -516,7 +520,7 @@ app.post('/offers', async (c) => {
       normalization: true,
       numericOrdering: true,
     },
-  }).sort({ score: { $meta: 'textScore' } });
+  });
 
   const result = {
     elements: offers.map((o) => orderOffersObject(o)),
