@@ -13,6 +13,18 @@ export class DB {
       cert: process.env['MONGO_CERT']?.substring(0, 100),
     });
 
+    if (!process.env['MONGO_URL']) {
+      throw new Error('MONGO_URL is required');
+    }
+
+    if (!process.env['MONGO_CA']) {
+      throw new Error('MONGO_CA is required');
+    }
+
+    if (!process.env['MONGO_CERT']) {
+      throw new Error('MONGO_CERT is required');
+    }
+
     await mongoose.connect(
       `mongodb://${process.env['MONGO_URL']}:27017/egdata`,
       {

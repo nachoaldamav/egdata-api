@@ -5,6 +5,7 @@ import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
 import { logger } from 'hono/logger';
+import { createHash } from 'node:crypto';
 import { DB } from './db';
 import { Offer } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
@@ -14,15 +15,46 @@ import { countries, regions } from './utils/countries';
 import { PriceHistory, Sales, type PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
-import { Namespace } from './db/schemas/namespace';
 import { AchievementSet } from './db/schemas/achievements';
-import mongoose from 'mongoose';
 import { getGameFeatures } from './utils/game-features';
 import { Asset, AssetType } from './db/schemas/assets';
 import { Changelog } from './db/schemas/changelog';
 import client from './clients/redis';
 import SandboxRoute from './routes/sandbox';
 import { config } from 'dotenv';
+
+interface SearchBody {
+  title?: string;
+  offerType?:
+    | 'IN_GAME_PURCHASE'
+    | 'BASE_GAME'
+    | 'EXPERIENCE'
+    | 'UNLOCKABLE'
+    | 'ADD_ON'
+    | 'Bundle'
+    | 'CONSUMABLE'
+    | 'WALLET'
+    | 'OTHERS'
+    | 'DEMO'
+    | 'DLC'
+    | 'VIRTUAL_CURRENCY'
+    | 'BUNDLE'
+    | 'DIGITAL_EXTRA'
+    | 'EDITION';
+  tags?: string[];
+  customAttributes?: string[];
+  seller?: string;
+  sortBy?:
+    | 'releaseDate'
+    | 'lastModifiedDate'
+    | 'effectiveDate'
+    | 'creationDate'
+    | 'viewableDate'
+    | 'pcReleaseDate';
+  limit?: number;
+  page?: number;
+  refundType?: string;
+}
 
 config();
 
@@ -365,63 +397,201 @@ app.post('/offers', async (c) => {
   });
 
   const query = body as SearchBody;
-  let sort:
-    | {
-        [key: string]: 1 | -1 | { $meta: 'textScore' };
-      }
-    | undefined = undefined;
 
-  let search: any = {};
-  if (query.query) {
-    search.$text = { $search: `"${query.query}"` };
-    if (!sort) {
-      sort = { score: { $meta: 'textScore' } };
-    }
+  const queryId = createHash('md5')
+    .update(
+      JSON.stringify({
+        ...query,
+        page: undefined,
+        limit: undefined,
+        sortBy: undefined,
+      })
+    )
+    .digest('hex');
+
+  const cacheKey = `offers:search:${queryId}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
   }
 
-  if (query.namespace) {
-    search.namespace = query.namespace;
+  const queryCache = `q:${queryId}`;
+
+  const cachedQuery = await client.get(queryCache);
+
+  if (!cachedQuery) {
+    await client.set(queryCache, JSON.stringify(query), {
+      EX: 2592000,
+    });
+  }
+
+  const limit = Math.min(query.limit || 10, 50);
+
+  const page = Math.max(query.page || 1, 1);
+
+  const sort = query.sortBy || 'lastModifiedDate';
+
+  const sortQuery = {
+    lastModifiedDate: -1,
+    releaseDate: -1,
+    effectiveDate: -1,
+    creationDate: -1,
+    viewableDate: -1,
+    pcReleaseDate: -1,
+  };
+
+  const mongoQuery: Record<string, any> = {};
+
+  if (query.title) {
+    mongoQuery.title = { $regex: new RegExp(query.title, 'i') };
   }
 
   if (query.offerType) {
-    search.offerType = query.offerType;
+    mongoQuery.offerType = query.offerType;
   }
 
-  if (query.categories) {
-    search.categories = { $in: query.categories };
+  /**
+   * tags provided by the user are tags.id, so we just need to check the tags array of the offers to find the offers that have the tags
+   */
+  if (query.tags) {
+    mongoQuery.tags = { $elemMatch: { id: { $in: query.tags } } };
   }
 
-  if (query.sortBy) {
-    if (!sort) sort = {};
-
-    // If the sortBy is "releaseDate", we need to ignore the releases past the current date
-    if (query.sortBy === 'releaseDate') {
-      search.releaseDate = { $lte: new Date() };
-    }
-
-    sort[query.sortBy] = query.sortOrder === 'asc' ? 1 : -1; // Secondary sort by specified field
+  if (query.customAttributes) {
+    mongoQuery.customAttributes = {
+      $elemMatch: { id: { $in: query.customAttributes } },
+    };
   }
 
-  const limit = Math.min(query.limit || 10, 100);
+  /**
+   * The seller is the ID of the seller, so we just need to check the seller.id field in the offers
+   */
+  if (query.seller) {
+    mongoQuery['seller.id'] = query.seller;
+  }
 
-  const offers = await Offer.find(search, undefined, {
+  if (query.refundType) {
+    mongoQuery.refundType = query.refundType;
+  }
+
+  if (
+    query.sortBy &&
+    (query.sortBy === 'releaseDate' ||
+      query.sortBy === 'pcReleaseDate' ||
+      query.sortBy === 'effectiveDate')
+  ) {
+    // If any of those sorts are used, we need to ignore the offers that are from after 2090 (mock date for unknown dates)
+    mongoQuery[query.sortBy] = { $lt: new Date('2090-01-01') };
+  }
+
+  const offers = await Offer.find(mongoQuery, undefined, {
     limit,
-    skip: query.page ? query.page * (query.limit || 10) : 0,
-    sort,
+    skip: (page - 1) * limit,
+    sort: {
+      [sort]: sortQuery[sort],
+    },
+    collation: { locale: 'en', strength: 1 },
   });
 
-  return c.json(
-    {
-      elements: offers.map((o) => orderOffersObject(o)),
-      total: await Offer.countDocuments(search),
-      page: query.page || 1,
-      limit,
-    },
-    200,
-    {
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    }
-  );
+  const result = {
+    elements: offers.map((o) => orderOffersObject(o)),
+    page,
+    limit,
+    total: await Offer.countDocuments(mongoQuery),
+    query: queryId,
+  };
+
+  return c.json(result, 200, {
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
+});
+
+app.get('/search/:id/count', async (c) => {
+  const { id } = c.req.param();
+
+  const queryKey = `q:${id}`;
+
+  const cacheKey = `search:count:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const cachedQuery = await client.get(queryKey);
+
+  if (!cachedQuery) {
+    c.status(404);
+    return c.json({
+      message: 'Query not found',
+    });
+  }
+
+  const query = JSON.parse(cachedQuery);
+
+  const mongoQuery: Record<string, any> = {};
+
+  if (query.title) {
+    mongoQuery.title = { $regex: new RegExp(query.title, 'i') };
+  }
+
+  if (query.offerType) {
+    mongoQuery.offerType = query.offerType;
+  }
+
+  if (query.tags) {
+    mongoQuery.tags = { $elemMatch: { id: { $in: query.tags } } };
+  }
+
+  if (query.customAttributes) {
+    mongoQuery.customAttributes = {
+      $elemMatch: { id: { $in: query.customAttributes } },
+    };
+  }
+
+  if (query.seller) {
+    mongoQuery['seller.id'] = query.seller;
+  }
+
+  if (query.refundType) {
+    mongoQuery.refundType = query.refundType;
+  }
+
+  try {
+    const tagCounts = await Offer.aggregate([
+      { $match: mongoQuery },
+      { $unwind: '$tags' },
+      { $group: { _id: '$tags.id', count: { $sum: 1 } } },
+    ]);
+
+    const offerTypeCounts = await Offer.aggregate([
+      { $match: mongoQuery },
+      { $group: { _id: '$offerType', count: { $sum: 1 } } },
+    ]);
+
+    const result = {
+      tagCounts,
+      offerTypeCounts,
+    };
+
+    await client.set(cacheKey, JSON.stringify(result), {
+      EX: 3600,
+    });
+
+    return c.json(result, 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  } catch (err) {
+    c.status(500);
+    c.json({ message: 'Error while counting tags' });
+  }
 });
 
 app.get('/items', async (c) => {
@@ -718,7 +888,7 @@ app.get('/autocomplete', async (c) => {
   const start = new Date();
   const offers = await Offer.find(
     {
-      $text: { $search: query.includes('"') ? query : `"${query}"` },
+      title: { $regex: new RegExp(query, 'i') },
     },
     {
       title: 1,
@@ -728,9 +898,7 @@ app.get('/autocomplete', async (c) => {
     },
     {
       limit,
-      sort: {
-        score: { $meta: 'textScore' },
-      },
+      collation: { locale: 'en', strength: 1 },
     }
   );
 
@@ -1679,23 +1847,6 @@ app.get('/changelist', async (ctx) => {
 });
 
 app.route('/sandboxes', SandboxRoute);
-
-interface SearchBody {
-  limit?: number;
-  page?: number;
-  query?: string;
-  namespace?: string;
-  offerType?: string;
-  sortBy?:
-    | 'lastModifiedDate'
-    | 'creationDate'
-    | 'effectiveDate'
-    | 'releaseDate'
-    | 'pcReleaseDate'
-    | 'currentPrice';
-  sortOrder?: 'asc' | 'desc';
-  categories?: string[];
-}
 
 serve(
   {
