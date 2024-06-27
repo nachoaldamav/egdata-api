@@ -447,7 +447,15 @@ app.post('/offers', async (c) => {
   const mongoQuery: Record<string, any> = {};
 
   if (query.title) {
-    mongoQuery.title = { $regex: new RegExp(query.title, 'i') };
+    mongoQuery['$text'] = {
+      $search: query.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(' ')
+        .map((q) => `"${q.trim()}"`)
+        .join(' | '),
+      $language: 'en',
+    };
   }
 
   if (query.offerType) {
@@ -488,14 +496,27 @@ app.post('/offers', async (c) => {
     mongoQuery[query.sortBy] = { $lt: new Date('2090-01-01') };
   }
 
+  if (!query.sortBy) {
+    mongoQuery.lastModifiedDate = { $lt: new Date() };
+  }
+
+  console.log(mongoQuery);
+
   const offers = await Offer.find(mongoQuery, undefined, {
     limit,
     skip: (page - 1) * limit,
     sort: {
+      score: { $meta: 'textScore' },
       [sort]: sortQuery[sort],
     },
-    collation: { locale: 'en', strength: 1 },
-  });
+    collation: {
+      locale: 'en',
+      strength: 1,
+      caseLevel: false,
+      normalization: true,
+      numericOrdering: true,
+    },
+  }).sort({ score: { $meta: 'textScore' } });
 
   const result = {
     elements: offers.map((o) => orderOffersObject(o)),
@@ -888,7 +909,13 @@ app.get('/autocomplete', async (c) => {
   const start = new Date();
   const offers = await Offer.find(
     {
-      title: { $regex: new RegExp(query, 'i') },
+      $text: {
+        $search: query
+          .split(' ')
+          .map((q) => `"${q.trim()}"`)
+          .join(' | '),
+        $language: 'en',
+      },
     },
     {
       title: 1,
@@ -899,19 +926,31 @@ app.get('/autocomplete', async (c) => {
     {
       limit,
       collation: { locale: 'en', strength: 1 },
+      sort: {
+        score: { $meta: 'textScore' },
+        offerType: -1,
+        lastModifiedDate: -1,
+      },
     }
   );
 
   const response = {
     elements: offers.map((o) => orderOffersObject(o)),
-    total: await Offer.countDocuments({
-      $text: { $search: `"${query}"` },
-    }),
+    total: await Offer.countDocuments(
+      {
+        title: { $regex: new RegExp(query, 'i') },
+      },
+      {
+        collation: { locale: 'en', strength: 1 },
+      }
+    ),
   };
 
-  await client.set(cacheKey, JSON.stringify(response), {
-    EX: 60,
-  });
+  if (response.elements.length > 0) {
+    await client.set(cacheKey, JSON.stringify(response), {
+      EX: 60,
+    });
+  }
 
   return c.json(response, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
