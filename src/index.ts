@@ -193,7 +193,7 @@ app.get('/offers', async (c) => {
     sort: {
       lastModifiedDate: -1,
     },
-  }).hint({ lastModifiedDate: 1 });
+  });
 
   const result = {
     elements: offers.map((o) => orderOffersObject(o)),
@@ -629,7 +629,7 @@ app.get('/items', async (c) => {
     sort: {
       lastModifiedDate: -1,
     },
-  }).hint({ lastModifiedDate: 1 });
+  });
 
   return c.json({
     elements: items,
