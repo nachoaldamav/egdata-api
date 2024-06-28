@@ -1608,6 +1608,13 @@ app.get('/offers/:id/mappings', async (c) => {
     _id: id,
   });
 
+  if (!mappings) {
+    c.status(404);
+    return c.json({
+      message: 'Mappings not found',
+    });
+  }
+
   await client.set(cacheKey, JSON.stringify(mappings), {
     // 1 day
     EX: 86400,
