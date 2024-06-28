@@ -22,6 +22,7 @@ import { Changelog } from './db/schemas/changelog';
 import client from './clients/redis';
 import SandboxRoute from './routes/sandbox';
 import { config } from 'dotenv';
+import { Mappings } from './db/schemas/mappings';
 
 interface SearchBody {
   title?: string;
@@ -1586,6 +1587,33 @@ app.get('/offers/:id/related', async (c) => {
   });
 
   return c.json(related, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/offers/:id/mappings', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `mappings:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const mappings = await Mappings.find({
+    _id: id,
+  });
+
+  await client.set(cacheKey, JSON.stringify(mappings), {
+    // 1 day
+    EX: 86400,
+  });
+
+  return c.json(mappings, 200, {
     'Cache-Control': 'public, max-age=3600',
   });
 });
