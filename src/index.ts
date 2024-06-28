@@ -473,7 +473,7 @@ app.post('/offers', async (c) => {
    * tags provided by the user are tags.id, so we just need to check the tags array of the offers to find the offers that have the tags
    */
   if (query.tags) {
-    mongoQuery.tags = { $elemMatch: { id: { $in: query.tags } } };
+    mongoQuery['tags.id'] = { $all: query.tags };
   }
 
   if (query.customAttributes) {
@@ -582,8 +582,11 @@ app.get('/search/:id/count', async (c) => {
     mongoQuery.offerType = query.offerType;
   }
 
+  /**
+   * The tags query should be "and", so we need to find the offers that have all the tags provided by the user
+   */
   if (query.tags) {
-    mongoQuery.tags = { $elemMatch: { id: { $in: query.tags } } };
+    mongoQuery['tags.id'] = { $all: query.tags };
   }
 
   if (query.customAttributes) {
