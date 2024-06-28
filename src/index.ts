@@ -412,7 +412,6 @@ app.post('/offers', async (c) => {
         ...query,
         page: undefined,
         limit: undefined,
-        sortBy: undefined,
       })
     )
     .digest('hex');
