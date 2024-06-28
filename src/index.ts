@@ -1604,7 +1604,7 @@ app.get('/offers/:id/mappings', async (c) => {
     });
   }
 
-  const mappings = await Mappings.find({
+  const mappings = await Mappings.findOne({
     _id: id,
   });
 
