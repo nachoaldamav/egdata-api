@@ -432,9 +432,7 @@ app.post('/offers', async (c) => {
   const cachedQuery = await client.get(queryCache);
 
   if (!cachedQuery) {
-    await client.set(queryCache, JSON.stringify(query), {
-      EX: 2592000,
-    });
+    await client.set(queryCache, JSON.stringify(query));
   }
 
   const limit = Math.min(query.limit || 10, 50);
@@ -636,6 +634,23 @@ app.get('/search/:id/count', async (c) => {
     c.status(500);
     c.json({ message: 'Error while counting tags' });
   }
+});
+
+app.get('/search/:id', async (c) => {
+  const { id } = c.req.param();
+
+  const queryKey = `q:${id}`;
+
+  const cachedQuery = await client.get(queryKey);
+
+  if (!cachedQuery) {
+    c.status(404);
+    return c.json({
+      message: 'Query not found',
+    });
+  }
+
+  return c.json(JSON.parse(cachedQuery));
 });
 
 app.get('/search/tags', async (c) => {
