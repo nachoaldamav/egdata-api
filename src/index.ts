@@ -544,6 +544,31 @@ app.post('/offers', async (c) => {
   });
 });
 
+app.get('/search/tags', async (c) => {
+  const tags = await Tags.find({
+    status: 'ACTIVE',
+  });
+
+  return c.json(tags, 200, {
+    'Cache-Control': 'public, max-age=604800',
+  });
+});
+
+app.get('/search/offer-types', async (c) => {
+  console.log('types');
+  const types = await Offer.aggregate([
+    { $group: { _id: '$offerType', count: { $sum: 1 } } },
+  ]);
+
+  return c.json(
+    types.filter((t) => t._id),
+    200,
+    {
+      'Cache-Control': 'public, max-age=604800',
+    }
+  );
+});
+
 app.get('/search/:id/count', async (c) => {
   const { id } = c.req.param();
 
@@ -650,16 +675,6 @@ app.get('/search/:id', async (c) => {
   }
 
   return c.json(JSON.parse(cachedQuery));
-});
-
-app.get('/search/tags', async (c) => {
-  const tags = await Tags.find({
-    status: 'ACTIVE',
-  });
-
-  return c.json(tags, 200, {
-    'Cache-Control': 'public, max-age=604800',
-  });
 });
 
 app.get('/items', async (c) => {
