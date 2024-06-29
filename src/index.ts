@@ -12,7 +12,12 @@ import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
-import { PriceHistory, Sales, type PriceHistoryType } from './db/schemas/price';
+import {
+  Price,
+  PriceHistory,
+  Sales,
+  type PriceHistoryType,
+} from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 import { AchievementSet } from './db/schemas/achievements';
@@ -1061,9 +1066,10 @@ app.get('/sales', async (c) => {
 
   const start = new Date();
 
-  const sales = await Sales.find(
+  const sales = await Price.find(
     {
-      'metadata.region': region,
+      region,
+      'totalPrice.discount': { $gt: 0 },
     },
     undefined,
     {
@@ -1081,8 +1087,7 @@ app.get('/sales', async (c) => {
 
   const offers = await Offer.find(
     {
-      // @ts-expect-error
-      id: { $in: sales.map((s) => s.metadata.id) },
+      id: { $in: sales.map((s) => s.offerId) },
     },
     {
       id: 1,
@@ -1098,8 +1103,7 @@ app.get('/sales', async (c) => {
   );
 
   const result = sales.map((s) => {
-    // @ts-expect-error
-    const offer = offers.find((o) => o.id === s.metadata.id);
+    const offer = offers.find((o) => o.id === s.offerId);
 
     const o = offer?.toObject();
 
