@@ -1055,14 +1055,14 @@ app.get('/sales', async (c) => {
 
   const cacheKey = `sales:${region}:${page}:${limit}:v0.3`;
 
-  const cached = await client.get(cacheKey);
+  /* const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
       'X-Cache': 'HIT',
     });
-  }
+  } */
 
   const start = new Date();
 
@@ -1081,8 +1081,9 @@ app.get('/sales', async (c) => {
     }
   );
 
-  const count = await Sales.countDocuments({
-    'metadata.region': region,
+  const count = await Price.countDocuments({
+    region,
+    'totalPrice.discount': { $gt: 0 },
   });
 
   const offers = await Offer.find(
