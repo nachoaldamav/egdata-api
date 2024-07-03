@@ -12,12 +12,7 @@ import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
-import {
-  Price,
-  PriceHistory,
-  Sales,
-  type PriceHistoryType,
-} from './db/schemas/price';
+import { Price, PriceHistory, type PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 import { AchievementSet } from './db/schemas/achievements';
@@ -28,6 +23,7 @@ import client from './clients/redis';
 import SandboxRoute from './routes/sandbox';
 import { config } from 'dotenv';
 import { Mappings } from './db/schemas/mappings';
+import { gaClient } from './clients/ga';
 
 interface SearchBody {
   title?: string;
@@ -69,22 +65,23 @@ const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 
 const app = new Hono();
 
-app.use(
-  '/*',
-  cors({
-    origin: (origin: string) => {
-      if (ALLOWED_ORIGINS.includes(origin)) {
-        return origin;
-      }
+// app.use(
+//   '/*',
+//   cors({
+//     origin: (origin: string) => {
+//       console.log(origin);
+//       if (ALLOWED_ORIGINS.includes(origin)) {
+//         return origin;
+//       }
 
-      return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
-    },
-    allowHeaders: ['Content-Type', 'Authorization'],
-    allowMethods: ['GET', 'POST'],
-    credentials: true,
-    maxAge: 86400,
-  })
-);
+//       return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
+//     },
+//     allowHeaders: ['Content-Type', 'Authorization'],
+//     allowMethods: ['GET', 'POST'],
+//     credentials: true,
+//     maxAge: 86400,
+//   })
+// );
 
 const db = new DB();
 
@@ -1053,16 +1050,16 @@ app.get('/sales', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 30);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sales:${region}:${page}:${limit}:v0.3`;
+  const cacheKey = `sales:${region}:${page}:${limit}:v0.4`;
 
-  /* const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
       'X-Cache': 'HIT',
     });
-  } */
+  }
 
   const start = new Date();
 
@@ -1992,6 +1989,22 @@ app.get('/changelist', async (ctx) => {
 });
 
 app.route('/sandboxes', SandboxRoute);
+
+app.post('/ping', async (c) => {
+  const body = await c.req.json();
+
+  await gaClient.track(body);
+
+  return c.json({ message: 'pong' });
+});
+
+app.get('/ping', async (c) => {
+  return c.json({ message: 'pong' });
+});
+
+app.options('/ping', async (c) => {
+  return c.json({ message: 'pong' });
+});
 
 serve(
   {
