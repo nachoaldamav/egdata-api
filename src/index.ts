@@ -7,17 +7,21 @@ import { etag } from 'hono/etag';
 import { logger } from 'hono/logger';
 import { createHash } from 'node:crypto';
 import { DB } from './db';
-import { Offer } from './db/schemas/offer';
+import { Offer, OfferType } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
-import { Price, PriceHistory, type PriceHistoryType } from './db/schemas/price';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 import { AchievementSet } from './db/schemas/achievements';
 import { getGameFeatures } from './utils/game-features';
 import { Asset, AssetType } from './db/schemas/assets';
+import {
+  PriceEngine,
+  PriceEngineHistorical,
+  PriceType,
+} from './db/schemas/price-engine';
 import { Changelog } from './db/schemas/changelog';
 import client from './clients/redis';
 import SandboxRoute from './routes/sandbox';
@@ -253,13 +257,13 @@ app.get('/offers/events/:id', async (c) => {
 
   const cacheKey = `event:${id}:${region}:${page}:${limit}`;
 
-  const cached = await client.get(cacheKey);
+  /* const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=3600',
     });
-  }
+  } */
 
   const event = await Tags.findOne({
     id,
@@ -273,56 +277,65 @@ app.get('/offers/events/:id', async (c) => {
     });
   }
 
-  const offers = await Offer.find(
+  const offers = await Offer.aggregate([
+    { $match: { tags: { $elemMatch: { id } } } },
     {
-      tags: { $elemMatch: { id } },
-    },
-    undefined,
-    {
-      sort: {
-        lastModifiedDate: -1,
+      $lookup: {
+        from: 'pricev2',
+        let: { offerId: '$id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$offerId', '$$offerId'] },
+                  { $eq: ['$region', region] },
+                ],
+              },
+            },
+          },
+          {
+            $sort: { updatedAt: -1 },
+          },
+          {
+            $limit: 1,
+          },
+        ],
+        as: 'price',
       },
-      limit,
-      skip,
-    }
-  );
-
-  const prices = await PriceHistory.find(
-    {
-      'metadata.id': { $in: offers.map((o) => o.id) },
-      'metadata.region': region,
     },
-    undefined,
     {
-      sort: {
-        date: -1,
+      $unwind: {
+        path: '$price',
+        preserveNullAndEmptyArrays: true,
       },
-    }
-  );
+    },
+    {
+      $sort: { 'price.price.discount': -1 },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $limit: limit,
+    },
+    {
+      $project: {
+        _id: 0,
+        id: 1,
+        namespace: 1,
+        title: 1,
+        seller: 1,
+        developerDisplayName: 1,
+        publisherDisplayName: 1,
+        keyImages: 1,
+        price: 1,
+      },
+    },
+  ]);
 
-  const data = offers.map((o) => {
-    const price = prices.find((p) => p.metadata?.id === o.id);
-    return {
-      id: o.id,
-      namespace: o.namespace,
-      title: o.title,
-      seller: o.seller,
-      keyImages: o.keyImages,
-      developerDisplayName: o.developerDisplayName,
-      publisherDisplayName: o.publisherDisplayName,
-      price,
-    };
-  });
-
-  const result: {
-    elements: any[];
-    title: string;
-    limit: number;
-    start: number;
-    page: number;
-    count: number;
-  } = {
-    elements: data,
+  const result = {
+    elements: offers,
     title: event.name ?? '',
     limit,
     start: skip,
@@ -333,7 +346,7 @@ app.get('/offers/events/:id', async (c) => {
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
-    EX: 86400,
+    EX: 3600,
   });
 
   return c.json(result, 200, {
@@ -1049,7 +1062,7 @@ app.get('/sales', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 30);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sales:${region}:${page}:${limit}:v0.4`;
+  const cacheKey = `sales:${region}:${page}:${limit}:v1.0`;
 
   const cached = await client.get(cacheKey);
 
@@ -1062,64 +1075,88 @@ app.get('/sales', async (c) => {
 
   const start = new Date();
 
-  const sales = await Price.find(
+  const result = await PriceEngine.aggregate<
+    Pick<
+      OfferType,
+      | 'id'
+      | 'namespace'
+      | 'title'
+      | 'seller'
+      | 'developerDisplayName'
+      | 'publisherDisplayName'
+      | 'keyImages'
+      | 'lastModifiedDate'
+      | 'offerType'
+    > & { price: PriceType }
+  >([
     {
-      region,
-      'totalPrice.discount': { $gt: 0 },
-    },
-    undefined,
-    {
-      limit,
-      skip,
-      sort: {
-        date: -1,
+      $match: {
+        region,
+        'price.discount': { $gt: 0 },
       },
-    }
-  );
-
-  const count = await Price.countDocuments({
-    region,
-    'totalPrice.discount': { $gt: 0 },
-  });
-
-  const offers = await Offer.find(
-    {
-      id: { $in: sales.map((s) => s.offerId) },
     },
     {
-      id: 1,
-      namespace: 1,
-      title: 1,
-      seller: 1,
-      developerDisplayName: 1,
-      publisherDisplayName: 1,
-      keyImages: 1,
-      lastModifiedDate: 1,
-      offerType: 1,
-    }
-  );
+      $lookup: {
+        from: 'offers',
+        localField: 'offerId',
+        foreignField: 'id',
+        as: 'offer',
+      },
+    },
+    {
+      $unwind: {
+        path: '$offer',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $sort: {
+        updatedAt: -1,
+      },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $limit: limit,
+    },
+    {
+      $project: {
+        _id: 0,
+        id: '$offer.id',
+        namespace: '$offer.namespace',
+        title: '$offer.title',
+        seller: '$offer.seller',
+        developerDisplayName: '$offer.developerDisplayName',
+        publisherDisplayName: '$offer.publisherDisplayName',
+        keyImages: '$offer.keyImages',
+        lastModifiedDate: '$offer.lastModifiedDate',
+        offerType: '$offer.offerType',
+        price: 1,
+      },
+    },
+  ]);
 
-  const result = sales.map((s) => {
-    const offer = offers.find((o) => o.id === s.offerId);
-
-    const o = offer?.toObject();
-
-    return {
-      id: o?.id,
-      namespace: o?.namespace,
-      title: o?.title,
-      seller: o?.seller,
-      developerDisplayName: o?.developerDisplayName,
-      publisherDisplayName: o?.publisherDisplayName,
-      keyImages: o?.keyImages,
-      lastModifiedDate: o?.lastModifiedDate,
-      offerType: o?.offerType,
-      price: s,
-    };
+  const count = await PriceEngine.countDocuments({
+    'price.discount': { $gt: 0 },
+    region,
   });
 
   const res = {
-    elements: result,
+    elements: result.map((r) => {
+      return {
+        id: r.id,
+        namespace: r.namespace,
+        title: r.title,
+        offerType: r.offerType,
+        seller: r.seller,
+        developerDisplayName: r.developerDisplayName,
+        publisherDisplayName: r.publisherDisplayName,
+        keyImages: r.keyImages,
+        lastModifiedDate: r.lastModifiedDate,
+        price: r.price,
+      };
+    }),
     page,
     limit,
     total: count,
@@ -1173,9 +1210,9 @@ app.get('/offers/:id/price-history', async (c) => {
     }
 
     // Show just the prices for the selected region
-    const prices = await PriceHistory.find({
-      'metadata.id': id,
-      'metadata.region': region,
+    const prices = await PriceEngineHistorical.find({
+      offerId: id,
+      region,
     }).sort({ date: -1 });
 
     if (!prices) {
@@ -1199,24 +1236,23 @@ app.get('/offers/:id/price-history', async (c) => {
     return c.json(JSON.parse(cached));
   }
 
-  const prices = await PriceHistory.find({
-    'metadata.id': id,
-    // get the prices for all regions
-    'metadata.region': { $in: Object.keys(regions) },
+  const prices = await PriceEngineHistorical.find({
+    offerId: id,
+    region: { $in: Object.keys(regions) },
   }).sort({ date: -1 });
 
   // Structure the data, Record<string, PriceHistoryType[]>
   const pricesByRegion = prices.reduce((acc, price) => {
-    if (!price.metadata?.region) return acc;
+    if (!price?.region) return acc;
 
-    if (!acc[price.metadata.region]) {
-      acc[price.metadata.region] = [];
+    if (!acc[price.region]) {
+      acc[price.region] = [];
     }
 
-    acc[price.metadata.region].push(price);
+    acc[price.region].push(price);
 
     return acc;
-  }, {} as Record<string, PriceHistoryType[]>);
+  }, {} as Record<string, PriceType[]>);
 
   if (!pricesByRegion || Object.keys(pricesByRegion).length === 0) {
     c.status(200);
@@ -1373,10 +1409,10 @@ app.get('/offers/:id/price', async (c) => {
     });
   }
 
-  const price = await PriceHistory.findOne(
+  const price = await PriceEngineHistorical.findOne(
     {
-      'metadata.id': id,
-      'metadata.region': region,
+      offerId: id,
+      region,
     },
     undefined,
     {
@@ -1421,9 +1457,9 @@ app.get('/offers/:id/regional-price', async (c) => {
   }
 
   // Iterate over all the regions (faster than aggregating) to get the last price, max and min for each region
-  const prices = await PriceHistory.find(
+  const prices = await PriceEngineHistorical.find(
     {
-      'metadata.id': id,
+      offerId: id,
     },
     undefined,
     {
@@ -1437,7 +1473,7 @@ app.get('/offers/:id/regional-price', async (c) => {
 
   const result = regionsKeys.reduce(
     (acc, r) => {
-      const regionPrices = prices.filter((p) => p.metadata?.region === r);
+      const regionPrices = prices.filter((p) => p?.region === r);
 
       if (!regionPrices.length) {
         return acc;
@@ -1445,9 +1481,7 @@ app.get('/offers/:id/regional-price', async (c) => {
 
       const lastPrice = regionPrices[0];
 
-      const allPrices = regionPrices.map(
-        (p) => p.totalPrice.discountPrice ?? 0
-      );
+      const allPrices = regionPrices.map((p) => p.price.discountPrice ?? 0);
 
       const maxPrice = Math.max(...allPrices);
 
@@ -1464,7 +1498,7 @@ app.get('/offers/:id/regional-price', async (c) => {
     {} as Record<
       string,
       {
-        currentPrice: PriceHistoryType;
+        currentPrice: PriceType;
         maxPrice: number;
         minPrice: number;
       }
@@ -1768,10 +1802,10 @@ app.get('/promotions/:id', async (c) => {
     }
   );
 
-  const prices = await PriceHistory.find(
+  const prices = await PriceEngineHistorical.find(
     {
-      'metadata.id': { $in: offers.map((o) => o.id) },
-      'metadata.region': region,
+      region,
+      offerId: { $in: offers.map((o) => o.id) },
     },
     undefined,
     {
@@ -1782,7 +1816,7 @@ app.get('/promotions/:id', async (c) => {
   );
 
   const data = offers.map((o) => {
-    const price = prices.find((p) => p.metadata?.id === o.id);
+    const price = prices.find((p) => p?.id === o.id);
     return {
       id: o.id,
       namespace: o.namespace,
