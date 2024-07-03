@@ -65,23 +65,22 @@ const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
 
 const app = new Hono();
 
-// app.use(
-//   '/*',
-//   cors({
-//     origin: (origin: string) => {
-//       console.log(origin);
-//       if (ALLOWED_ORIGINS.includes(origin)) {
-//         return origin;
-//       }
+app.use(
+  '/*',
+  cors({
+    origin: (origin: string) => {
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return origin;
+      }
 
-//       return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
-//     },
-//     allowHeaders: ['Content-Type', 'Authorization'],
-//     allowMethods: ['GET', 'POST'],
-//     credentials: true,
-//     maxAge: 86400,
-//   })
-// );
+      return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
+    },
+    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['GET', 'POST'],
+    credentials: true,
+    maxAge: 86400,
+  })
+);
 
 const db = new DB();
 
