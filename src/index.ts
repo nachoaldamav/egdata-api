@@ -25,6 +25,7 @@ import {
 import { Changelog } from './db/schemas/changelog';
 import client from './clients/redis';
 import SandboxRoute from './routes/sandbox';
+import SearchRoute from './routes/search';
 import { config } from 'dotenv';
 import { Mappings } from './db/schemas/mappings';
 import { gaClient } from './clients/ga';
@@ -556,139 +557,6 @@ app.post('/offers', async (c) => {
   return c.json(result, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
   });
-});
-
-app.get('/search/tags', async (c) => {
-  const tags = await Tags.find({
-    status: 'ACTIVE',
-  });
-
-  return c.json(tags, 200, {
-    'Cache-Control': 'public, max-age=604800',
-  });
-});
-
-app.get('/search/offer-types', async (c) => {
-  console.log('types');
-  const types = await Offer.aggregate([
-    { $group: { _id: '$offerType', count: { $sum: 1 } } },
-  ]);
-
-  return c.json(
-    types.filter((t) => t._id),
-    200,
-    {
-      'Cache-Control': 'public, max-age=604800',
-    }
-  );
-});
-
-app.get('/search/:id/count', async (c) => {
-  const { id } = c.req.param();
-
-  const queryKey = `q:${id}`;
-
-  const cacheKey = `search:count:${id}`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
-    });
-  }
-
-  const cachedQuery = await client.get(queryKey);
-
-  if (!cachedQuery) {
-    c.status(404);
-    return c.json({
-      message: 'Query not found',
-    });
-  }
-
-  const query = JSON.parse(cachedQuery);
-
-  const mongoQuery: Record<string, any> = {};
-
-  if (query.title) {
-    mongoQuery.title = { $regex: new RegExp(query.title, 'i') };
-  }
-
-  if (query.offerType) {
-    mongoQuery.offerType = query.offerType;
-  }
-
-  /**
-   * The tags query should be "and", so we need to find the offers that have all the tags provided by the user
-   */
-  if (query.tags) {
-    mongoQuery['tags.id'] = { $all: query.tags };
-  }
-
-  if (query.customAttributes) {
-    mongoQuery.customAttributes = {
-      $elemMatch: { id: { $in: query.customAttributes } },
-    };
-  }
-
-  if (query.seller) {
-    mongoQuery['seller.id'] = query.seller;
-  }
-
-  if (query.refundType) {
-    mongoQuery.refundType = query.refundType;
-  }
-
-  if (query.isCodeRedemptionOnly !== undefined) {
-    mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
-  }
-
-  try {
-    const tagCounts = await Offer.aggregate([
-      { $match: mongoQuery },
-      { $unwind: '$tags' },
-      { $group: { _id: '$tags.id', count: { $sum: 1 } } },
-    ]);
-
-    const offerTypeCounts = await Offer.aggregate([
-      { $match: mongoQuery },
-      { $group: { _id: '$offerType', count: { $sum: 1 } } },
-    ]);
-
-    const result = {
-      tagCounts,
-      offerTypeCounts,
-    };
-
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 3600,
-    });
-
-    return c.json(result, 200, {
-      'Cache-Control': 'public, max-age=3600',
-    });
-  } catch (err) {
-    c.status(500);
-    c.json({ message: 'Error while counting tags' });
-  }
-});
-
-app.get('/search/:id', async (c) => {
-  const { id } = c.req.param();
-
-  const queryKey = `q:${id}`;
-
-  const cachedQuery = await client.get(queryKey);
-
-  if (!cachedQuery) {
-    c.status(404);
-    return c.json({
-      message: 'Query not found',
-    });
-  }
-
-  return c.json(JSON.parse(cachedQuery));
 });
 
 app.get('/items', async (c) => {
@@ -2022,6 +1890,8 @@ app.get('/changelist', async (ctx) => {
 });
 
 app.route('/sandboxes', SandboxRoute);
+
+app.route('/search', SearchRoute);
 
 app.post('/ping', async (c) => {
   const body = await c.req.json();

@@ -2,7 +2,10 @@ import { createHash } from 'crypto';
 import { Hono } from 'hono';
 import client from '../clients/redis';
 import { Offer } from '../db/schemas/offer';
-import { orderOffersObject } from '../utils/order-offers-object';
+import { Tags } from '../db/schemas/tags';
+import { PipelineStage } from 'mongoose';
+import { regions } from '../utils/countries';
+import { getCookie } from 'hono/cookie';
 
 interface SearchBody {
   title?: string;
@@ -49,6 +52,18 @@ app.get('/', (c) => c.json('Hello, World!'));
 
 app.post('/', async (c) => {
   const start = new Date();
+
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region =
+    Object.keys(regions).find((r) =>
+      regions[r].countries.includes(selectedCountry)
+    ) || 'US';
+
   const body = await c.req.json().catch((err) => {
     c.status(400);
     return null;
@@ -72,7 +87,7 @@ app.post('/', async (c) => {
     )
     .digest('hex');
 
-  const cacheKey = `offers:search:${queryId}`;
+  const cacheKey = `offers:search:${queryId}:${region}`;
 
   const cached = await client.get(cacheKey);
 
@@ -82,7 +97,9 @@ app.post('/', async (c) => {
     });
   }
 
-  const queryCache = `q:${queryId}`;
+  console.warn(`Cache miss for ${cacheKey}`);
+
+  const queryCache = `q:${queryId}:${region}`;
 
   const cachedQuery = await client.get(queryCache);
 
@@ -106,6 +123,7 @@ app.post('/', async (c) => {
   };
 
   const mongoQuery: Record<string, any> = {};
+  const priceQuery: Record<string, any> = {};
 
   if (query.title) {
     mongoQuery['$text'] = {
@@ -155,7 +173,9 @@ app.post('/', async (c) => {
     query.sortBy &&
     (query.sortBy === 'releaseDate' ||
       query.sortBy === 'pcReleaseDate' ||
-      query.sortBy === 'effectiveDate')
+      query.sortBy === 'effectiveDate' ||
+      query.sortBy === 'creationDate' ||
+      query.sortBy === 'viewableDate')
   ) {
     // If any of those sorts are used, we need to ignore the offers that are from after 2090 (mock date for unknown dates)
     mongoQuery[query.sortBy] = { $lt: new Date('2090-01-01') };
@@ -165,39 +185,320 @@ app.post('/', async (c) => {
     mongoQuery.lastModifiedDate = { $lt: new Date() };
   }
 
-  console.log(mongoQuery);
+  if (query.price) {
+    if (query.price.min) {
+      priceQuery['price.discountPrice'] = {
+        $gte: query.price.min,
+      };
+    }
 
-  const offers = await Offer.find(mongoQuery, undefined, {
-    limit,
-    skip: (page - 1) * limit,
-    sort: {
-      ...(query.title
-        ? {
-            score: { $meta: 'textScore' },
-          }
-        : {}),
-      [sort]: sortQuery[sort],
+    if (query.price.max) {
+      priceQuery['price.discountPrice'] = {
+        ...priceQuery['price.discountPrice'],
+        $lte: query.price.max,
+      };
+    }
+  }
+
+  if (query.onSale) {
+    priceQuery['price.discount'] = { $gt: 0 };
+  }
+
+  const offersPipeline: PipelineStage[] = [
+    {
+      $match: mongoQuery,
     },
-    collation: {
-      locale: 'en',
-      strength: 1,
-      caseLevel: false,
-      normalization: true,
-      numericOrdering: true,
+    {
+      $sort: {
+        ...(query.title
+          ? {
+              score: { $meta: 'textScore' },
+            }
+          : {}),
+        [sort]: sortQuery[sort],
+      },
     },
-  });
+    {
+      $lookup: {
+        from: 'pricev2',
+        localField: 'id',
+        foreignField: 'offerId',
+        as: 'priceEngine',
+        pipeline: [
+          {
+            $match: {
+              region: region,
+              ...priceQuery,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        price: { $arrayElemAt: ['$priceEngine', 0] },
+      },
+    },
+    {
+      $match: {
+        price: { $ne: null },
+      },
+    },
+    {
+      $project: {
+        priceEngine: 0,
+      },
+    },
+    {
+      $skip: (page - 1) * limit,
+    },
+    {
+      $limit: limit,
+    },
+    // Simplified the fields to return
+    {
+      $project: {
+        _id: 0,
+        id: 1,
+        namespace: 1,
+        title: 1,
+        offerType: 1,
+        keyImages: 1,
+        seller: 1,
+        developerDisplayName: 1,
+        publisherDisplayName: 1,
+        price: 1,
+      },
+    },
+  ];
+
+  const [offersData] = await Promise.allSettled([
+    Offer.aggregate(offersPipeline),
+  ]);
+
+  const offers = offersData.status === 'fulfilled' ? offersData.value : [];
 
   const result = {
-    elements: offers.map((o) => orderOffersObject(o)),
+    elements: offers,
     page,
     limit,
-    total: await Offer.countDocuments(mongoQuery),
     query: queryId,
   };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
 
   return c.json(result, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
   });
+});
+
+app.get('/tags', async (c) => {
+  const tags = await Tags.find({
+    status: 'ACTIVE',
+  });
+
+  return c.json(tags, 200, {
+    'Cache-Control': 'public, max-age=604800',
+  });
+});
+
+app.get('/offer-types', async (c) => {
+  console.log('types');
+  const types = await Offer.aggregate([
+    { $group: { _id: '$offerType', count: { $sum: 1 } } },
+  ]);
+
+  return c.json(
+    types.filter((t) => t._id),
+    200,
+    {
+      'Cache-Control': 'public, max-age=604800',
+    }
+  );
+});
+
+app.get('/:id/count', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region =
+    Object.keys(regions).find((r) =>
+      regions[r].countries.includes(selectedCountry)
+    ) || 'US';
+
+  const { id } = c.req.param();
+
+  const queryKey = `q:${id}:${region}`;
+
+  const cacheKey = `search:count:${id}:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  }
+
+  const cachedQuery = await client.get(queryKey);
+
+  if (!cachedQuery) {
+    c.status(404);
+    return c.json({
+      message: 'Query not found',
+    });
+  }
+
+  const query = JSON.parse(cachedQuery);
+
+  const mongoQuery: Record<string, any> = {};
+  const priceQuery: Record<string, any> = {};
+
+  if (query.title) {
+    mongoQuery.title = { $regex: new RegExp(query.title, 'i') };
+  }
+
+  if (query.offerType) {
+    mongoQuery.offerType = query.offerType;
+  }
+
+  /**
+   * The tags query should be "and", so we need to find the offers that have all the tags provided by the user
+   */
+  if (query.tags) {
+    mongoQuery['tags.id'] = { $all: query.tags };
+  }
+
+  if (query.customAttributes) {
+    mongoQuery.customAttributes = {
+      $elemMatch: { id: { $in: query.customAttributes } },
+    };
+  }
+
+  if (query.seller) {
+    mongoQuery['seller.id'] = query.seller;
+  }
+
+  if (query.refundType) {
+    mongoQuery.refundType = query.refundType;
+  }
+
+  if (query.isCodeRedemptionOnly !== undefined) {
+    mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
+  }
+
+  if (query.price) {
+    if (query.price.min) {
+      priceQuery['price.discountPrice'] = {
+        $gte: query.price.min,
+      };
+    }
+
+    if (query.price.max) {
+      priceQuery['price.discountPrice'] = {
+        ...priceQuery['price.discountPrice'],
+        $lte: query.price.max,
+      };
+    }
+  }
+
+  if (query.onSale) {
+    priceQuery['price.discount'] = { $gt: 0 };
+  }
+
+  try {
+    const [tagCountsData, offerTypeCountsData, totalCountData] =
+      await Promise.allSettled([
+        Offer.aggregate([
+          { $match: mongoQuery },
+          { $unwind: '$tags' },
+          { $group: { _id: '$tags.id', count: { $sum: 1 } } },
+        ]),
+        Offer.aggregate([
+          { $match: mongoQuery },
+          { $group: { _id: '$offerType', count: { $sum: 1 } } },
+        ]),
+        Offer.aggregate([
+          { $match: mongoQuery },
+          // Append the price query to the pipeline
+          {
+            $lookup: {
+              from: 'pricev2',
+              localField: 'id',
+              foreignField: 'offerId',
+              as: 'priceEngine',
+              pipeline: [
+                {
+                  $match: {
+                    region,
+                    ...priceQuery,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              price: { $arrayElemAt: ['$priceEngine', 0] },
+            },
+          },
+          {
+            $match: {
+              price: { $ne: null },
+            },
+          },
+          {
+            $count: 'total',
+          },
+        ]),
+      ]);
+
+    const result = {
+      tagCounts:
+        tagCountsData.status === 'fulfilled' ? tagCountsData.value : [],
+      offerTypeCounts:
+        offerTypeCountsData.status === 'fulfilled'
+          ? offerTypeCountsData.value
+          : [],
+      total:
+        totalCountData.status === 'fulfilled'
+          ? totalCountData.value[0]?.total
+          : 0,
+    };
+
+    await client.set(cacheKey, JSON.stringify(result), {
+      EX: 86400,
+    });
+
+    return c.json(result, 200, {
+      'Cache-Control': 'public, max-age=3600',
+    });
+  } catch (err) {
+    c.status(500);
+    c.json({ message: 'Error while counting tags' });
+  }
+});
+
+app.get('/:id', async (c) => {
+  const { id } = c.req.param();
+
+  const queryKey = `q:${id}`;
+
+  const cachedQuery = await client.get(queryKey);
+
+  if (!cachedQuery) {
+    c.status(404);
+    return c.json({
+      message: 'Query not found',
+    });
+  }
+
+  return c.json(JSON.parse(cachedQuery));
 });
 
 export default app;
