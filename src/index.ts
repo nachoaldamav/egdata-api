@@ -93,7 +93,7 @@ db.connect();
 
 app.use('/*', etag());
 
-app.use(logger());
+// app.use(logger());
 
 app.get('/health', (c) => {
   return c.json({
@@ -1478,7 +1478,7 @@ app.get('/promotions/:id', async (c) => {
     });
   }
 
-  const cacheKey = `promotion:${id}:${region}:${page}:${limit}`;
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -1517,7 +1517,7 @@ app.get('/promotions/:id', async (c) => {
     }
   );
 
-  const prices = await PriceEngineHistorical.find(
+  const prices = await PriceEngine.find(
     {
       region,
       offerId: { $in: offers.map((o) => o.id) },
@@ -1531,7 +1531,10 @@ app.get('/promotions/:id', async (c) => {
   );
 
   const data = offers.map((o) => {
-    const price = prices.find((p) => p?.id === o.id);
+    const price = prices.find((p) => p?.offerId === o.id);
+    if (!price) {
+      console.warn(`Price not found for offer ${o.id}`);
+    }
     return {
       id: o.id,
       namespace: o.namespace,
