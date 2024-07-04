@@ -6,6 +6,7 @@ import { Tags } from '../db/schemas/tags';
 import { PipelineStage } from 'mongoose';
 import { regions } from '../utils/countries';
 import { getCookie } from 'hono/cookie';
+import { title } from 'process';
 
 interface SearchBody {
   title?: string;
@@ -87,11 +88,12 @@ app.post('/', async (c) => {
     )
     .digest('hex');
 
-  const cacheKey = `offers:search:${queryId}:${region}`;
+  const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
   if (cached) {
+    console.warn(`Cache hit for ${cacheKey}`);
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
     });
@@ -104,7 +106,10 @@ app.post('/', async (c) => {
   const cachedQuery = await client.get(queryCache);
 
   if (!cachedQuery) {
+    console.warn(`Cache miss for ${queryCache}`);
     await client.set(queryCache, JSON.stringify(query));
+  } else {
+    console.warn(`Cache hit for ${queryCache}`);
   }
 
   const limit = Math.min(query.limit || 10, 50);
@@ -255,21 +260,6 @@ app.post('/', async (c) => {
     {
       $limit: limit,
     },
-    // Simplified the fields to return
-    {
-      $project: {
-        _id: 0,
-        id: 1,
-        namespace: 1,
-        title: 1,
-        offerType: 1,
-        keyImages: 1,
-        seller: 1,
-        developerDisplayName: 1,
-        publisherDisplayName: 1,
-        price: 1,
-      },
-    },
   ];
 
   const [offersData] = await Promise.allSettled([
@@ -305,7 +295,6 @@ app.get('/tags', async (c) => {
 });
 
 app.get('/offer-types', async (c) => {
-  console.log('types');
   const types = await Offer.aggregate([
     { $group: { _id: '$offerType', count: { $sum: 1 } } },
   ]);
@@ -335,7 +324,7 @@ app.get('/:id/count', async (c) => {
 
   const queryKey = `q:${id}:${region}`;
 
-  const cacheKey = `search:count:${id}:${region}`;
+  const cacheKey = `search:count:${id}:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -416,11 +405,63 @@ app.get('/:id/count', async (c) => {
       await Promise.allSettled([
         Offer.aggregate([
           { $match: mongoQuery },
+          {
+            $lookup: {
+              from: 'pricev2',
+              localField: 'id',
+              foreignField: 'offerId',
+              as: 'priceEngine',
+              pipeline: [
+                {
+                  $match: {
+                    region,
+                    ...priceQuery,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              price: { $arrayElemAt: ['$priceEngine', 0] },
+            },
+          },
+          {
+            $match: {
+              price: { $ne: null },
+            },
+          },
           { $unwind: '$tags' },
           { $group: { _id: '$tags.id', count: { $sum: 1 } } },
         ]),
         Offer.aggregate([
           { $match: mongoQuery },
+          {
+            $lookup: {
+              from: 'pricev2',
+              localField: 'id',
+              foreignField: 'offerId',
+              as: 'priceEngine',
+              pipeline: [
+                {
+                  $match: {
+                    region,
+                    ...priceQuery,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              price: { $arrayElemAt: ['$priceEngine', 0] },
+            },
+          },
+          {
+            $match: {
+              price: { $ne: null },
+            },
+          },
           { $group: { _id: '$offerType', count: { $sum: 1 } } },
         ]),
         Offer.aggregate([
@@ -486,8 +527,18 @@ app.get('/:id/count', async (c) => {
 
 app.get('/:id', async (c) => {
   const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
-  const queryKey = `q:${id}`;
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region =
+    Object.keys(regions).find((r) =>
+      regions[r].countries.includes(selectedCountry)
+    ) || 'US';
+
+  const queryKey = `q:${id}:${region}`;
 
   const cachedQuery = await client.get(queryKey);
 
