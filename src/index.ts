@@ -1543,6 +1543,8 @@ app.get('/promotions/:id', async (c) => {
       keyImages: o.keyImages,
       developerDisplayName: o.developerDisplayName,
       publisherDisplayName: o.publisherDisplayName,
+      releaseDate: o.releaseDate,
+      prePurchase: o.prePurchase,
       price,
     };
   });
@@ -1739,10 +1741,6 @@ app.get('/changelist', async (ctx) => {
   });
 });
 
-app.route('/sandboxes', SandboxRoute);
-
-app.route('/search', SearchRoute);
-
 app.post('/ping', async (c) => {
   const body = await c.req.json();
 
@@ -1758,6 +1756,10 @@ app.get('/ping', async (c) => {
 app.options('/ping', async (c) => {
   return c.json({ message: 'pong' });
 });
+
+app.route('/sandboxes', SandboxRoute);
+
+app.route('/search', SearchRoute);
 
 serve(
   {
