@@ -6,7 +6,6 @@ import { Tags } from '../db/schemas/tags';
 import { PipelineStage } from 'mongoose';
 import { regions } from '../utils/countries';
 import { getCookie } from 'hono/cookie';
-import { title } from 'process';
 
 interface SearchBody {
   title?: string;
@@ -101,7 +100,7 @@ app.post('/', async (c) => {
 
   console.warn(`Cache miss for ${cacheKey}`);
 
-  const queryCache = `q:${queryId}:${region}`;
+  const queryCache = `q:${queryId}`;
 
   const cachedQuery = await client.get(queryCache);
 
@@ -322,7 +321,7 @@ app.get('/:id/count', async (c) => {
 
   const { id } = c.req.param();
 
-  const queryKey = `q:${id}:${region}`;
+  const queryKey = `q:${id}`;
 
   const cacheKey = `search:count:${id}:${region}:v0.1`;
 
@@ -414,7 +413,7 @@ app.get('/:id/count', async (c) => {
               pipeline: [
                 {
                   $match: {
-                    region,
+                    region: 'EURO',
                     ...priceQuery,
                   },
                 },
@@ -445,7 +444,7 @@ app.get('/:id/count', async (c) => {
               pipeline: [
                 {
                   $match: {
-                    region,
+                    region: 'EURO',
                     ...priceQuery,
                   },
                 },
@@ -476,7 +475,7 @@ app.get('/:id/count', async (c) => {
               pipeline: [
                 {
                   $match: {
-                    region,
+                    region: 'EURO',
                     ...priceQuery,
                   },
                 },
@@ -527,18 +526,8 @@ app.get('/:id/count', async (c) => {
 
 app.get('/:id', async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-
-  // Get the region for the selected country
-  const region =
-    Object.keys(regions).find((r) =>
-      regions[r].countries.includes(selectedCountry)
-    ) || 'US';
-
-  const queryKey = `q:${id}:${region}`;
+  const queryKey = `q:${id}`;
 
   const cachedQuery = await client.get(queryKey);
 

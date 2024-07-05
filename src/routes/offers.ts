@@ -318,6 +318,17 @@ app.get('/upcoming', async (c) => {
   });
 });
 
+app.get('/genres', async (c) => {
+  const genres = await Tags.find({
+    groupName: 'genre',
+    status: 'ACTIVE',
+  });
+
+  return c.json(genres, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
 app.get('/:id', async (c) => {
   const { id } = c.req.param();
 
