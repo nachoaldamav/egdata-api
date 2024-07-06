@@ -505,7 +505,7 @@ app.get('/sales', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 30);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sales:${region}:${page}:${limit}:v1.0`;
+  const cacheKey = `sales:${region}:${page}:${limit}:v1.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -575,7 +575,7 @@ app.get('/sales', async (c) => {
         keyImages: '$offer.keyImages',
         lastModifiedDate: '$offer.lastModifiedDate',
         offerType: '$offer.offerType',
-        price: 1,
+        price: '$price',
       },
     },
   ]);
