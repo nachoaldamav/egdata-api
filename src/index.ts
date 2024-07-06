@@ -505,7 +505,7 @@ app.get('/sales', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 30);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sales:${region}:${page}:${limit}:v1.1`;
+  const cacheKey = `sales:${region}:${page}:${limit}:v1.2`;
 
   const cached = await client.get(cacheKey);
 
@@ -519,23 +519,18 @@ app.get('/sales', async (c) => {
   const start = new Date();
 
   const result = await PriceEngine.aggregate<
-    Pick<
-      OfferType,
-      | 'id'
-      | 'namespace'
-      | 'title'
-      | 'seller'
-      | 'developerDisplayName'
-      | 'publisherDisplayName'
-      | 'keyImages'
-      | 'lastModifiedDate'
-      | 'offerType'
-    > & { price: PriceType }
+    { offer: OfferType } & { price: PriceType }
   >([
     {
       $match: {
         region,
         'price.discount': { $gt: 0 },
+      },
+    },
+    {
+      // Save the data under "price" key
+      $addFields: {
+        price: '$$ROOT',
       },
     },
     {
@@ -563,21 +558,6 @@ app.get('/sales', async (c) => {
     {
       $limit: limit,
     },
-    {
-      $project: {
-        _id: 0,
-        id: '$offer.id',
-        namespace: '$offer.namespace',
-        title: '$offer.title',
-        seller: '$offer.seller',
-        developerDisplayName: '$offer.developerDisplayName',
-        publisherDisplayName: '$offer.publisherDisplayName',
-        keyImages: '$offer.keyImages',
-        lastModifiedDate: '$offer.lastModifiedDate',
-        offerType: '$offer.offerType',
-        price: '$price',
-      },
-    },
   ]);
 
   const count = await PriceEngine.countDocuments({
@@ -588,15 +568,7 @@ app.get('/sales', async (c) => {
   const res = {
     elements: result.map((r) => {
       return {
-        id: r.id,
-        namespace: r.namespace,
-        title: r.title,
-        offerType: r.offerType,
-        seller: r.seller,
-        developerDisplayName: r.developerDisplayName,
-        publisherDisplayName: r.publisherDisplayName,
-        keyImages: r.keyImages,
-        lastModifiedDate: r.lastModifiedDate,
+        ...r.offer,
         price: r.price,
       };
     }),
