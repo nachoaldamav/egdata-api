@@ -15,6 +15,7 @@ import { Tags } from '../db/schemas/tags';
 import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
 import { off } from 'process';
+import { release } from 'os';
 
 const app = new Hono();
 
@@ -331,14 +332,20 @@ app.get('/genres', async (c) => {
 
   const result = await Promise.all(
     genres.map(async (genre) => {
-      const offers = await Offer.find({
-        tags: { $elemMatch: { id: genre.id } },
-        offerType: 'BASE_GAME',
-      })
-        .limit(3)
-        .sort({
-          lastModifiedDate: -1,
-        });
+      const offers = await Offer.find(
+        {
+          tags: { $elemMatch: { id: genre.id } },
+          offerType: 'BASE_GAME',
+          releaseDate: { $lte: new Date() },
+        },
+        undefined,
+        {
+          limit: 3,
+          sort: {
+            releaseDate: -1,
+          },
+        }
+      );
 
       return {
         genre,
