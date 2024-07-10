@@ -134,6 +134,17 @@ app.get('/sitemap.xml', async (c) => {
   });
 });
 
+app.get('/robots.txt', async (c) => {
+  // Disallow all robots as this is an API
+  const robots = `User-agent: *
+Disallow: /`;
+
+  return c.text(robots, 200, {
+    'Content-Type': 'text/plain',
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
 app.get('/items', async (c) => {
   const MAX_LIMIT = 50;
   const limit = Math.min(

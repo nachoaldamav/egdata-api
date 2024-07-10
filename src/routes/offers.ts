@@ -14,8 +14,6 @@ import { getGameFeatures } from '../utils/game-features';
 import { Tags } from '../db/schemas/tags';
 import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
-import { off } from 'process';
-import { release } from 'os';
 
 const app = new Hono();
 
