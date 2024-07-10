@@ -14,6 +14,7 @@ import { getGameFeatures } from '../utils/game-features';
 import { Tags } from '../db/schemas/tags';
 import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
+import { off } from 'process';
 
 const app = new Hono();
 
@@ -332,6 +333,7 @@ app.get('/genres', async (c) => {
     genres.map(async (genre) => {
       const offers = await Offer.find({
         tags: { $elemMatch: { id: genre.id } },
+        offerType: 'BASE_GAME',
       })
         .limit(3)
         .sort({
