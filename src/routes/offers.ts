@@ -13,6 +13,7 @@ import { attributesToObject } from '../utils/attributes-to-object';
 import { getGameFeatures } from '../utils/game-features';
 import { Tags } from '../db/schemas/tags';
 import { orderOffersObject } from '../utils/order-offers-object';
+import { getImage } from '../utils/get-image';
 
 const app = new Hono();
 
@@ -318,13 +319,44 @@ app.get('/upcoming', async (c) => {
   });
 });
 
+/**
+ * Retrieves the list of genres with 3 games applied to it for the homepage
+ */
 app.get('/genres', async (c) => {
   const genres = await Tags.find({
     groupName: 'genre',
     status: 'ACTIVE',
   });
 
-  return c.json(genres, 200, {
+  const result = await Promise.all(
+    genres.map(async (genre) => {
+      const offers = await Offer.find({
+        tags: { $elemMatch: { id: genre.id } },
+      })
+        .limit(3)
+        .sort({
+          lastModifiedDate: -1,
+        });
+
+      return {
+        genre,
+        offers: offers.map((o) => {
+          return {
+            id: o.id,
+            title: o.title,
+            image: getImage(o.keyImages, [
+              'OfferImageTall',
+              'Thumbnail',
+              'DieselGameBoxTall',
+              'DieselStoreFrontTall',
+            ]),
+          };
+        }),
+      };
+    })
+  );
+
+  return c.json(result, 200, {
     'Cache-Control': 'public, max-age=3600',
   });
 });
