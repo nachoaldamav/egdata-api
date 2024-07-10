@@ -185,6 +185,11 @@ app.post('/', async (c) => {
     mongoQuery[query.sortBy] = { $lt: new Date('2090-01-01') };
   }
 
+  if (['releaseDate', 'pcReleaseDate'].includes(sort)) {
+    // If the sort is releaseDate or pcReleaseDate, we need to ignore the offers that are from after the current date
+    mongoQuery[sort] = { $lte: new Date() };
+  }
+
   if (!query.sortBy) {
     mongoQuery.lastModifiedDate = { $lt: new Date() };
   }
