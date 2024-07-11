@@ -13,7 +13,11 @@ import { countries, regions } from './utils/countries';
 import { Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 import { Asset } from './db/schemas/assets';
-import { PriceEngine, PriceType } from './db/schemas/price-engine';
+import {
+  PriceEngine,
+  PriceEngineHistorical,
+  PriceType,
+} from './db/schemas/price-engine';
 import { Changelog } from './db/schemas/changelog';
 import client from './clients/redis';
 import SandboxRoute from './routes/sandbox';
@@ -954,7 +958,7 @@ app.get('/changelist', async (ctx) => {
 });
 
 app.get('/stats', async (c) => {
-  const cacheKey = 'stats:v0.1';
+  const cacheKey = 'stats:v0.2';
 
   const cached = await client.get(cacheKey);
 
@@ -971,6 +975,8 @@ app.get('/stats', async (c) => {
     assetsData,
     priceEngineData,
     changelogData,
+    sandboxData,
+    productsData,
   ] = await Promise.allSettled([
     Offer.countDocuments(),
     Item.countDocuments(),
@@ -978,6 +984,8 @@ app.get('/stats', async (c) => {
     Asset.countDocuments(),
     PriceEngine.countDocuments(),
     Changelog.countDocuments(),
+    db.db.collection('sandboxes').countDocuments(),
+    db.db.collection('products').countDocuments(),
   ]);
 
   const offers = offersData.status === 'fulfilled' ? offersData.value : 0;
@@ -988,6 +996,9 @@ app.get('/stats', async (c) => {
     priceEngineData.status === 'fulfilled' ? priceEngineData.value : 0;
   const changelog =
     changelogData.status === 'fulfilled' ? changelogData.value : 0;
+  const sandboxes = sandboxData.status === 'fulfilled' ? sandboxData.value : 0;
+  // @ts-ignore-next-line
+  const products = productsData.status === 'fulfilled' ? sandboxData.value : 0;
 
   const res = {
     offers,
@@ -996,6 +1007,8 @@ app.get('/stats', async (c) => {
     assets,
     priceEngine,
     changelog,
+    sandboxes,
+    products,
   };
 
   await client.set(cacheKey, JSON.stringify(res), {
