@@ -319,9 +319,6 @@ app.get('/upcoming', async (c) => {
   });
 });
 
-/**
- * Retrieves the list of genres with 3 games applied to it for the homepage
- */
 app.get('/genres', async (c) => {
   const genres = await Tags.find({
     groupName: 'genre',

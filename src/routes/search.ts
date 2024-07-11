@@ -174,15 +174,16 @@ app.post('/', async (c) => {
   }
 
   if (
-    query.sortBy &&
-    (query.sortBy === 'releaseDate' ||
-      query.sortBy === 'pcReleaseDate' ||
-      query.sortBy === 'effectiveDate' ||
-      query.sortBy === 'creationDate' ||
-      query.sortBy === 'viewableDate')
+    [
+      'releaseDate',
+      'pcReleaseDate',
+      'effectiveDate',
+      'creationDate',
+      'viewableDate',
+    ].includes(sort)
   ) {
     // If any of those sorts are used, we need to ignore the offers that are from after 2090 (mock date for unknown dates)
-    mongoQuery[query.sortBy] = { $lt: new Date('2090-01-01') };
+    mongoQuery[sort] = { $lt: new Date('2090-01-01') };
   }
 
   if (['releaseDate', 'pcReleaseDate'].includes(sort)) {
@@ -190,7 +191,7 @@ app.post('/', async (c) => {
     mongoQuery[sort] = { $lte: new Date() };
   }
 
-  if (!query.sortBy) {
+  if (!sort) {
     mongoQuery.lastModifiedDate = { $lt: new Date() };
   }
 

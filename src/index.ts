@@ -953,6 +953,60 @@ app.get('/changelist', async (ctx) => {
   });
 });
 
+app.get('/stats', async (c) => {
+  const cacheKey = 'stats:v0.1';
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const [
+    offersData,
+    itemsData,
+    tagsData,
+    assetsData,
+    priceEngineData,
+    changelogData,
+  ] = await Promise.allSettled([
+    Offer.countDocuments(),
+    Item.countDocuments(),
+    Tags.countDocuments(),
+    Asset.countDocuments(),
+    PriceEngine.countDocuments(),
+    Changelog.countDocuments(),
+  ]);
+
+  const offers = offersData.status === 'fulfilled' ? offersData.value : 0;
+  const items = itemsData.status === 'fulfilled' ? itemsData.value : 0;
+  const tags = tagsData.status === 'fulfilled' ? tagsData.value : 0;
+  const assets = assetsData.status === 'fulfilled' ? assetsData.value : 0;
+  const priceEngine =
+    priceEngineData.status === 'fulfilled' ? priceEngineData.value : 0;
+  const changelog =
+    changelogData.status === 'fulfilled' ? changelogData.value : 0;
+
+  const res = {
+    offers,
+    items,
+    tags,
+    assets,
+    priceEngine,
+    changelog,
+  };
+
+  await client.set(cacheKey, JSON.stringify(res), {
+    EX: 3600,
+  });
+
+  return c.json(res, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 app.post('/ping', async (c) => {
   const body = await c.req.json();
 
