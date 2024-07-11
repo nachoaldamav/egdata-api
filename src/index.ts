@@ -958,7 +958,7 @@ app.get('/changelist', async (ctx) => {
 });
 
 app.get('/stats', async (c) => {
-  const cacheKey = 'stats:v0.2';
+  const cacheKey = 'stats:v0.3';
 
   const cached = await client.get(cacheKey);
 
@@ -977,6 +977,8 @@ app.get('/stats', async (c) => {
     changelogData,
     sandboxData,
     productsData,
+    offersYearData,
+    itemsYearData,
   ] = await Promise.allSettled([
     Offer.countDocuments(),
     Item.countDocuments(),
@@ -986,6 +988,18 @@ app.get('/stats', async (c) => {
     Changelog.countDocuments(),
     db.db.collection('sandboxes').countDocuments(),
     db.db.collection('products').countDocuments(),
+    Offer.countDocuments({
+      creationDate: {
+        $gte: new Date(new Date().getFullYear(), 0, 1),
+        $lt: new Date(new Date().getFullYear() + 1, 0, 1),
+      },
+    }),
+    Item.countDocuments({
+      creationDate: {
+        $gte: new Date(new Date().getFullYear(), 0, 1),
+        $lt: new Date(new Date().getFullYear() + 1, 0, 1),
+      },
+    }),
   ]);
 
   const offers = offersData.status === 'fulfilled' ? offersData.value : 0;
@@ -999,6 +1013,10 @@ app.get('/stats', async (c) => {
   const sandboxes = sandboxData.status === 'fulfilled' ? sandboxData.value : 0;
   // @ts-ignore-next-line
   const products = productsData.status === 'fulfilled' ? sandboxData.value : 0;
+  const offersYear =
+    offersYearData.status === 'fulfilled' ? offersYearData.value : 0;
+  const itemsYear =
+    itemsYearData.status === 'fulfilled' ? itemsYearData.value : 0;
 
   const res = {
     offers,
@@ -1009,6 +1027,8 @@ app.get('/stats', async (c) => {
     changelog,
     sandboxes,
     products,
+    offersYear,
+    itemsYear,
   };
 
   await client.set(cacheKey, JSON.stringify(res), {
