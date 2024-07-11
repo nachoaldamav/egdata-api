@@ -694,7 +694,7 @@ app.get('/promotions/:id', async (c) => {
     });
   }
 
-  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:v0.1`;
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:v0.2`;
 
   const cached = await client.get(cacheKey);
 
@@ -752,15 +752,7 @@ app.get('/promotions/:id', async (c) => {
       console.warn(`Price not found for offer ${o.id}`);
     }
     return {
-      id: o.id,
-      namespace: o.namespace,
-      title: o.title,
-      seller: o.seller,
-      keyImages: o.keyImages,
-      developerDisplayName: o.developerDisplayName,
-      publisherDisplayName: o.publisherDisplayName,
-      releaseDate: o.releaseDate,
-      prePurchase: o.prePurchase,
+      ...orderOffersObject(o),
       price,
     };
   });
