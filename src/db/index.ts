@@ -43,3 +43,5 @@ export class DB {
     await this.db.close();
   }
 }
+
+export const db = new DB();

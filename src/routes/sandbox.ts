@@ -6,6 +6,7 @@ import { Namespace } from '../db/schemas/namespace';
 import { Item } from '../db/schemas/item';
 import { Offer } from '../db/schemas/offer';
 import { Asset } from '../db/schemas/assets';
+import { db } from '../db';
 
 const app = new Hono();
 
@@ -46,7 +47,24 @@ app.get('/', async (ctx) => {
   );
 });
 
-app.get('/:sandboxId', (c) => c.json(`get ${c.req.param('id')}`));
+app.get('/:sandboxId', async (c) => {
+  const { sandboxId } = c.req.param();
+
+  const sandbox = await db.db.collection('sandboxes').findOne({
+    // @ts-ignore
+    _id: sandboxId,
+  });
+
+  if (!sandbox) {
+    c.status(404);
+
+    return c.json({
+      message: 'Sandbox not found',
+    });
+  }
+
+  return c.json(sandbox);
+});
 
 app.get('/:sandboxId/achievements', async (ctx) => {
   const start = Date.now();
