@@ -34,7 +34,8 @@ interface SearchBody {
     | 'effectiveDate'
     | 'creationDate'
     | 'viewableDate'
-    | 'pcReleaseDate';
+    | 'pcReleaseDate'
+    | 'upcoming';
   limit?: number;
   page?: number;
   refundType?: string;
@@ -173,15 +174,7 @@ app.post('/', async (c) => {
     mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
   }
 
-  if (
-    [
-      'releaseDate',
-      'pcReleaseDate',
-      'effectiveDate',
-      'creationDate',
-      'viewableDate',
-    ].includes(sort)
-  ) {
+  if (['effectiveDate', 'creationDate', 'viewableDate'].includes(sort)) {
     // If any of those sorts are used, we need to ignore the offers that are from after 2090 (mock date for unknown dates)
     mongoQuery[sort] = { $lt: new Date('2090-01-01') };
   }
@@ -189,6 +182,11 @@ app.post('/', async (c) => {
   if (['releaseDate', 'pcReleaseDate'].includes(sort)) {
     // If the sort is releaseDate or pcReleaseDate, we need to ignore the offers that are from after the current date
     mongoQuery[sort] = { $lte: new Date() };
+  }
+
+  if (['upcoming'].includes(sort)) {
+    // If the sort is upcoming, we need to ignore the offers that are from before the current date
+    mongoQuery['releaseDate'] = { $gte: new Date() };
   }
 
   if (!sort) {
@@ -214,19 +212,33 @@ app.post('/', async (c) => {
     priceQuery['price.discount'] = { $gt: 0 };
   }
 
+  const sortingParams = () => {
+    let sortParams = {};
+
+    if (query.title) {
+      sortParams = {
+        score: { $meta: 'textScore' },
+      };
+    }
+
+    if (sort !== 'upcoming') {
+      // @ts-expect-error
+      sortParams[sort] = sortQuery[sort];
+    } else {
+      sortParams = {
+        releaseDate: 1,
+      };
+    }
+
+    return sortParams;
+  };
+
   const offersPipeline: PipelineStage[] = [
     {
       $match: mongoQuery,
     },
     {
-      $sort: {
-        ...(query.title
-          ? {
-              score: { $meta: 'textScore' },
-            }
-          : {}),
-        [sort]: sortQuery[sort],
-      },
+      $sort: sortingParams(),
     },
     {
       $lookup: {
