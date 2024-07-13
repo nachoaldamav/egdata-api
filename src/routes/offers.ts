@@ -8,13 +8,14 @@ import { AssetType } from '../db/schemas/assets';
 import { Changelog } from '../db/schemas/changelog';
 import { Item } from '../db/schemas/item';
 import { Mappings } from '../db/schemas/mappings';
-import { Offer } from '../db/schemas/offer';
+import { Offer, OfferType } from '../db/schemas/offer';
 import { attributesToObject } from '../utils/attributes-to-object';
 import { getGameFeatures } from '../utils/game-features';
 import { Tags } from '../db/schemas/tags';
 import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
 import { Media } from '../db/schemas/media';
+import { CollectionOffer } from '../db/schemas/collections';
 
 const app = new Hono();
 
@@ -363,6 +364,109 @@ app.get('/genres', async (c) => {
 
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/top-wishlisted', async (c) => {
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 1);
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
+  const start = new Date();
+
+  const cacheKey = `top-wishlisted:${page}:${limit}`;
+
+  /* const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  } */
+
+  const result = await CollectionOffer.aggregate([
+    {
+      $match: {
+        _id: 'top-wishlisted',
+      },
+    },
+    {
+      $project: {
+        offers: {
+          $slice: ['$offers', skip, limit],
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: 'offers',
+        localField: 'offers._id',
+        foreignField: 'id',
+        as: 'offerDetails',
+      },
+    },
+    {
+      $unwind: '$offerDetails',
+    },
+    {
+      $sort: {
+        'offerDetails.id': -1,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: {
+          $first: {
+            $size: '$offers',
+          },
+        },
+        elements: {
+          $push: '$offerDetails',
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        page: {
+          $literal: 1,
+        },
+        limit: {
+          $literal: 1,
+        },
+        total: 1,
+        elements: 1,
+      },
+    },
+  ]);
+
+  if (result.length > 0) {
+    const response = {
+      elements: result[0].elements.map((o: OfferType) => orderOffersObject(o)),
+      page,
+      limit,
+      total:
+        (
+          await CollectionOffer.findOne({
+            _id: 'top-wishlisted',
+          }).exec()
+        )?.offers.length ?? 0,
+    };
+
+    await client.set(cacheKey, JSON.stringify(response), {
+      EX: 3600,
+    });
+
+    return c.json(response, 200, {
+      'Cache-Control': 'public, max-age=60',
+      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    });
+  }
+
+  return c.json({ elements: [], page, limit, total: 0 }, 200, {
+    'Cache-Control': 'public, max-age=60',
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
