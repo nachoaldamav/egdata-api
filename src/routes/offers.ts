@@ -14,6 +14,7 @@ import { getGameFeatures } from '../utils/game-features';
 import { Tags } from '../db/schemas/tags';
 import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
+import { Media } from '../db/schemas/media';
 
 const app = new Hono();
 
@@ -911,6 +912,39 @@ app.get('/:id/mappings', async (c) => {
 
   return c.json(mappings, 200, {
     'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/:id/media', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `media:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const media = await Media.findOne({
+    _id: id,
+  });
+
+  if (!media) {
+    c.status(404);
+    return c.json({
+      message: 'Media not found',
+    });
+  }
+
+  await client.set(cacheKey, JSON.stringify(media), {
+    EX: 60,
+  });
+
+  return c.json(media, 200, {
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
