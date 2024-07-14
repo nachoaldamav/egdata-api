@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import { regions } from '../utils/countries';
 import client from '../clients/redis';
-import { PriceEngineHistorical, PriceType } from '../db/schemas/price-engine';
+import {
+  PriceEngine,
+  PriceEngineHistorical,
+  PriceType,
+} from '../db/schemas/price-engine';
 import { getCookie } from 'hono/cookie';
 import { AchievementSet } from '../db/schemas/achievements';
 import { AssetType } from '../db/schemas/assets';
@@ -376,13 +380,13 @@ app.get('/top-wishlisted', async (c) => {
 
   const cacheKey = `top-wishlisted:${page}:${limit}`;
 
-  /* const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
     });
-  } */
+  }
 
   const result = await CollectionOffer.aggregate([
     {
@@ -467,6 +471,53 @@ app.get('/top-wishlisted', async (c) => {
   return c.json({ elements: [], page, limit, total: 0 }, 200, {
     'Cache-Control': 'public, max-age=60',
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
+});
+
+app.get('/featured-discounts', async (c) => {
+  const featuredOffers = await CollectionOffer.find({}, 'offers._id').lean();
+  const offersIds = featuredOffers.flatMap((o) => o.offers.map((o) => o._id));
+
+  const offers = await Offer.find({
+    id: { $in: offersIds },
+    // Only show "BASE_GAME" and "DLC" offers
+    offerType: {
+      $in: ['BASE_GAME', 'DLC'],
+    },
+  });
+
+  const prices = await PriceEngine.find({
+    offerId: { $in: offers.map((o) => o.id) },
+    region: 'US',
+    'price.discount': { $gt: 0 },
+  });
+
+  const result = offers
+    .map((o) => {
+      const price = prices.find((p) => p.offerId === o.id);
+
+      return {
+        ...o.toObject(),
+        price: price ?? null,
+      };
+    })
+    .filter((o) => o.price);
+
+  const firstEndingSale = result.sort((a, b) => {
+    const aFirstRule = a.price?.appliedRules.sort(
+      (a, b) => a.endDate.getTime() - b.endDate.getTime()
+    )[0];
+    const bFirstRule = b.price?.appliedRules.sort(
+      (a, b) => a.endDate.getTime() - b.endDate.getTime()
+    )[0];
+
+    if (!aFirstRule || !bFirstRule) return 0;
+
+    return aFirstRule.endDate.getTime() - bFirstRule.endDate.getTime();
+  })[0];
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=3600',
   });
 });
 
