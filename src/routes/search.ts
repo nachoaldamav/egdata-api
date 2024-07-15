@@ -307,7 +307,7 @@ app.get('/tags', async (c) => {
   });
 
   return c.json(tags, 200, {
-    'Cache-Control': 'public, max-age=604800',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -320,7 +320,7 @@ app.get('/offer-types', async (c) => {
     types.filter((t) => t._id),
     200,
     {
-      'Cache-Control': 'public, max-age=604800',
+      'Cache-Control': 'public, max-age=60',
     }
   );
 });
