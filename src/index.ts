@@ -137,9 +137,11 @@ app.get('/sitemap.xml', async (c) => {
 });
 
 app.get('/robots.txt', async (c) => {
-  // Disallow all robots as this is an API
+  // Disallow all robots as this is an API (Besides the sitemap)
   const robots = `User-agent: *
-Disallow: /`;
+Disallow: /
+Allow: /sitemap.xml
+`;
 
   return c.text(robots, 200, {
     'Content-Type': 'text/plain',
