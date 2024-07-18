@@ -296,9 +296,37 @@ app.get('/items-from-offer/:id', async (c) => {
 
 app.get('/latest-games', async (c) => {
   const start = new Date();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `latest-games:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+      'X-Cache': 'HIT',
+    });
+  }
+
   const items = await Offer.find(
     {
-      offerType: 'BASE_GAME',
+      offerType: { $in: ['BASE_GAME', 'DLC', 'ADDON'] },
     },
     undefined,
     {
@@ -308,37 +336,30 @@ app.get('/latest-games', async (c) => {
       },
     }
   );
+
+  const prices = await PriceEngine.find({
+    region,
+    offerId: { $in: items.map((i) => i.id) },
+  });
+
   const end = new Date();
 
-  return c.json(
-    items.map((i) => {
-      return {
-        id: i.id,
-        namespace: i.namespace,
-        title: i.title,
-        description: i.description,
-        lastModifiedDate: i.lastModifiedDate,
-        effectiveDate: i.effectiveDate,
-        creationDate: i.creationDate,
-        keyImages: i.keyImages,
-        productSlug: i.productSlug,
-        urlSlug: i.urlSlug,
-        url: i.url,
-        tags: i.tags.map((t) => t.name),
-        releaseDate: i.releaseDate,
-        pcReleaseDate: i.pcReleaseDate,
-        prePurchase: i.prePurchase,
-        developerDisplayName: i.developerDisplayName,
-        publisherDisplayName: i.publisherDisplayName,
-        seller: i.seller?.name,
-      };
-    }),
-    200,
-    {
-      'Cache-Control': 'public, max-age=60',
-      'Server-Timing': `db;dur=${end.getTime() - start.getTime()}`,
-    }
-  );
+  const result = items.map((i) => {
+    const price = prices.find((p) => p.offerId === i.id);
+    return {
+      ...orderOffersObject(i),
+      price: price,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+    'Server-Timing': `db;dur=${end.getTime() - start.getTime()}`,
+  });
 });
 
 app.get('/featured', async (c) => {
