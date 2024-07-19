@@ -15,7 +15,7 @@ import { Mappings } from '../db/schemas/mappings';
 import { Offer, OfferType } from '../db/schemas/offer';
 import { attributesToObject } from '../utils/attributes-to-object';
 import { getGameFeatures } from '../utils/game-features';
-import { Tags } from '../db/schemas/tags';
+import { TagModel, Tags } from '../db/schemas/tags';
 import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
 import { Media } from '../db/schemas/media';
@@ -1151,6 +1151,89 @@ app.get('/:id/media', async (c) => {
   });
 
   return c.json(media, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
+app.get('/:id/suggestions', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `suggestions:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const tagsIds = offer.tags.map((t) => t.id);
+  const tagsInformation = await TagModel.find({
+    id: { $in: tagsIds },
+  });
+
+  const genres = tagsInformation.filter((t) => t.groupName === 'genre');
+
+  const suggestions = await Offer.find(
+    {
+      tags: { $elemMatch: { id: { $in: genres.map((g) => g.id) } } },
+      id: { $ne: id },
+      namespace: { $ne: offer.namespace },
+      offerType: { $in: ['BASE_GAME', 'DLC'] },
+    },
+    undefined,
+    {
+      limit: 25,
+      sort: {
+        lastModifiedDate: -1,
+      },
+    }
+  );
+
+  const prices = await PriceEngine.find({
+    offerId: { $in: suggestions.map((o) => o.id) },
+    region: region,
+  });
+
+  const result = suggestions.map((o) => {
+    const price = prices.find((p) => p.offerId === o.id);
+    return {
+      ...orderOffersObject(o),
+      price: price ?? null,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
+
+  return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',
   });
 });
