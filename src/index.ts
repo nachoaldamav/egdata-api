@@ -872,6 +872,14 @@ app.get('/stats', async (c) => {
   });
 });
 
+app.get('/tags', async (c) => {
+  const group = c.req.query('group');
+
+  const tags = await Tags.find(group ? { groupName: group } : {});
+
+  return c.json(tags);
+});
+
 app.post('/ping', async (c) => {
   try {
     const body = await c.req.json();
