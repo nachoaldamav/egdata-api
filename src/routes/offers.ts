@@ -25,6 +25,23 @@ const app = new Hono();
 
 app.get('/', async (c) => {
   const start = new Date();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
   const MAX_LIMIT = 50;
   const limit = Math.min(
     Number.parseInt(c.req.query('limit') || '10'),
@@ -32,7 +49,7 @@ app.get('/', async (c) => {
   );
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
 
-  const cacheKey = `offers:${page}:${limit}`;
+  const cacheKey = `offers:${region}:${page}:${limit}`;
 
   const cached = await client.get(cacheKey);
 
@@ -50,8 +67,19 @@ app.get('/', async (c) => {
     },
   });
 
+  const prices = await PriceEngine.find({
+    offerId: { $in: offers.map((o) => o.id) },
+    region,
+  });
+
   const result = {
-    elements: offers.map((o) => orderOffersObject(o)),
+    elements: offers.map((o) => {
+      const price = prices.find((p) => p.offerId === o.id);
+      return {
+        ...orderOffersObject(o),
+        price: price ?? null,
+      };
+    }),
     page,
     limit,
     total: await Offer.countDocuments(),
