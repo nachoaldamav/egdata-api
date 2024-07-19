@@ -254,7 +254,7 @@ app.get('/upcoming', async (c) => {
 
   const start = new Date();
 
-  const cacheKey = `upcoming:${region}:${page}:${limit}`;
+  const cacheKey = `upcoming:${region}:${page}:${limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -315,26 +315,15 @@ app.get('/upcoming', async (c) => {
     {
       $limit: limit,
     },
-    {
-      $project: {
-        _id: 0,
-        id: 1,
-        namespace: 1,
-        title: 1,
-        offerType: 1,
-        seller: 1,
-        developerDisplayName: 1,
-        publisherDisplayName: 1,
-        keyImages: 1,
-        releaseDate: 1,
-        prePurchase: 1,
-        price: 1,
-      },
-    },
   ]);
 
   const result = {
-    elements: offers,
+    elements: offers.map((o) => {
+      return {
+        ...orderOffersObject(o),
+        price: o.price ?? null,
+      };
+    }),
     limit,
     start: skip,
     page,
