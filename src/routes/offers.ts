@@ -8,7 +8,7 @@ import {
 } from '../db/schemas/price-engine';
 import { getCookie } from 'hono/cookie';
 import { AchievementSet } from '../db/schemas/achievements';
-import { AssetType } from '../db/schemas/assets';
+import { Asset, AssetType } from '../db/schemas/assets';
 import { Changelog } from '../db/schemas/changelog';
 import { Item } from '../db/schemas/item';
 import { Mappings } from '../db/schemas/mappings';
@@ -924,7 +924,7 @@ app.get('/:id/changelog', async (c) => {
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `changelog:${id}:${page}:${limit}`;
+  const cacheKey = `changelog:${id}:${page}:${limit}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -933,9 +933,33 @@ app.get('/:id/changelog', async (c) => {
     });
   }
 
+  const [offerData, itemsData] = await Promise.allSettled([
+    Offer.findOne({ id }),
+    Item.find({
+      linkedOffers: id,
+    }),
+  ]);
+
+  const offer = offerData.status === 'fulfilled' ? offerData.value : null;
+  const items = itemsData.status === 'fulfilled' ? itemsData.value : [];
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const itemsIds = items.map((i) => i.id);
+  const assets = await Asset.find({
+    itemId: { $in: itemsIds },
+  });
+
+  const allIds = [id, ...itemsIds.concat(assets.map((a) => a.artifactId))];
+
   const changelist = await Changelog.find(
     {
-      'metadata.contextId': id,
+      'metadata.contextId': { $in: allIds },
     },
     undefined,
     {

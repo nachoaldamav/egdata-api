@@ -35,7 +35,9 @@ interface SearchBody {
     | 'creationDate'
     | 'viewableDate'
     | 'pcReleaseDate'
-    | 'upcoming';
+    | 'upcoming'
+    | 'priceAsc'
+    | 'priceDesc';
   limit?: number;
   page?: number;
   refundType?: string;
@@ -90,14 +92,14 @@ app.post('/', async (c) => {
 
   const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    console.warn(`Cache hit for ${cacheKey}`);
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
+  // if (cached) {
+  //   console.warn(`Cache hit for ${cacheKey}`);
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   console.warn(`Cache miss for ${cacheKey}`);
 
@@ -221,16 +223,32 @@ app.post('/', async (c) => {
       };
     }
 
-    if (sort !== 'upcoming') {
+    if (!['upcoming', 'priceAsc', 'priceDesc'].includes(sort)) {
       // @ts-expect-error
       sortParams[sort] = sortQuery[sort];
     } else {
       sortParams = {
-        releaseDate: 1,
+        lastModifiedDate: 1,
       };
     }
 
     return sortParams;
+  };
+
+  const priceSort = () => {
+    if (sort === 'priceAsc') {
+      return {
+        'price.price.discountPrice': 1,
+      };
+    }
+
+    if (sort === 'priceDesc') {
+      return {
+        'price.price.discountPrice': -1,
+      };
+    }
+
+    return null;
   };
 
   const offersPipeline: PipelineStage[] = [
