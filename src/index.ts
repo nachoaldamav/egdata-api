@@ -701,6 +701,12 @@ app.get('/region', async (c) => {
   });
 });
 
+app.get('/regions', async (c) => {
+  return c.json(regions, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
 app.get('/changelist', async (ctx) => {
   const start = Date.now();
 
