@@ -1136,7 +1136,8 @@ app.get('/:id/media', async (c) => {
   }
 
   await client.set(cacheKey, JSON.stringify(media), {
-    EX: 60,
+    // 1 day
+    EX: 86400,
   });
 
   return c.json(media, 200, {
