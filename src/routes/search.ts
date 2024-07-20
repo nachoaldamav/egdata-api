@@ -92,14 +92,14 @@ app.post('/', async (c) => {
 
   const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
-  const cached = await client.get(cacheKey);
+  /* const cached = await client.get(cacheKey);
 
   if (cached) {
     console.warn(`Cache hit for ${cacheKey}`);
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
     });
-  }
+  } */
 
   console.warn(`Cache miss for ${cacheKey}`);
 
@@ -242,19 +242,25 @@ app.post('/', async (c) => {
   };
 
   const priceSort = () => {
+    let sortQuery: Record<string, any> = {};
     if (sort === 'priceAsc') {
-      return {
+      sortQuery = {
         'price.price.discountPrice': 1,
       };
     }
 
     if (sort === 'priceDesc') {
-      return {
+      sortQuery = {
         'price.price.discountPrice': -1,
       };
     }
 
-    return null;
+    if (Object.keys(sortQuery).length === 0) {
+      // @ts-expect-error
+      sortQuery = undefined;
+    }
+
+    return sortQuery;
   };
 
   const offersPipeline: PipelineStage[] = [
@@ -285,6 +291,8 @@ app.post('/', async (c) => {
         price: { $arrayElemAt: ['$priceEngine', 0] },
       },
     },
+    // Sort by price only if price sort is specified
+    ...(priceSort() ? [{ $sort: priceSort() }] : []),
     {
       $match: {
         price: { $ne: null },
