@@ -96,14 +96,14 @@ app.post('/', async (c) => {
 
   const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    console.warn(`Cache hit for ${cacheKey}`);
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
+  // if (cached) {
+  //   console.warn(`Cache hit for ${cacheKey}`);
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   console.warn(`Cache miss for ${cacheKey}`);
 
@@ -212,7 +212,7 @@ app.post('/', async (c) => {
 
     if (query.price.max) {
       priceQuery['price.discountPrice'] = {
-        ...priceQuery['discountPrice'],
+        ...priceQuery['price.discountPrice'],
         $lte: query.price.max,
       };
     }
@@ -369,6 +369,8 @@ app.post('/', async (c) => {
       },
     ];
   }
+
+  console.log(inspect(offersPipeline, false, null, true));
 
   const offersData = await db.db
     .collection(collection)
