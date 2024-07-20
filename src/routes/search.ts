@@ -6,6 +6,8 @@ import { Tags } from '../db/schemas/tags';
 import { PipelineStage } from 'mongoose';
 import { regions } from '../utils/countries';
 import { getCookie } from 'hono/cookie';
+import { db } from '../db';
+import { inspect } from 'util';
 
 interface SearchBody {
   title?: string;
@@ -37,7 +39,9 @@ interface SearchBody {
     | 'pcReleaseDate'
     | 'upcoming'
     | 'priceAsc'
-    | 'priceDesc';
+    | 'priceDesc'
+    | 'price';
+  sortDir?: 'asc' | 'desc';
   limit?: number;
   page?: number;
   refundType?: string;
@@ -92,14 +96,14 @@ app.post('/', async (c) => {
 
   const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
-  /* const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    console.warn(`Cache hit for ${cacheKey}`);
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  } */
+  // if (cached) {
+  //   console.warn(`Cache hit for ${cacheKey}`);
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   console.warn(`Cache miss for ${cacheKey}`);
 
@@ -119,14 +123,16 @@ app.post('/', async (c) => {
   const page = Math.max(query.page || 1, 1);
 
   const sort = query.sortBy || 'lastModifiedDate';
+  const sortDir = query.sortDir || 'desc';
+  const dir = sortDir === 'asc' ? 1 : -1;
 
   const sortQuery = {
-    lastModifiedDate: -1,
-    releaseDate: -1,
-    effectiveDate: -1,
-    creationDate: -1,
-    viewableDate: -1,
-    pcReleaseDate: -1,
+    lastModifiedDate: dir,
+    releaseDate: dir,
+    effectiveDate: dir,
+    creationDate: dir,
+    viewableDate: dir,
+    pcReleaseDate: dir,
   };
 
   const mongoQuery: Record<string, any> = {};
@@ -199,14 +205,14 @@ app.post('/', async (c) => {
 
   if (query.price) {
     if (query.price.min) {
-      priceQuery['price.discountPrice'] = {
+      priceQuery['discountPrice'] = {
         $gte: query.price.min,
       };
     }
 
     if (query.price.max) {
-      priceQuery['price.discountPrice'] = {
-        ...priceQuery['price.discountPrice'],
+      priceQuery['discountPrice'] = {
+        ...priceQuery['discountPrice'],
         $lte: query.price.max,
       };
     }
@@ -230,95 +236,149 @@ app.post('/', async (c) => {
       sortParams[sort] = sortQuery[sort];
     } else if (sort === 'upcoming') {
       sortParams = {
-        releaseDate: 1,
+        releaseDate: dir === 1 ? 1 : -1,
       };
     } else {
       sortParams = {
-        lastModifiedDate: 1,
+        lastModifiedDate: dir,
       };
     }
 
     return sortParams;
   };
 
-  const priceSort = () => {
-    let sortQuery: Record<string, any> = {};
-    if (sort === 'priceAsc') {
-      sortQuery = {
-        'price.price.discountPrice': 1,
-      };
-    }
+  let offersPipeline: PipelineStage[] = [];
+  let collection = 'offers';
 
-    if (sort === 'priceDesc') {
-      sortQuery = {
-        'price.price.discountPrice': -1,
-      };
-    }
+  if (['priceAsc', 'priceDesc', 'price'].includes(sort)) {
+    // If sorting by price, start with the pricing collection
+    // const priceSortOrder = sort === 'priceAsc' ? 1 : -1;
+    const priceSortOrder =
+      sort === 'priceAsc' || sort === 'priceDesc'
+        ? sort === 'priceAsc'
+          ? 1
+          : -1
+        : dir;
 
-    if (Object.keys(sortQuery).length === 0) {
-      // @ts-expect-error
-      sortQuery = undefined;
-    }
-
-    return sortQuery;
-  };
-
-  const offersPipeline: PipelineStage[] = [
-    {
-      $match: mongoQuery,
-    },
-    {
-      $sort: sortingParams(),
-    },
-    {
-      $lookup: {
-        from: 'pricev2',
-        localField: 'id',
-        foreignField: 'offerId',
-        as: 'priceEngine',
-        pipeline: [
-          {
-            $match: {
-              region: region,
-              ...priceQuery,
-            },
+    collection = 'pricev2';
+    offersPipeline = [
+      {
+        $match: {
+          region: region,
+          ...priceQuery,
+        },
+      },
+      {
+        $sort: {
+          'price.discountPrice': priceSortOrder,
+        },
+      },
+      // Move the root content (all of it) to the price field
+      {
+        $addFields: {
+          price: '$$ROOT',
+        },
+      },
+      {
+        $lookup: {
+          from: 'offers',
+          localField: 'offerId',
+          foreignField: 'id',
+          as: 'offerDetails',
+        },
+      },
+      {
+        $unwind: '$offerDetails',
+      },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: ['$offerDetails', '$$ROOT'],
           },
-        ],
+        },
       },
-    },
-    {
-      $addFields: {
-        price: { $arrayElemAt: ['$priceEngine', 0] },
+      {
+        $match: mongoQuery,
       },
-    },
-    // Sort by price only if price sort is specified
-    ...(priceSort() ? [{ $sort: priceSort() }] : []),
-    {
-      $match: {
-        price: { $ne: null },
+      {
+        $skip: (page - 1) * limit,
       },
-    },
-    {
-      $project: {
-        priceEngine: 0,
+      {
+        $limit: limit,
       },
-    },
-    {
-      $skip: (page - 1) * limit,
-    },
-    {
-      $limit: limit,
-    },
-  ];
+      {
+        $project: {
+          discountPrice: 0,
+          offerDetails: 0,
+          appliedRules: 0,
+          region: 0,
+          country: 0,
+          offerId: 0,
+          updatedAt: 0,
+        },
+      },
+    ];
+  } else {
+    // If not sorting by price, use the original pipeline
+    offersPipeline = [
+      {
+        $match: mongoQuery,
+      },
+      {
+        $sort: {
+          ...(query.title ? { score: { $meta: 'textScore' } } : {}),
+          ...sortingParams(),
+        },
+      },
+      {
+        $lookup: {
+          from: 'pricev2',
+          localField: 'id',
+          foreignField: 'offerId',
+          as: 'priceEngine',
+          pipeline: [
+            {
+              $match: {
+                region: region,
+                ...priceQuery,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          price: { $arrayElemAt: ['$priceEngine', 0] },
+        },
+      },
+      {
+        $match: {
+          price: { $ne: null },
+        },
+      },
+      {
+        $project: {
+          priceEngine: 0,
+        },
+      },
+      {
+        $skip: (page - 1) * limit,
+      },
+      {
+        $limit: limit,
+      },
+    ];
+  }
 
-  const [offersData] = await Promise.allSettled([
-    Offer.aggregate(offersPipeline),
-  ]);
+  console.log(inspect(offersPipeline, { depth: null }));
 
-  const offers = offersData.status === 'fulfilled' ? offersData.value : [];
+  const offersData = await db.db
+    .collection(collection)
+    .aggregate(offersPipeline)
+    .toArray();
 
   const result = {
-    elements: offers,
+    elements: offersData,
     page,
     limit,
     query: queryId,
