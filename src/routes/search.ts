@@ -92,14 +92,14 @@ app.post('/', async (c) => {
 
   const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   console.warn(`Cache hit for ${cacheKey}`);
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    console.warn(`Cache hit for ${cacheKey}`);
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   console.warn(`Cache miss for ${cacheKey}`);
 
@@ -188,7 +188,9 @@ app.post('/', async (c) => {
 
   if (['upcoming'].includes(sort)) {
     // If the sort is upcoming, we need to ignore the offers that are from before the current date
-    mongoQuery['releaseDate'] = { $gte: new Date() };
+    mongoQuery['releaseDate'] = {
+      $gte: new Date(),
+    };
   }
 
   if (!sort) {
@@ -226,6 +228,10 @@ app.post('/', async (c) => {
     if (!['upcoming', 'priceAsc', 'priceDesc'].includes(sort)) {
       // @ts-expect-error
       sortParams[sort] = sortQuery[sort];
+    } else if (sort === 'upcoming') {
+      sortParams = {
+        releaseDate: 1,
+      };
     } else {
       sortParams = {
         lastModifiedDate: 1,
