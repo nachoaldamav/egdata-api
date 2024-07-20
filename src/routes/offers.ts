@@ -798,7 +798,7 @@ app.get('/:id/price', async (c) => {
     });
   }
 
-  const cacheKey = `price:${id}:${region}`;
+  const cacheKey = `price:${id}:${region}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -807,18 +807,10 @@ app.get('/:id/price', async (c) => {
     });
   }
 
-  const price = await PriceEngineHistorical.findOne(
-    {
-      offerId: id,
-      region,
-    },
-    undefined,
-    {
-      sort: {
-        date: -1,
-      },
-    }
-  );
+  const price = await PriceEngine.findOne({
+    offerId: id,
+    region,
+  });
 
   if (!price) {
     c.status(404);
