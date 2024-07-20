@@ -205,13 +205,13 @@ app.post('/', async (c) => {
 
   if (query.price) {
     if (query.price.min) {
-      priceQuery['discountPrice'] = {
+      priceQuery['price.discountPrice'] = {
         $gte: query.price.min,
       };
     }
 
     if (query.price.max) {
-      priceQuery['discountPrice'] = {
+      priceQuery['price.discountPrice'] = {
         ...priceQuery['discountPrice'],
         $lte: query.price.max,
       };
