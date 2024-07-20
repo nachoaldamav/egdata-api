@@ -803,7 +803,7 @@ app.get('/:id/price', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -824,7 +824,7 @@ app.get('/:id/price', async (c) => {
   });
 
   return c.json(price, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
