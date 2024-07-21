@@ -562,6 +562,7 @@ app.get('/sales', async (c) => {
       $match: {
         region,
         'price.discount': { $gt: 0 },
+        'appliedRules.endDate': { $ne: null },
       },
     },
     {
@@ -586,7 +587,7 @@ app.get('/sales', async (c) => {
     },
     {
       $sort: {
-        updatedAt: -1,
+        'appliedRules.endDate': 1,
       },
     },
     {
