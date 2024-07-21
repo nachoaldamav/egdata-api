@@ -517,7 +517,9 @@ app.get('/autocomplete', async (c) => {
 });
 
 app.get('/countries', async (c) => {
-  return c.json(countries);
+  return c.json(countries, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
 });
 
 app.get('/sales', async (c) => {
@@ -696,9 +698,15 @@ app.get('/region', async (c) => {
     });
   }
 
-  return c.json({
-    region: { code: region, ...regions[region] },
-  });
+  return c.json(
+    {
+      region: { code: region, ...regions[region] },
+    },
+    200,
+    {
+      'Cache-Control': 'public, max-age=3600',
+    }
+  );
 });
 
 app.get('/regions', async (c) => {
