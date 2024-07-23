@@ -195,6 +195,7 @@ app.get('/robots.txt', async (c) => {
   const robots = `User-agent: *
 Disallow: /
 Allow: /sitemap.xml
+Allow: /promotions-sitemap.xml
 `;
 
   return c.text(robots, 200, {
