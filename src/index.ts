@@ -10,7 +10,7 @@ import { Item } from './db/schemas/item';
 import { orderOffersObject } from './utils/order-offers-object';
 import { getFeaturedGames } from './utils/get-featured-games';
 import { countries, regions } from './utils/countries';
-import { Tags } from './db/schemas/tags';
+import { TagModel, Tags } from './db/schemas/tags';
 import { attributesToObject } from './utils/attributes-to-object';
 import { Asset } from './db/schemas/assets';
 import { PriceEngine, PriceType } from './db/schemas/price-engine';
@@ -115,6 +115,61 @@ app.get('/sitemap.xml', async (c) => {
         <url>
           <loc>https://egdata.app/offers/${offer.id}</loc>
           <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
+        </url>`;
+        });
+
+        page++;
+      }
+    }
+
+    siteMap += '</urlset>';
+
+    await client.set(cacheKey, siteMap, {
+      EX: cacheTimeInSec,
+    });
+  }
+
+  return c.text(siteMap, 200, {
+    'Content-Type': 'application/xml',
+    'Cache-Control': `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
+  });
+});
+
+app.get('/promotions-sitemap.xml', async (c) => {
+  const cacheKey = 'promotions-sitemap';
+  const cacheTimeInSec = 3600 * 24; // 1 day
+  const cacheStaleTimeInSec = cacheTimeInSec * 7; // 7 days
+  const cached = await client.get(cacheKey);
+  let siteMap = '';
+
+  if (cached) {
+    siteMap = cached;
+  } else {
+    siteMap = `<?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+
+    const pageSize = 1000;
+    let page = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const tags = await TagModel.find(
+        { groupName: 'event', referenceCount: { $gt: 0 } },
+        undefined,
+        {
+          limit: pageSize,
+          skip: page * pageSize,
+          sort: { updated: -1 },
+        }
+      );
+
+      hasMore = tags.length === pageSize;
+
+      if (0 < tags.length) {
+        tags.forEach((tag) => {
+          siteMap += `
+        <url>
+          <loc>https://egdata.app/promotions/${tag.id}</loc>
         </url>`;
         });
 
