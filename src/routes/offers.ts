@@ -633,6 +633,7 @@ app.get('/latest-achievements', async (c) => {
     const price = prices.find((p) => p.offerId === o.id);
     return {
       ...orderOffersObject(o),
+      achievements: o.achievements,
       price: price ?? null,
     };
   });
