@@ -86,6 +86,15 @@ app.get('/sitemap.xml', async (c) => {
   const cached = await client.get(cacheKey);
   let siteMap = '';
 
+  const sections = [
+    'items',
+    'achievements',
+    'related',
+    'metadata',
+    'changelog',
+    'media',
+  ];
+
   if (cached) {
     siteMap = cached;
   } else {
@@ -115,7 +124,18 @@ app.get('/sitemap.xml', async (c) => {
         <url>
           <loc>https://egdata.app/offers/${offer.id}</loc>
           <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
-        </url>`;
+        </url>
+        ${sections
+          .map(
+            (section) => `
+        <url>
+          <loc>https://egdata.app/offers/${offer.id}/${section}</loc>
+          <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
+        </url>
+        `
+          )
+          .join('')}
+        `;
         });
 
         page++;
