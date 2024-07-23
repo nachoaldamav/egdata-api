@@ -96,14 +96,14 @@ app.post('/', async (c) => {
 
   const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   console.warn(`Cache hit for ${cacheKey}`);
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    console.warn(`Cache hit for ${cacheKey}`);
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   console.warn(`Cache miss for ${cacheKey}`);
 
@@ -122,7 +122,7 @@ app.post('/', async (c) => {
 
   const page = Math.max(query.page || 1, 1);
 
-  const sort = query.sortBy || 'lastModifiedDate';
+  let sort = query.sortBy || 'lastModifiedDate';
   const sortDir = query.sortDir || 'desc';
   const dir = sortDir === 'asc' ? 1 : -1;
 
@@ -148,6 +148,9 @@ app.post('/', async (c) => {
         .join(' | '),
       $language: 'en',
     };
+
+    // Force the sort to be 'lastModifiedDate' if the title is provided
+    sort = 'lastModifiedDate';
   }
 
   if (query.offerType) {
@@ -231,7 +234,7 @@ app.post('/', async (c) => {
       };
     }
 
-    if (!['upcoming', 'priceAsc', 'priceDesc'].includes(sort)) {
+    if (!['upcoming', 'priceAsc', 'priceDesc', 'price'].includes(sort)) {
       // @ts-expect-error
       sortParams[sort] = sortQuery[sort];
     } else if (sort === 'upcoming') {
@@ -370,15 +373,23 @@ app.post('/', async (c) => {
     ];
   }
 
-  console.log(inspect(offersPipeline, false, null, true));
-
   const offersData = await db.db
     .collection(collection)
     .aggregate(offersPipeline)
     .toArray();
 
   const result = {
-    elements: offersData,
+    // If sortBy is 'price and it's using title, we sort the page by the price direction
+    elements: offersData.sort((a, b) => {
+      if (query.sortBy === 'price' && query.title) {
+        if (sortDir === 'asc') {
+          return a.price.price.discountPrice - b.price.price.discountPrice;
+        }
+        return b.price.price.discountPrice - a.price.price.discountPrice;
+      }
+
+      return 0;
+    }),
     page,
     limit,
     query: queryId,
