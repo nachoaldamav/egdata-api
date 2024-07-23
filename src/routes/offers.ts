@@ -20,6 +20,7 @@ import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
 import { Media } from '../db/schemas/media';
 import { CollectionOffer } from '../db/schemas/collections';
+import { PipelineStage } from 'mongoose';
 
 const app = new Hono();
 
@@ -535,6 +536,113 @@ app.get('/featured-discounts', async (c) => {
 
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/latest-achievements', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `latest-achievements:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const pipeline: PipelineStage[] = [
+    {
+      $match: {
+        offerType: { $in: ['BASE_GAME'] },
+        creationDate: { $lte: new Date() },
+        'tags.id': '19847',
+      },
+    },
+    {
+      $sort: { creationDate: -1 },
+    },
+    {
+      $lookup: {
+        from: 'achievementsets',
+        let: { namespace: '$namespace' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$sandboxId', '$$namespace'] },
+                  { $eq: ['$isBase', true] },
+                ],
+              },
+            },
+          },
+        ],
+        as: 'achievements',
+      },
+    },
+    {
+      $addFields: {
+        achievements: { $arrayElemAt: ['$achievements', 0] },
+      },
+    },
+    {
+      $match: {
+        achievements: { $ne: null },
+      },
+    },
+    {
+      $limit: 15,
+    },
+    {
+      $project: {
+        ...Object.keys(Offer.schema.obj).reduce((acc, key) => {
+          // @ts-expect-error
+          acc[key] = 1;
+          return acc;
+        }, {}),
+
+        achievements: 1,
+      },
+    },
+  ];
+
+  const offers = await Offer.aggregate(pipeline);
+
+  const prices = await PriceEngine.find({
+    offerId: { $in: offers.map((o) => o.id) },
+    region,
+  });
+
+  const result = offers.map((o) => {
+    const price = prices.find((p) => p.offerId === o.id);
+    return {
+      ...orderOffersObject(o),
+      price: price ?? null,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
