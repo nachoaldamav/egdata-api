@@ -236,7 +236,7 @@ app.post('/', async (c) => {
       sortParams[sort] = sortQuery[sort];
     } else if (sort === 'upcoming') {
       sortParams = {
-        releaseDate: dir === 1 ? 1 : -1,
+        releaseDate: 1,
       };
     } else {
       sortParams = {
