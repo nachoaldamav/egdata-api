@@ -40,7 +40,7 @@ app.get('/', async (c) => {
 
   const result = await Promise.all(
     freeGames.map(async (game) => {
-      const [offerData, priceData] = await Promise.allSettled([
+      const [offerData, priceData, historicalData] = await Promise.allSettled([
         Offer.findOne({
           id: game.id,
         }),
@@ -48,10 +48,15 @@ app.get('/', async (c) => {
           offerId: game.id,
           region: region,
         }),
+        FreeGames.find({
+          id: game.id,
+        }),
       ]);
 
       const offer = offerData.status === 'fulfilled' ? offerData.value : null;
       const price = priceData.status === 'fulfilled' ? priceData.value : null;
+      const historical =
+        historicalData.status === 'fulfilled' ? historicalData.value : [];
 
       if (!offer) {
         return {
@@ -61,7 +66,7 @@ app.get('/', async (c) => {
 
       return {
         ...orderOffersObject(offer?.toObject()),
-        giveaway: game,
+        giveaway: { ...game.toObject(), historical },
         price: price ?? null,
       };
     })
