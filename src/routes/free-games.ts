@@ -2,10 +2,30 @@ import { Hono } from 'hono';
 import { FreeGames } from '../db/schemas/freegames';
 import { Offer } from '../db/schemas/offer';
 import { orderOffersObject } from '../utils/order-offers-object';
+import { PriceEngine } from '../db/schemas/price-engine';
+import { regions } from '../utils/countries';
+import { getCookie } from 'hono/cookie';
 
 const app = new Hono();
 
 app.get('/', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
   const freeGames = await FreeGames.find(
     {
       endDate: { $gte: new Date() },
@@ -20,9 +40,18 @@ app.get('/', async (c) => {
 
   const result = await Promise.all(
     freeGames.map(async (game) => {
-      const offer = await Offer.findOne({
-        id: game.id,
-      });
+      const [offerData, priceData] = await Promise.allSettled([
+        Offer.findOne({
+          id: game.id,
+        }),
+        PriceEngine.findOne({
+          offerId: game.id,
+          region: region,
+        }),
+      ]);
+
+      const offer = offerData.status === 'fulfilled' ? offerData.value : null;
+      const price = priceData.status === 'fulfilled' ? priceData.value : null;
 
       if (!offer) {
         return {
@@ -33,6 +62,7 @@ app.get('/', async (c) => {
       return {
         ...orderOffersObject(offer?.toObject()),
         giveaway: game,
+        price: price ?? null,
       };
     })
   );

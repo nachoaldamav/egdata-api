@@ -21,6 +21,7 @@ import { getImage } from '../utils/get-image';
 import { Media } from '../db/schemas/media';
 import { CollectionOffer } from '../db/schemas/collections';
 import { PipelineStage } from 'mongoose';
+import { Sandbox } from '../db/schemas/sandboxes';
 
 const app = new Hono();
 
@@ -1325,6 +1326,50 @@ app.get('/:id/suggestions', async (c) => {
   });
 
   return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
+app.get('/:id/age-rating', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `age-rating:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const sandbox = await Sandbox.findOne({
+    _id: offer.namespace,
+  });
+
+  if (!sandbox) {
+    c.status(404);
+    return c.json({
+      message: 'Sandbox not found',
+    });
+  }
+
+  const ageRatings = sandbox.ageGatings;
+
+  await client.set(cacheKey, JSON.stringify(ageRatings), {
+    EX: 3600,
+  });
+
+  return c.json(ageRatings, 200, {
     'Cache-Control': 'public, max-age=60',
   });
 });
