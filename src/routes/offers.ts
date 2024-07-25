@@ -533,7 +533,7 @@ app.get('/featured-discounts', async (c) => {
 
   const prices = await PriceEngine.find({
     offerId: { $in: offers.map((o) => o.id) },
-    region: 'US',
+    region,
     'price.discount': { $gt: 0 },
   });
 
