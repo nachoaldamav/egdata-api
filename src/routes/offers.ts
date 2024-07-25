@@ -520,7 +520,8 @@ app.get('/featured-discounts', async (c) => {
         price: price ?? null,
       };
     })
-    .filter((o) => o.price);
+    .filter((o) => o.price)
+    .slice(0, 15);
 
   const firstEndingSale = result.sort((a, b) => {
     const aFirstRule = a.price?.appliedRules.sort(
