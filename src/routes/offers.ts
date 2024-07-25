@@ -494,6 +494,32 @@ app.get('/top-wishlisted', async (c) => {
 });
 
 app.get('/featured-discounts', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `featured-discounts:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
   const featuredOffers = await CollectionOffer.find({}, 'offers._id').lean();
   const offersIds = featuredOffers.flatMap((o) => o.offers.map((o) => o._id));
 
@@ -523,18 +549,10 @@ app.get('/featured-discounts', async (c) => {
     .filter((o) => o.price)
     .slice(0, 15);
 
-  const firstEndingSale = result.sort((a, b) => {
-    const aFirstRule = a.price?.appliedRules.sort(
-      (a, b) => a.endDate.getTime() - b.endDate.getTime()
-    )[0];
-    const bFirstRule = b.price?.appliedRules.sort(
-      (a, b) => a.endDate.getTime() - b.endDate.getTime()
-    )[0];
-
-    if (!aFirstRule || !bFirstRule) return 0;
-
-    return aFirstRule.endDate.getTime() - bFirstRule.endDate.getTime();
-  })[0];
+  // Save the result in cache, set the expiration to the first sale ending date
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
 
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',
