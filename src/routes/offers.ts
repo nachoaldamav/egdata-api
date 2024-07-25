@@ -547,7 +547,7 @@ app.get('/featured-discounts', async (c) => {
       };
     })
     .filter((o) => o.price)
-    .slice(0, 15);
+    .slice(0, 20);
 
   // Save the result in cache, set the expiration to the first sale ending date
   await client.set(cacheKey, JSON.stringify(result), {
