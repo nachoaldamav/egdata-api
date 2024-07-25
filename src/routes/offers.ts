@@ -104,7 +104,7 @@ app.get('/events', async (c) => {
   });
 
   return c.json(events, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -139,7 +139,7 @@ app.get('/events/:id', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -229,7 +229,7 @@ app.get('/events/:id', async (c) => {
 
   return c.json(result, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -386,7 +386,7 @@ app.get('/genres', async (c) => {
   );
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -536,7 +536,7 @@ app.get('/featured-discounts', async (c) => {
   })[0];
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -665,7 +665,7 @@ app.get('/:id', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -713,7 +713,7 @@ app.get('/:id/price-history', async (c) => {
 
     if (cached) {
       return c.json(JSON.parse(cached), 200, {
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'public, max-age=60',
       });
     }
 
@@ -733,7 +733,7 @@ app.get('/:id/price-history', async (c) => {
     });
 
     return c.json(prices, 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -772,7 +772,7 @@ app.get('/:id/price-history', async (c) => {
   });
 
   return c.json(pricesByRegion, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -823,7 +823,7 @@ app.get('/:id/assets', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -859,7 +859,7 @@ app.get('/:id/assets', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -872,7 +872,7 @@ app.get('/:id/items', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -885,7 +885,7 @@ app.get('/:id/items', async (c) => {
   });
 
   return c.json(items, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -1020,7 +1020,7 @@ app.get('/:id/changelog', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -1138,7 +1138,7 @@ app.get('/:id/related', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -1175,7 +1175,7 @@ app.get('/:id/related', async (c) => {
   });
 
   return c.json(related, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -1188,7 +1188,7 @@ app.get('/:id/mappings', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -1209,7 +1209,7 @@ app.get('/:id/mappings', async (c) => {
   });
 
   return c.json(mappings, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 

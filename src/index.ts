@@ -220,7 +220,7 @@ Allow: /promotions-sitemap.xml
 
   return c.text(robots, 200, {
     'Content-Type': 'text/plain',
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -274,7 +274,7 @@ app.get('/items-from-offer/:id', async (c) => {
   if (cached) {
     console.log(`[CACHE] ${cacheKey} found`);
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -366,7 +366,7 @@ app.get('/items-from-offer/:id', async (c) => {
   });
 
   return c.json(res, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -453,7 +453,7 @@ app.get('/featured', async (c) => {
   if (cachedResponse) {
     console.log(`[CACHE] ${responseCacheKey} found`);
     return c.json(JSON.parse(cachedResponse), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -498,7 +498,7 @@ app.get('/featured', async (c) => {
     offers.map((o) => orderOffersObject(o)),
     200,
     {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
       'Server-Timing': `db;dur=${
         GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
       }`,
@@ -594,7 +594,7 @@ app.get('/autocomplete', async (c) => {
 
 app.get('/countries', async (c) => {
   return c.json(countries, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -733,7 +733,7 @@ app.get('/changelog', async (c) => {
   });
 
   return c.json(changelist, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 
@@ -781,14 +781,14 @@ app.get('/region', async (c) => {
     },
     200,
     {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     }
   );
 });
 
 app.get('/regions', async (c) => {
   return c.json(regions, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 

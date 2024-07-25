@@ -145,7 +145,7 @@ app.get('/:sandboxId/items', async (ctx) => {
   );
 
   return ctx.json(items, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 

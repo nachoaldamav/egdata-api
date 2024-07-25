@@ -144,7 +144,7 @@ app.get('/:id/cover', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -185,7 +185,7 @@ app.get('/:id/cover', async (c) => {
   });
 
   return c.json(baseGame, 200, {
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=60',
   });
 });
 

@@ -450,7 +450,7 @@ app.get('/:id/count', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
@@ -637,7 +637,7 @@ app.get('/:id/count', async (c) => {
     });
 
     return c.json(result, 200, {
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=60',
     });
   } catch (err) {
     c.status(500);
