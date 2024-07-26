@@ -25,12 +25,7 @@ const changelistSchema = new mongoose.Schema(
     metadata: { required: true, type: metaSchema },
   },
   {
-    collection: 'changelogs',
-    timeseries: {
-      timeField: 'timestamp',
-      metaField: 'metadata',
-      granularity: 'minutes',
-    },
+    collection: 'changelogs_v2',
   }
 );
 
