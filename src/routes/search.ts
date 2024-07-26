@@ -7,7 +7,8 @@ import { PipelineStage } from 'mongoose';
 import { regions } from '../utils/countries';
 import { getCookie } from 'hono/cookie';
 import { db } from '../db';
-import { inspect } from 'util';
+import { Changelog } from '../db/schemas/changelog';
+import { meiliSearchClient } from '../clients/meilisearch';
 
 interface SearchBody {
   title?: string;
@@ -426,6 +427,30 @@ app.get('/offer-types', async (c) => {
       'Cache-Control': 'public, max-age=60',
     }
   );
+});
+
+app.get('/changelog', async (c) => {
+  // Get the search opts (query, page, limit, type)
+  const {
+    query,
+    page: requestedPage,
+    limit: requestedLimit,
+    type,
+  } = c.req.query();
+
+  // Parse the page and limit
+  const page = Math.max(parseInt(requestedPage, 10) || 1, 1);
+  const limit = Math.min(parseInt(requestedLimit, 10) || 10, 50);
+
+  const changelogs = await meiliSearchClient.index('changelog').search(query, {
+    offset: (page - 1) * limit,
+    limit,
+  });
+
+  // Return the changelogs
+  return c.json(changelogs, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
 });
 
 app.get('/:id/count', async (c) => {

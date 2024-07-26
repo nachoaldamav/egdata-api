@@ -24,6 +24,7 @@ import FreeGamesRoute from './routes/free-games';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga';
 import { Event } from './db/schemas/events';
+import { meiliSearchClient } from './clients/meilisearch';
 
 config();
 
@@ -1007,6 +1008,24 @@ app.get('/ping', async (c) => {
 
 app.options('/ping', async (c) => {
   return c.json({ message: 'pong' });
+});
+
+app.patch('/refresh-meilisearch', async (c) => {
+  console.log('Refreshing MeiliSearch index');
+  const changelogDocs = await Changelog.find({}, undefined, {
+    sort: {
+      timestamp: -1,
+    },
+  });
+
+  console.log(`Found ${changelogDocs.length} changelogs`);
+
+  const changelog = changelogDocs.map((c) => c.toObject());
+
+  console.log('Adding documents to MeiliSearch');
+  await meiliSearchClient.index('changelog').addDocuments(changelog);
+
+  return c.json({ message: 'ok' });
 });
 
 app.route('/sandboxes', SandboxRoute);

@@ -10,6 +10,7 @@
     "axios": "1.7.2",
     "dotenv": "16.4.5",
     "hono": "4.5.0",
+    "meilisearch": "^0.41.0",
     "mongoose": "8.5.1",
     "redis": "4.6.15"
   },
