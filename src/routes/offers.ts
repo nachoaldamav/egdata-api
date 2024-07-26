@@ -576,7 +576,7 @@ app.get('/latest-achievements', async (c) => {
     });
   }
 
-  const cacheKey = `latest-achievements:${region}`;
+  const cacheKey = `latest-achievements:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -590,12 +590,12 @@ app.get('/latest-achievements', async (c) => {
     {
       $match: {
         offerType: { $in: ['BASE_GAME'] },
-        creationDate: { $lte: new Date() },
+        releaseDate: { $lte: new Date() },
         'tags.id': '19847',
       },
     },
     {
-      $sort: { creationDate: -1 },
+      $sort: { releaseDate: -1 },
     },
     {
       $lookup: {

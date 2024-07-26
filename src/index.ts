@@ -1023,7 +1023,11 @@ app.patch('/refresh-meilisearch', async (c) => {
   const changelog = changelogDocs.map((c) => c.toObject());
 
   console.log('Adding documents to MeiliSearch');
-  await meiliSearchClient.index('changelog').addDocuments(changelog);
+  const index = meiliSearchClient.index('changelog');
+
+  await index.addDocuments(changelog, {
+    primaryKey: '_id',
+  });
 
   return c.json({ message: 'ok' });
 });

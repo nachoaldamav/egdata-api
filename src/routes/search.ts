@@ -445,6 +445,7 @@ app.get('/changelog', async (c) => {
   const changelogs = await meiliSearchClient.index('changelog').search(query, {
     offset: (page - 1) * limit,
     limit,
+    sort: ['timestamp:desc'],
   });
 
   // Return the changelogs
