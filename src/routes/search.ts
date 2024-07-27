@@ -7,8 +7,10 @@ import { PipelineStage } from 'mongoose';
 import { regions } from '../utils/countries';
 import { getCookie } from 'hono/cookie';
 import { db } from '../db';
-import { Changelog } from '../db/schemas/changelog';
+import { Changelog, ChangelogType } from '../db/schemas/changelog';
 import { meiliSearchClient } from '../clients/meilisearch';
+import { Item } from '../db/schemas/item';
+import { Asset } from '../db/schemas/assets';
 
 interface SearchBody {
   title?: string;
@@ -442,11 +444,44 @@ app.get('/changelog', async (c) => {
   const page = Math.max(parseInt(requestedPage, 10) || 1, 1);
   const limit = Math.min(parseInt(requestedLimit, 10) || 10, 50);
 
-  const changelogs = await meiliSearchClient.index('changelog').search(query, {
+  const changelogs = await meiliSearchClient.index('changelog').search<
+    ChangelogType & {
+      document: unknown;
+    }
+  >(query, {
     offset: (page - 1) * limit,
     limit,
     sort: ['timestamp:desc'],
   });
+
+  await Promise.all(
+    changelogs.hits.map(async (hit) => {
+      const type = hit.metadata.contextType;
+      const id = hit.metadata.contextId;
+
+      if (type === 'offer') {
+        hit.document = await Offer.findOne({ id });
+      }
+
+      if (type === 'item') {
+        hit.document = await Item.findOne({
+          id,
+        });
+      }
+
+      if (type === 'asset') {
+        const asset = await Asset.findOne({
+          artifactId: id,
+        });
+
+        hit.document = await Item.findOne({
+          id: asset?.itemId,
+        });
+      }
+
+      return hit;
+    })
+  );
 
   // Return the changelogs
   return c.json(changelogs, 200, {
