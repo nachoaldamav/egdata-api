@@ -590,13 +590,13 @@ app.get('/latest-achievements', async (c) => {
     {
       $match: {
         offerType: { $in: ['BASE_GAME'] },
-        releaseDate: { $lte: new Date() },
+        creationDate: { $lte: new Date() },
         'tags.id': '19847',
         prePurchase: false,
       },
     },
     {
-      $sort: { releaseDate: -1 },
+      $sort: { creationDate: -1 },
     },
     {
       $lookup: {
