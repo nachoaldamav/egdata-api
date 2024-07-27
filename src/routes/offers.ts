@@ -592,6 +592,7 @@ app.get('/latest-achievements', async (c) => {
         offerType: { $in: ['BASE_GAME'] },
         releaseDate: { $lte: new Date() },
         'tags.id': '19847',
+        prePurchase: false,
       },
     },
     {
