@@ -132,8 +132,6 @@ app.get('/:id', async (c) => {
       },
     ];
 
-    console.log(priceStages);
-
     stages.push(...priceStages);
   } else {
     const offerStages: PipelineStage[] = [
