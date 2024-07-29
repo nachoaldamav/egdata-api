@@ -6,6 +6,17 @@ import { PriceEngine } from '../db/schemas/price-engine';
 import { Tags } from '../db/schemas/tags';
 import { regions } from '../utils/countries';
 import { orderOffersObject } from '../utils/order-offers-object';
+import { PipelineStage } from 'mongoose';
+
+type SortBy =
+  | 'releaseDate'
+  | 'lastModifiedDate'
+  | 'effectiveDate'
+  | 'creationDate'
+  | 'viewableDate'
+  | 'pcReleaseDate'
+  | 'upcoming'
+  | 'price';
 
 const app = new Hono();
 
@@ -29,8 +40,6 @@ app.get('/:id', async (c) => {
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const skip = (page - 1) * limit;
 
-  const start = new Date();
-
   const selectedCountry = country ?? cookieCountry ?? 'US';
 
   const region = Object.keys(regions).find((r) =>
@@ -44,7 +53,10 @@ app.get('/:id', async (c) => {
     });
   }
 
-  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:v0.2`;
+  const sortBy = (c.req.query('sortBy') ?? 'lastModifiedDate') as SortBy;
+  const sortDir = (c.req.query('sortDir') ?? 'desc') as 'asc' | 'desc';
+
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}`;
 
   const cached = await client.get(cacheKey);
 
@@ -65,58 +77,111 @@ app.get('/:id', async (c) => {
     });
   }
 
-  /**
-   * Tags is Array<{ id: string, name: string }>
-   */
-  const offers = await Offer.find(
-    {
-      tags: { $elemMatch: { id: id } },
-    },
-    undefined,
-    {
-      sort: {
-        lastModifiedDate: -1,
-      },
-      limit,
-      skip,
-    }
-  );
+  const stages: PipelineStage[] = [];
 
-  const prices = await PriceEngine.find(
-    {
+  if (sortBy === 'price') {
+    const priceStages: PipelineStage[] = [
+      {
+        $match: {
+          region,
+        },
+      },
+      {
+        $sort: {
+          'price.discountPrice': sortDir === 'asc' ? 1 : -1,
+        },
+      },
+      {
+        $lookup: {
+          from: 'offers',
+          localField: 'offerId',
+          foreignField: 'id',
+          as: 'offer',
+        },
+      },
+      {
+        $unwind: '$offer',
+      },
+      {
+        $match: {
+          'offer.tags': { $elemMatch: { id } },
+        },
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+      {
+        $project: {
+          _id: 0,
+          id: '$offer.id',
+          namespace: '$offer.namespace',
+          title: '$offer.title',
+          keyImages: '$offer.keyImages',
+          price: '$price',
+        },
+      },
+    ];
+
+    stages.push(...priceStages);
+  } else {
+    const offerStages: PipelineStage[] = [
+      {
+        $match: {
+          tags: { $elemMatch: { id } },
+        },
+      },
+      {
+        $sort: {
+          [sortBy]: sortDir === 'asc' ? 1 : -1,
+        },
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+      {
+        $unwind: {
+          path: '$price',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
+
+    stages.push(...offerStages);
+  }
+
+  const offersReq =
+    sortBy === 'price'
+      ? PriceEngine.aggregate(stages)
+      : Offer.aggregate(stages);
+
+  const offers = await offersReq;
+
+  if (sortBy !== 'price') {
+    const prices = await PriceEngine.find({
       region,
       offerId: { $in: offers.map((o) => o.id) },
-    },
-    undefined,
-    {
-      sort: {
-        date: -1,
-      },
-    }
-  );
+    });
 
-  const data = offers.map((o) => {
-    const price = prices.find((p) => p?.offerId === o.id);
-    if (!price) {
-      console.warn(`Price not found for offer ${o.id}`);
-    }
-    return {
-      ...orderOffersObject(o),
-      price,
-    };
-  });
+    offers.forEach((o) => {
+      o.price = prices.find((p) => p.id === o.id)?.price;
+    });
+  }
 
   const result: {
-    elements: any[];
+    elements: unknown[];
     title: string;
-    limit: number;
     start: number;
     page: number;
     count: number;
   } = {
-    elements: data,
+    elements: offers,
     title: event.name ?? '',
-    limit,
     start: skip,
     page,
     count: await Offer.countDocuments({
@@ -129,7 +194,6 @@ app.get('/:id', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
     'Cache-Control': 'public, max-age=60',
   });
 });
