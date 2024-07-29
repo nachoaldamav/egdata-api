@@ -56,7 +56,6 @@ app.get('/:id', async (c) => {
 
   const event = await Tags.findOne({
     id,
-    groupName: 'event',
   });
 
   if (!event) {
