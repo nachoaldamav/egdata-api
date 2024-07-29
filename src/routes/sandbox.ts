@@ -120,8 +120,9 @@ app.get('/:sandboxId/achievements', async (ctx) => {
 app.get('/:sandboxId/items', async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await Namespace.findOne({
-    namespace: sandboxId,
+  const sandbox = await db.db.collection('sandboxes').findOne({
+    // @ts-ignore
+    _id: sandboxId,
   });
 
   if (!sandbox) {
@@ -152,8 +153,9 @@ app.get('/:sandboxId/items', async (ctx) => {
 app.get('/:sandboxId/offers', async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await Namespace.findOne({
-    namespace: sandboxId,
+  const sandbox = await db.db.collection('sandboxes').findOne({
+    // @ts-ignore
+    _id: sandboxId,
   });
 
   if (!sandbox) {
@@ -195,8 +197,9 @@ app.get('/:sandboxId/offers', async (ctx) => {
 app.get('/:sandboxId/assets', async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await Namespace.findOne({
-    namespace: sandboxId,
+  const sandbox = await db.db.collection('sandboxes').findOne({
+    // @ts-ignore
+    _id: sandboxId,
   });
 
   if (!sandbox) {
