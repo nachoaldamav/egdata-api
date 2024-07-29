@@ -58,13 +58,13 @@ app.get('/:id', async (c) => {
 
   const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}`;
 
-  const cached = await client.get(cacheKey);
+  /* const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
     });
-  }
+  } */
 
   const event = await Tags.findOne({
     id,
@@ -108,6 +108,18 @@ app.get('/:id', async (c) => {
         },
       },
       {
+        $addFields: {
+          price: '$$ROOT',
+        },
+      },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: ['$offer', { price: '$price' }],
+          },
+        },
+      },
+      {
         $skip: skip,
       },
       {
@@ -115,15 +127,12 @@ app.get('/:id', async (c) => {
       },
       {
         $project: {
-          _id: 0,
-          id: '$offer.id',
-          namespace: '$offer.namespace',
-          title: '$offer.title',
-          keyImages: '$offer.keyImages',
-          price: '$price',
+          'price.offer': 0, // Remove the redundant 'offer' field from the price object
         },
       },
     ];
+
+    console.log(priceStages);
 
     stages.push(...priceStages);
   } else {
