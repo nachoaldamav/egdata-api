@@ -1032,6 +1032,25 @@ app.patch('/refresh-meilisearch', async (c) => {
   return c.json({ message: 'ok' });
 });
 
+app.get('/offer-by-slug/:slug', async (c) => {
+  const { slug } = c.req.param();
+
+  const offer = await Offer.findOne({
+    'offerMappings.pageSlug': slug,
+  });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  return c.json({
+    id: offer.id,
+  });
+});
+
 app.route('/sandboxes', SandboxRoute);
 
 app.route('/search', SearchRoute);
