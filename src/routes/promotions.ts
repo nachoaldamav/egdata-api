@@ -56,7 +56,7 @@ app.get('/:id', async (c) => {
   const sortBy = (c.req.query('sortBy') ?? 'lastModifiedDate') as SortBy;
   const sortDir = (c.req.query('sortDir') ?? 'desc') as 'asc' | 'desc';
 
-  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:v0.3`;
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -176,7 +176,7 @@ app.get('/:id', async (c) => {
     });
 
     offers.forEach((o) => {
-      o.price = prices.find((p) => p.id === o.id) ?? null;
+      o.price = prices.find((p) => p.offerId === o.id) ?? null;
     });
   }
 
