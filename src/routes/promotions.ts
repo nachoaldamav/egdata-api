@@ -169,7 +169,7 @@ app.get('/:id', async (c) => {
     });
 
     offers.forEach((o) => {
-      o.price = prices.find((p) => p.id === o.id)?.price;
+      o.price = prices.find((p) => p.id === o.id) ?? null;
     });
   }
 
