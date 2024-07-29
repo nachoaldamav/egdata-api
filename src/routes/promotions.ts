@@ -56,15 +56,15 @@ app.get('/:id', async (c) => {
   const sortBy = (c.req.query('sortBy') ?? 'lastModifiedDate') as SortBy;
   const sortDir = (c.req.query('sortDir') ?? 'desc') as 'asc' | 'desc';
 
-  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}`;
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:v0.3`;
 
-  /* const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
     });
-  } */
+  }
 
   const event = await Tags.findOne({
     id,
