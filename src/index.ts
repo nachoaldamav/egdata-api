@@ -251,18 +251,23 @@ app.get('/items', async (c) => {
 
 app.get('/items/:id', async (c) => {
   const { id } = c.req.param();
-  const item = await Item.find({
+  const item = await Item.findOne({
     $or: [{ _id: id }, { id: id }],
   });
 
-  if (!item || item.length === 0) {
+  if (!item) {
     c.status(404);
     return c.json({
       message: 'Item not found',
     });
   }
 
-  return c.json(item[0]);
+  return c.json({
+    ...item.toObject(),
+    customAttributes: item.customAttributes
+      ? attributesToObject(item.customAttributes as any)
+      : {},
+  });
 });
 
 app.get('/items-from-offer/:id', async (c) => {
