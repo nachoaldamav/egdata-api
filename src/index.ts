@@ -624,13 +624,13 @@ app.get('/sales', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 30);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sales:${region}:${page}:${limit}:v1.2`;
+  const cacheKey = `sales:${region}:${page}:${limit}:v1.3`;
 
   const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      'Cache-Control': 'public, max-age=0',
       'X-Cache': 'HIT',
     });
   }
@@ -698,11 +698,11 @@ app.get('/sales', async (c) => {
   };
 
   await client.set(cacheKey, JSON.stringify(res), {
-    EX: 3600,
+    EX: 60,
   });
 
   return c.json(res, 200, {
-    'Cache-Control': 'public, max-age=60',
+    'Cache-Control': 'public, max-age=0',
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
