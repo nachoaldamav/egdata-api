@@ -25,6 +25,7 @@ import { config } from 'dotenv';
 import { gaClient } from './clients/ga';
 import { Event } from './db/schemas/events';
 import { meiliSearchClient } from './clients/meilisearch';
+import { CollectionOffer } from './db/schemas/collections';
 
 config();
 
@@ -813,21 +814,89 @@ app.get('/sellers/:id', async (c) => {
 
 app.get('/sellers/:id/cover', async (c) => {
   const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const selectedCountry = country ?? cookieCountry ?? 'US';
 
-  const offer = await Offer.findOne({
-    'seller.id': id,
-  });
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
 
-  if (!offer) {
+  if (!region) {
     c.status(404);
     return c.json({
-      message: 'Seller not found',
+      message: 'Country not found',
     });
   }
 
-  return c.json({
-    id: offer.id,
+  const cacheKey = `sellers:${id}:cover:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const topSellers = await CollectionOffer.findById('top-sellers');
+
+  if (!topSellers) {
+    c.status(404);
+    return c.json({
+      message: 'Top sellers collection not found',
+    });
+  }
+
+  const offersInTopSellers = await Offer.find(
+    {
+      id: { $in: topSellers.offers.map((o) => o._id) },
+      'seller.id': id,
+    },
+    undefined,
+    {
+      sort: {
+        lastModifiedDate: -1,
+      },
+    }
+  );
+
+  let offers = offersInTopSellers.slice(0, 5);
+
+  if (offers.length === 0) {
+    // Just get the 1st offer from the seller
+    offers = await Offer.find(
+      {
+        'seller.id': id,
+      },
+      undefined,
+      {
+        limit: 5,
+        sort: {
+          lastModifiedDate: -1,
+        },
+      }
+    );
+  }
+
+  const prices = await PriceEngine.find({
+    offerId: { $in: offers.map((o) => o.id) },
+    region,
   });
+
+  const result = offers.map((o) => {
+    const price = prices.find((p) => p.offerId === o.id);
+    return {
+      ...orderOffersObject(o),
+      price,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
+
+  return c.json(result);
 });
 
 app.get('/region', async (c) => {
