@@ -752,6 +752,9 @@ app.get('/sellers', async (c) => {
 app.get('/sellers/:id', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
+  const limit = Number.parseInt(c.req.query('limit') || '0');
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const offerType = c.req.query('offerType');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
   const selectedCountry = country ?? cookieCountry ?? 'US';
@@ -767,9 +770,30 @@ app.get('/sellers/:id', async (c) => {
     });
   }
 
-  const offers = await Offer.find({ 'seller.id': id }).sort({
-    lastModifiedDate: -1,
-  });
+  const cacheKey = `sellers:${id}:${region}:${page}:${limit}:${offerType}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offers = await Offer.find(
+    {
+      'seller.id': id,
+      ...(offerType ? { offerType } : {}),
+    },
+    undefined,
+    {
+      limit: limit === 0 ? undefined : limit,
+      skip: (page - 1) * (limit === 0 ? 1 : limit),
+      sort: {
+        lastModifiedDate: -1,
+      },
+    }
+  );
 
   const prices = await PriceEngine.find({
     offerId: { $in: offers.map((o) => o.id) },
@@ -785,6 +809,25 @@ app.get('/sellers/:id', async (c) => {
   });
 
   return c.json(result);
+});
+
+app.get('/sellers/:id/cover', async (c) => {
+  const { id } = c.req.param();
+
+  const offer = await Offer.findOne({
+    'seller.id': id,
+  });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Seller not found',
+    });
+  }
+
+  return c.json({
+    id: offer.id,
+  });
 });
 
 app.get('/region', async (c) => {
