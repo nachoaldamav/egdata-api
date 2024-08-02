@@ -752,16 +752,23 @@ app.get('/sellers', async (c) => {
 app.get('/sellers/:id', async (c) => {
   const { id } = c.req.param();
 
-  const isSimpleMetadata = c.req.query('full') !== 'true';
-
-  const offers = await Offer.find(
-    { 'seller.id': id },
-    isSimpleMetadata ? { id: 1, title: 1, namespace: 1, offerType: 1 } : {}
-  ).sort({
+  const offers = await Offer.find({ 'seller.id': id }).sort({
     lastModifiedDate: -1,
   });
 
-  return c.json(offers);
+  const prices = await PriceEngine.find({
+    offerId: { $in: offers.map((o) => o.id) },
+  });
+
+  const result = offers.map((o) => {
+    const price = prices.find((p) => p.offerId === o.id);
+    return {
+      ...orderOffersObject(o),
+      price,
+    };
+  });
+
+  return c.json(result);
 });
 
 app.get('/region', async (c) => {
