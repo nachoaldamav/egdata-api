@@ -751,6 +751,21 @@ app.get('/sellers', async (c) => {
 
 app.get('/sellers/:id', async (c) => {
   const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
 
   const offers = await Offer.find({ 'seller.id': id }).sort({
     lastModifiedDate: -1,
@@ -758,6 +773,7 @@ app.get('/sellers/:id', async (c) => {
 
   const prices = await PriceEngine.find({
     offerId: { $in: offers.map((o) => o.id) },
+    region,
   });
 
   const result = offers.map((o) => {
