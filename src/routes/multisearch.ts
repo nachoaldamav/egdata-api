@@ -10,10 +10,6 @@ app.get('/', (c) => {
 app.get('/offers', async (c) => {
   const { query } = c.req.query();
 
-  if (!query) {
-    return c.json({ message: 'Please provide a query' }, 400);
-  }
-
   const search = await meiliSearchClient.index('offers').search(query);
 
   return c.json(search);
@@ -22,10 +18,6 @@ app.get('/offers', async (c) => {
 app.get('/items', async (c) => {
   const { query } = c.req.query();
 
-  if (!query) {
-    return c.json({ message: 'Please provide a query' }, 400);
-  }
-
   const search = await meiliSearchClient.index('items').search(query);
 
   return c.json(search);
@@ -33,10 +25,6 @@ app.get('/items', async (c) => {
 
 app.get('/sellers', async (c) => {
   const { query } = c.req.query();
-
-  if (!query) {
-    return c.json({ message: 'Please provide a query' }, 400);
-  }
 
   const search = await meiliSearchClient.index('sellers').search(query);
 
