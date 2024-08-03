@@ -21,11 +21,13 @@ import SearchRoute from './routes/search';
 import OffersRoute from './routes/offers';
 import PromotionsRoute from './routes/promotions';
 import FreeGamesRoute from './routes/free-games';
+import MultisearchRoute from './routes/multisearch';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga';
 import { Event } from './db/schemas/events';
 import { meiliSearchClient } from './clients/meilisearch';
 import { CollectionOffer } from './db/schemas/collections';
+import { Seller } from './db/schemas/sellers';
 
 config();
 
@@ -53,8 +55,6 @@ app.use(
 db.connect();
 
 app.use('/*', etag());
-
-// app.use(logger());
 
 app.get('/health', (c) => {
   return c.json({
@@ -1150,7 +1150,7 @@ app.options('/ping', async (c) => {
   return c.json({ message: 'pong' });
 });
 
-app.patch('/refresh-meilisearch', async (c) => {
+async function refreshChangelogIndex() {
   console.log('Refreshing MeiliSearch index');
   const changelogDocs = await Changelog.find({}, undefined, {
     sort: {
@@ -1168,6 +1168,83 @@ app.patch('/refresh-meilisearch', async (c) => {
   await index.addDocuments(changelog, {
     primaryKey: '_id',
   });
+}
+
+async function refreshOffersIndex() {
+  console.log('Refreshing MeiliSearch index');
+  const offers = await Offer.find({}, undefined, {
+    sort: {
+      lastModifiedDate: -1,
+    },
+  });
+
+  console.log(`Found ${offers.length} offers`);
+
+  console.log('Adding documents to MeiliSearch');
+  const index = meiliSearchClient.index('offers');
+
+  await index.addDocuments(
+    offers.map((o) => o.toObject()),
+    {
+      primaryKey: '_id',
+    }
+  );
+}
+
+async function refreshItemsIndex() {
+  console.log('Refreshing MeiliSearch index');
+  const items = await Item.find({}, undefined, {
+    sort: {
+      lastModifiedDate: -1,
+    },
+  });
+
+  console.log(`Found ${items.length} items`);
+
+  console.log('Adding documents to MeiliSearch');
+  const index = meiliSearchClient.index('items');
+
+  await index.addDocuments(
+    items.map((o) => o.toObject()),
+    {
+      primaryKey: '_id',
+    }
+  );
+}
+
+async function refreshSellersIndex() {
+  console.log('Refreshing MeiliSearch index');
+  const sellers = await Seller.find({}, undefined, {
+    sort: {
+      updatedAt: -1,
+    },
+  });
+
+  console.log(`Found ${sellers.length} sellers`);
+
+  console.log('Adding documents to MeiliSearch');
+
+  const index = meiliSearchClient.index('sellers');
+
+  await index.addDocuments(
+    sellers.map((o) => o.toObject()),
+    {
+      primaryKey: '_id',
+    }
+  );
+
+  console.log('Sellers index refreshed');
+}
+
+app.patch('/refresh-meilisearch', async (c) => {
+  console.log('Refreshing MeiliSearch index');
+
+  await Promise.allSettled([
+    refreshChangelogIndex(),
+    refreshOffersIndex(),
+    refreshItemsIndex(),
+    refreshSellersIndex(),
+  ]);
 
   return c.json({ message: 'ok' });
 });
@@ -1200,6 +1277,8 @@ app.route('/offers', OffersRoute);
 app.route('/promotions', PromotionsRoute);
 
 app.route('/free-games', FreeGamesRoute);
+
+app.route('/multisearch', MultisearchRoute);
 
 serve(
   {

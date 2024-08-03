@@ -7,7 +7,7 @@ import { PipelineStage } from 'mongoose';
 import { regions } from '../utils/countries';
 import { getCookie } from 'hono/cookie';
 import { db } from '../db';
-import { Changelog, ChangelogType } from '../db/schemas/changelog';
+import { ChangelogType } from '../db/schemas/changelog';
 import { meiliSearchClient } from '../clients/meilisearch';
 import { Item } from '../db/schemas/item';
 import { Asset } from '../db/schemas/assets';
