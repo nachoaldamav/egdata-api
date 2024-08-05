@@ -818,6 +818,7 @@ app.get('/:id', async (c) => {
 
 app.get('/:id/price-history', async (c) => {
   const { id } = c.req.param();
+  const since = c.req.query('since');
 
   const country = c.req.query('country');
 
@@ -826,7 +827,9 @@ app.get('/:id/price-history', async (c) => {
   );
 
   if (region) {
-    const cacheKey = `price-history:${id}:${region}:v0.1`;
+    const cacheKey = `price-history:${id}:${region}:${
+      since ?? 'unlimited'
+    }:v0.1`;
     const cached = await client.get(cacheKey);
 
     if (cached) {
@@ -839,6 +842,9 @@ app.get('/:id/price-history', async (c) => {
     const prices = await PriceEngineHistorical.find({
       offerId: id,
       region,
+      ...(since && {
+        updatedAt: { $gte: new Date(since) },
+      }),
     }).sort({ date: -1 });
 
     if (!prices) {
@@ -855,7 +861,7 @@ app.get('/:id/price-history', async (c) => {
     });
   }
 
-  const cacheKey = `price-history:${id}:v0.1`;
+  const cacheKey = `price-history:${id}:all:${since ?? 'unlimited'}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -865,6 +871,9 @@ app.get('/:id/price-history', async (c) => {
   const prices = await PriceEngineHistorical.find({
     offerId: id,
     region: { $in: Object.keys(regions) },
+    ...(since && {
+      updatedAt: { $gte: new Date(since) },
+    }),
   }).sort({ date: -1 });
 
   // Structure the data, Record<string, PriceHistoryType[]>
