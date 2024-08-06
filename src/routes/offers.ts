@@ -821,10 +821,11 @@ app.get('/:id/price-history', async (c) => {
   const since = c.req.query('since');
 
   const country = c.req.query('country');
+  const usrRegion = c.req.query('region');
 
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(country)
-  );
+  const region =
+    usrRegion ||
+    Object.keys(regions).find((r) => regions[r].countries.includes(country));
 
   if (region) {
     const cacheKey = `price-history:${id}:${region}:${
