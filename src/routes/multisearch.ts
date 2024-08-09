@@ -10,7 +10,9 @@ app.get('/', (c) => {
 app.get('/offers', async (c) => {
   const { query } = c.req.query();
 
-  const search = await meiliSearchClient.index('offers').search(query);
+  const search = await meiliSearchClient.index('offers').search(query, {
+    sort: ['lastModifiedDate:desc'],
+  });
 
   return c.json(search);
 });
@@ -18,7 +20,9 @@ app.get('/offers', async (c) => {
 app.get('/items', async (c) => {
   const { query } = c.req.query();
 
-  const search = await meiliSearchClient.index('items').search(query);
+  const search = await meiliSearchClient.index('items').search(query, {
+    sort: ['lastModifiedDate:desc'],
+  });
 
   return c.json(search);
 });
