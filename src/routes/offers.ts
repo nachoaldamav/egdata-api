@@ -517,11 +517,26 @@ app.get('/top-sellers', async (c) => {
       },
     },
     {
-      $project: {
-        offers: {
-          $slice: ['$offers', skip, limit],
-        },
+      $unwind: '$offers',
+    },
+    {
+      $sort: {
+        'offers.position': 1, // Sort by position in ascending order
       },
+    },
+    {
+      $group: {
+        _id: '$_id',
+        offers: { $push: '$offers' },
+      },
+    },
+    {
+      $project: {
+        offers: { $slice: ['$offers', skip, limit] },
+      },
+    },
+    {
+      $unwind: '$offers',
     },
     {
       $lookup: {
@@ -535,32 +550,17 @@ app.get('/top-sellers', async (c) => {
       $unwind: '$offerDetails',
     },
     {
-      $sort: {
-        'offerDetails.id': -1,
-      },
-    },
-    {
       $group: {
         _id: null,
-        total: {
-          $first: {
-            $size: '$offers',
-          },
-        },
-        elements: {
-          $push: '$offerDetails',
-        },
+        total: { $sum: 1 },
+        elements: { $push: '$offerDetails' },
       },
     },
     {
       $project: {
         _id: 0,
-        page: {
-          $literal: 1,
-        },
-        limit: {
-          $literal: 1,
-        },
+        page: { $literal: page },
+        limit: { $literal: limit },
         total: 1,
         elements: 1,
       },
