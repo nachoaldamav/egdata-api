@@ -684,78 +684,59 @@ app.get('/latest-achievements', async (c) => {
     });
   }
 
-  const pipeline: PipelineStage[] = [
-    {
-      $match: {
-        offerType: { $in: ['BASE_GAME'] },
-        creationDate: { $lte: new Date() },
-        'tags.id': '19847',
-        prePurchase: false,
-      },
-    },
-    {
-      $sort: { creationDate: -1 },
-    },
-    {
-      $lookup: {
-        from: 'achievementsets',
-        let: { namespace: '$namespace' },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $eq: ['$sandboxId', '$$namespace'] },
-                  { $eq: ['$isBase', true] },
-                ],
-              },
-            },
-          },
-        ],
-        as: 'achievements',
-      },
-    },
-    {
-      $addFields: {
-        achievements: { $arrayElemAt: ['$achievements', 0] },
-      },
-    },
-    {
-      $match: {
-        achievements: { $ne: null },
-      },
-    },
-    {
-      $limit: 15,
-    },
-    {
-      $project: {
-        ...Object.keys(Offer.schema.obj).reduce((acc, key) => {
-          // @ts-expect-error
-          acc[key] = 1;
-          return acc;
-        }, {}),
+  const limit = 15; // Number of games to fetch per page
+  let skip = 0;
+  let result: any[] = [];
 
-        achievements: 1,
-      },
-    },
-  ];
+  while (result.length < 20) {
+    const offers = await Offer.find({
+      offerType: { $in: ['BASE_GAME'] },
+      'tags.id': '19847',
+      effectiveDate: { $lte: new Date() },
+    })
+      .sort({ creationDate: -1 })
+      .skip(skip)
+      .limit(limit);
 
-  const offers = await Offer.aggregate(pipeline);
+    const [achievementsData, pricesData] = await Promise.allSettled([
+      AchievementSet.find({
+        sandboxId: { $in: offers.map((o) => o.namespace) },
+        isBase: true,
+      }),
+      PriceEngine.find({
+        offerId: { $in: offers.map((o) => o.id) },
+        region,
+      }),
+    ]);
 
-  const prices = await PriceEngine.find({
-    offerId: { $in: offers.map((o) => o.id) },
-    region,
-  });
+    const achievements =
+      achievementsData.status === 'fulfilled' ? achievementsData.value : [];
+    const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
 
-  const result = offers.map((o) => {
-    const price = prices.find((p) => p.offerId === o.id);
-    return {
-      ...orderOffersObject(o),
-      achievements: o.achievements,
-      price: price ?? null,
-    };
-  });
+    const pageResults = offers
+      .map((o) => {
+        const price = prices.find((p) => p.offerId === o.id);
+        const achievement = achievements.find(
+          (a) => a.sandboxId === o.namespace
+        );
+        return {
+          ...orderOffersObject(o),
+          achievements: achievement,
+          price: price ?? null,
+        };
+      })
+      .filter((o) => o.achievements);
+
+    result = result.concat(pageResults);
+    skip += limit;
+
+    if (offers.length < limit) {
+      // Reached the end of the data
+      break;
+    }
+  }
+
+  result = result.slice(0, 20);
 
   await client.set(cacheKey, JSON.stringify(result), {
     EX: 3600,
