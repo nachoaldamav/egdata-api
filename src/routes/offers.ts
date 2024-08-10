@@ -20,7 +20,6 @@ import { orderOffersObject } from '../utils/order-offers-object';
 import { getImage } from '../utils/get-image';
 import { Media } from '../db/schemas/media';
 import { CollectionOffer } from '../db/schemas/collections';
-import { PipelineStage } from 'mongoose';
 import { Sandbox } from '../db/schemas/sandboxes';
 
 const app = new Hono();

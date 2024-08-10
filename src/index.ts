@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
+import { logger } from 'hono/logger';
 import { db } from './db';
 import { Offer, OfferType } from './db/schemas/offer';
 import { Item } from './db/schemas/item';
@@ -55,6 +56,8 @@ app.use(
 db.connect();
 
 app.use('/*', etag());
+
+app.use(logger());
 
 app.get('/health', (c) => {
   return c.json({
