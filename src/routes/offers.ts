@@ -673,7 +673,7 @@ app.get('/latest-achievements', async (c) => {
     });
   }
 
-  const cacheKey = `latest-achievements:${region}`;
+  const cacheKey = `latest-achievements:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -693,7 +693,7 @@ app.get('/latest-achievements', async (c) => {
       'tags.id': '19847',
       effectiveDate: { $lte: new Date() },
     })
-      .sort({ creationDate: -1 })
+      .sort({ effectiveDate: -1 })
       .skip(skip)
       .limit(limit);
 
