@@ -674,7 +674,7 @@ app.get('/latest-achievements', async (c) => {
     });
   }
 
-  const cacheKey = `latest-achievements:${region}:v0.1`;
+  const cacheKey = `latest-achievements:${region}`;
 
   const cached = await client.get(cacheKey);
 
