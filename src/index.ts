@@ -1212,7 +1212,7 @@ async function refreshOffersIndex() {
     offers.map((o) => {
       return {
         ...o.toObject(),
-        oferTypeRank: o.offerType ? offerTypeRanks[o.offerType] ?? 16 : 16,
+        offerTypeRank: o.offerType ? offerTypeRanks[o.offerType] ?? 16 : 16,
       };
     }),
     {
