@@ -1173,6 +1173,28 @@ async function refreshChangelogIndex() {
   });
 }
 
+const offerTypeRanks: {
+  [key: string]: number;
+} = {
+  BASE_GAME: 0,
+  DLC: 1,
+  ADD_ON: 2,
+  EDITION: 3,
+  BUNDLE: 4,
+  Bundle: 5,
+  IN_GAME_PURCHASE: 6,
+  VIRTUAL_CURRENCY: 7,
+  CONSUMABLE: 8,
+  UNLOCKABLE: 9,
+  DIGITAL_EXTRA: 10,
+  EXPERIENCE: 11,
+  DEMO: 12,
+  WALLET: 13,
+  OTHERS: 14,
+  null: 15,
+  undefined: 16,
+};
+
 async function refreshOffersIndex() {
   console.log('Refreshing MeiliSearch index');
   const offers = await Offer.find({}, undefined, {
@@ -1187,7 +1209,12 @@ async function refreshOffersIndex() {
   const index = meiliSearchClient.index('offers');
 
   await index.addDocuments(
-    offers.map((o) => o.toObject()),
+    offers.map((o) => {
+      return {
+        ...o.toObject(),
+        oferTypeRank: o.offerType ? offerTypeRanks[o.offerType] ?? 16 : 16,
+      };
+    }),
     {
       primaryKey: '_id',
     }
