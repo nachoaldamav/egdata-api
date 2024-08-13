@@ -1079,7 +1079,7 @@ app.get('/:id/regional-price', async (c) => {
       undefined,
       {
         sort: {
-          date: -1,
+          updatedAt: -1,
         },
       }
     );
@@ -1123,7 +1123,7 @@ app.get('/:id/regional-price', async (c) => {
     undefined,
     {
       sort: {
-        date: -1,
+        updatedAt: -1,
       },
     }
   );
@@ -1138,7 +1138,9 @@ app.get('/:id/regional-price', async (c) => {
         return acc;
       }
 
-      const lastPrice = regionPrices[0];
+      const lastPrice = regionPrices.sort(
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+      )[0];
 
       const allPrices = regionPrices.map((p) => p.price.discountPrice ?? 0);
 
