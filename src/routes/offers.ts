@@ -1049,18 +1049,69 @@ app.get('/:id/price', async (c) => {
 app.get('/:id/regional-price', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  if (country) {
+    const region = Object.keys(regions).find((r) =>
+      regions[r].countries.includes(country)
+    );
 
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
+    if (!region) {
+      c.status(404);
+      return c.json({
+        message: 'Country not found',
+      });
+    }
 
-  if (!region) {
-    c.status(404);
-    return c.json({
-      message: 'Country not found',
+    const cacheKey = `regional-price:${id}:${region}:v0.1`;
+    const cached = await client.get(cacheKey);
+
+    if (cached) {
+      return c.json(JSON.parse(cached), 200, {
+        'Cache-Control': 'public, max-age=60',
+      });
+    }
+
+    const price = await PriceEngineHistorical.find(
+      {
+        offerId: id,
+        region,
+      },
+      undefined,
+      {
+        sort: {
+          date: -1,
+        },
+      }
+    );
+
+    if (!price) {
+      c.status(404);
+      return c.json({
+        message: 'Price not found',
+      });
+    }
+
+    const result = {
+      currentPrice: price[0],
+      maxPrice: Math.max(...price.map((p) => p.price.discountPrice ?? 0)),
+      minPrice: Math.min(...price.map((p) => p.price.discountPrice ?? 0)),
+    };
+
+    await client.set(cacheKey, JSON.stringify(result), {
+      EX: 3600,
+    });
+
+    return c.json(result, 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const cacheKey = `regional-price:${id}:all:v0.1`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
     });
   }
 
