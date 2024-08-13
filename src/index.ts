@@ -1195,7 +1195,7 @@ const offerTypeRanks: {
   undefined: 16,
 };
 
-const PAGE_SIZE = 100; // Adjust this value based on your needs
+const PAGE_SIZE = 500; // Adjust this value based on your needs
 
 async function refreshOffersIndex() {
   console.log('Refreshing MeiliSearch index');
