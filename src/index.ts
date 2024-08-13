@@ -1195,75 +1195,118 @@ const offerTypeRanks: {
   undefined: 16,
 };
 
+const PAGE_SIZE = 100; // Adjust this value based on your needs
+
 async function refreshOffersIndex() {
   console.log('Refreshing MeiliSearch index');
-  const offers = await Offer.find({}, undefined, {
-    sort: {
-      lastModifiedDate: -1,
-    },
-  });
-
-  console.log(`Found ${offers.length} offers`);
-
-  console.log('Adding documents to MeiliSearch');
   const index = meiliSearchClient.index('offers');
 
-  await index.addDocuments(
-    offers.map((o) => {
-      return {
-        ...o.toObject(),
-        offerTypeRank: o.offerType ? offerTypeRanks[o.offerType] ?? 16 : 16,
-      };
-    }),
-    {
-      primaryKey: '_id',
-    }
-  );
+  let page = 0;
+  let totalOffers = 0;
+  while (true) {
+    const offers = await Offer.find({}, undefined, {
+      sort: {
+        lastModifiedDate: -1,
+      },
+      skip: page * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    });
+
+    if (offers.length === 0) break;
+
+    totalOffers += offers.length;
+    console.log(
+      `Processing offers ${totalOffers - offers.length + 1} to ${totalOffers}`
+    );
+
+    await index.addDocuments(
+      offers.map((o) => {
+        return {
+          ...o.toObject(),
+          offerTypeRank: o.offerType ? offerTypeRanks[o.offerType] ?? 16 : 16,
+        };
+      }),
+      {
+        primaryKey: '_id',
+      }
+    );
+
+    page++;
+  }
+
+  console.log(`Total offers processed: ${totalOffers}`);
 }
 
 async function refreshItemsIndex() {
   console.log('Refreshing MeiliSearch index');
-  const items = await Item.find({}, undefined, {
-    sort: {
-      lastModifiedDate: -1,
-    },
-  });
-
-  console.log(`Found ${items.length} items`);
-
-  console.log('Adding documents to MeiliSearch');
   const index = meiliSearchClient.index('items');
 
-  await index.addDocuments(
-    items.map((o) => o.toObject()),
-    {
-      primaryKey: '_id',
-    }
-  );
+  let page = 0;
+  let totalItems = 0;
+  while (true) {
+    const items = await Item.find({}, undefined, {
+      sort: {
+        lastModifiedDate: -1,
+      },
+      skip: page * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    });
+
+    if (items.length === 0) break;
+
+    totalItems += items.length;
+    console.log(
+      `Processing items ${totalItems - items.length + 1} to ${totalItems}`
+    );
+
+    await index.addDocuments(
+      items.map((o) => o.toObject()),
+      {
+        primaryKey: '_id',
+      }
+    );
+
+    page++;
+  }
+
+  console.log(`Total items processed: ${totalItems}`);
 }
 
 async function refreshSellersIndex() {
   console.log('Refreshing MeiliSearch index');
-  const sellers = await Seller.find({}, undefined, {
-    sort: {
-      updatedAt: -1,
-    },
-  });
-
-  console.log(`Found ${sellers.length} sellers`);
-
-  console.log('Adding documents to MeiliSearch');
-
   const index = meiliSearchClient.index('sellers');
 
-  await index.addDocuments(
-    sellers.map((o) => o.toObject()),
-    {
-      primaryKey: '_id',
-    }
-  );
+  let page = 0;
+  let totalSellers = 0;
+  while (true) {
+    const sellers = await Seller.find({}, undefined, {
+      sort: {
+        updatedAt: -1,
+      },
+      skip: page * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    });
 
-  console.log('Sellers index refreshed');
+    if (sellers.length === 0) break;
+
+    totalSellers += sellers.length;
+    console.log(
+      `Processing sellers ${
+        totalSellers - sellers.length + 1
+      } to ${totalSellers}`
+    );
+
+    await index.addDocuments(
+      sellers.map((o) => o.toObject()),
+      {
+        primaryKey: '_id',
+      }
+    );
+
+    page++;
+  }
+
+  console.log(`Total sellers processed: ${totalSellers}`);
 }
 
 app.patch('/refresh-meilisearch', async (c) => {
