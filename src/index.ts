@@ -46,10 +46,8 @@ app.use(
 
       return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
     },
-    allowHeaders: ['Content-Type', 'Authorization'],
-    allowMethods: ['GET', 'POST'],
-    credentials: true,
-    maxAge: 86400,
+    allowHeaders: [],
+    allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
   })
 );
 
