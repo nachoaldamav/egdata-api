@@ -1,6 +1,10 @@
 import mongoose from 'mongoose';
 
 const EpicAuthSchema = new mongoose.Schema({
+  _id: {
+    type: String,
+    required: true,
+  },
   scope: {
     type: String,
     required: true,
