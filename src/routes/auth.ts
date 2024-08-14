@@ -49,9 +49,15 @@ app.get('/callback', async (c) => {
 });
 
 app.get('/login', async (c) => {
+  const { redirect } = c.req.query();
+
   const { EPIC_CLIENT_ID, EPIC_CLIENT_SECRET, EPIC_REDIRECT_URI } = process.env;
 
-  if (!EPIC_CLIENT_ID || !EPIC_CLIENT_SECRET || !EPIC_REDIRECT_URI) {
+  if (
+    !EPIC_CLIENT_ID ||
+    !EPIC_CLIENT_SECRET ||
+    (!EPIC_REDIRECT_URI && !redirect)
+  ) {
     return c.json({
       error: 'Missing environment variables',
     });
@@ -61,7 +67,10 @@ app.get('/login', async (c) => {
   url.pathname = '/id/authorize';
   url.searchParams.append('client_id', EPIC_CLIENT_ID);
   url.searchParams.append('scope', 'basic_profile');
-  url.searchParams.append('redirect_uri', EPIC_REDIRECT_URI);
+  url.searchParams.append(
+    'redirect_uri',
+    (redirect || EPIC_REDIRECT_URI) as string
+  );
   url.searchParams.append('response_type', 'code');
 
   return c.redirect(url.toString());
