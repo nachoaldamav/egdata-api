@@ -21,6 +21,7 @@ import { getImage } from '../utils/get-image';
 import { Media } from '../db/schemas/media';
 import { CollectionOffer } from '../db/schemas/collections';
 import { Sandbox } from '../db/schemas/sandboxes';
+import { FreeGames } from '../db/schemas/freegames';
 
 const app = new Hono();
 
@@ -1531,6 +1532,40 @@ app.get('/:id/age-rating', async (c) => {
   });
 
   return c.json(ageRatings, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
+app.get('/:id/giveaways', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `giveaways:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const giveaways = await FreeGames.find(
+    {
+      id,
+    },
+    undefined,
+    {
+      sort: {
+        startDate: -1,
+      },
+    }
+  );
+
+  await client.set(cacheKey, JSON.stringify(giveaways), {
+    EX: 3600,
+  });
+
+  return c.json(giveaways, 200, {
     'Cache-Control': 'public, max-age=60',
   });
 });
