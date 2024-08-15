@@ -500,7 +500,7 @@ app.get('/top-sellers', async (c) => {
 
   const start = new Date();
 
-  const cacheKey = `top-sellers:${page}:${limit}`;
+  const cacheKey = `top-sellers:${page}:${limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -581,7 +581,7 @@ app.get('/top-sellers', async (c) => {
     };
 
     await client.set(cacheKey, JSON.stringify(response), {
-      EX: 3600,
+      EX: 360,
     });
 
     return c.json(response, 200, {
