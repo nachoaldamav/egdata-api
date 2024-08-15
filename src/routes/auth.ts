@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { EpicAuth } from '../db/schemas/epic-auth';
 import { encrypt, decrypt } from '../utils/tokens';
+import { jwtMiddleware } from '../middlewares/jwt';
+import { generateJWT } from '../utils/jwt';
 
 /**
  * This route handles the authentication with Epic Games.
@@ -98,8 +100,10 @@ app.get('/callback', async (c) => {
       });
     }
 
+    const jwtToken = generateJWT({ id: encrypt(tokens._id) });
+
     return c.json({
-      id: encrypt(tokens._id),
+      jwt: jwtToken,
     });
   } else {
     const { nanoid } = await import('nanoid');
@@ -109,8 +113,10 @@ app.get('/callback', async (c) => {
       ...data,
     });
 
+    const jwtToken = generateJWT({ id: encrypt(id) });
+
     return c.json({
-      id: encrypt(id),
+      jwt: jwtToken,
     });
   }
 });
@@ -143,7 +149,7 @@ app.get('/login', async (c) => {
   return c.redirect(url.toString());
 });
 
-app.get('/tokens/:id', async (c) => {
+app.get('/tokens/:id', jwtMiddleware, async (c) => {
   const { id } = c.req.param();
 
   const _id = decrypt(id);

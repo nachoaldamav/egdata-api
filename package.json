@@ -10,12 +10,14 @@
     "axios": "1.7.4",
     "dotenv": "16.4.5",
     "hono": "4.5.0",
+    "jsonwebtoken": "^9.0.2",
     "meilisearch": "^0.41.0",
     "mongoose": "8.5.1",
     "nanoid": "^5.0.7",
     "redis": "4.6.15"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "9.0.3",
     "@types/node": "20.14.11",
     "tsup": "8.2.0",
     "tsx": "4.16.2",
