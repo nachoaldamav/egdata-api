@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { nanoid } from 'nanoid';
 import { EpicAuth } from '../db/schemas/epic-auth';
 import { encrypt, decrypt } from '../utils/tokens';
 
@@ -103,6 +102,7 @@ app.get('/callback', async (c) => {
       id: encrypt(tokens._id),
     });
   } else {
+    const { nanoid } = await import('nanoid');
     const id = nanoid();
     await EpicAuth.create({
       _id: id,
