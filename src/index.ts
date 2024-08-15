@@ -24,6 +24,7 @@ import PromotionsRoute from './routes/promotions';
 import FreeGamesRoute from './routes/free-games';
 import MultisearchRoute from './routes/multisearch';
 import AuthRoute from './routes/auth';
+import AccountsRoute from './routes/accounts';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga';
 import { Event } from './db/schemas/events';
@@ -1353,6 +1354,8 @@ app.route('/free-games', FreeGamesRoute);
 app.route('/multisearch', MultisearchRoute);
 
 app.route('/auth', AuthRoute);
+
+app.route('/accounts', AccountsRoute);
 
 serve(
   {
