@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { nanoid } from 'nanoid';
 import { EpicAuth } from '../db/schemas/epic-auth';
-import { encrypt } from '../utils/tokens';
+import { encrypt, decrypt } from '../utils/tokens';
 
 /**
  * This route handles the authentication with Epic Games.
@@ -141,6 +141,93 @@ app.get('/login', async (c) => {
   url.searchParams.append('response_type', 'code');
 
   return c.redirect(url.toString());
+});
+
+app.get('/tokens/:id', async (c) => {
+  const { id } = c.req.param();
+
+  const _id = decrypt(id);
+
+  const tokens = await EpicAuth.findOne({ _id });
+
+  if (!tokens) {
+    return c.json({
+      error: 'Invalid ID',
+    });
+  }
+
+  return c.json(tokens);
+});
+
+app.patch('/refresh', async (c) => {
+  const { token } = c.req.query();
+
+  if (!token || token !== process.env.COOKIE_SECRET) {
+    return c.json({
+      error: 'Invalid token',
+    });
+  }
+
+  const { EPIC_CLIENT_ID, EPIC_CLIENT_SECRET } = process.env;
+
+  if (!EPIC_CLIENT_ID || !EPIC_CLIENT_SECRET) {
+    return c.json({
+      error: 'Missing environment variables',
+    });
+  }
+
+  const auth = Buffer.from(`${EPIC_CLIENT_ID}:${EPIC_CLIENT_SECRET}`).toString(
+    'base64'
+  );
+
+  // Get tokens that are about to expire
+  const plusHalfHour = new Date(Date.now() + 30 * 60 * 1000);
+
+  const authEntries = await EpicAuth.find({
+    expires_at: { $lt: plusHalfHour },
+  });
+
+  for (const entry of authEntries) {
+    const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
+
+    const body = new URLSearchParams();
+    body.append('grant_type', 'refresh_token');
+    body.append('refresh_token', entry.refresh_token);
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    });
+
+    const data = await response.json();
+
+    if (data.access_token && data.refresh_token) {
+      await EpicAuth.updateOne(
+        { account_id: entry.account_id },
+        {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_at: new Date(Date.now() + data.expires_in * 1000),
+          refresh_expires_at: new Date(
+            Date.now() + data.refresh_expires_in * 1000
+          ),
+        }
+      );
+    } else {
+      console.error(
+        `Failed to refresh token for account_id ${entry.account_id}`,
+        data
+      );
+    }
+  }
+
+  return c.json({
+    message: 'Refreshed tokens',
+  });
 });
 
 export default app;
