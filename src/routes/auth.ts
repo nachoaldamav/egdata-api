@@ -151,6 +151,14 @@ app.get('/login', async (c) => {
 
 app.get('/tokens/:id', jwtMiddleware, async (c) => {
   const { id } = c.req.param();
+  // @ts-ignore
+  const jwtId = c.get('user') as { id: string };
+
+  if (id !== jwtId.id) {
+    return c.json({
+      error: 'Unauthorized',
+    });
+  }
 
   const _id = decrypt(id);
 
