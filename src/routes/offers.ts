@@ -1645,27 +1645,28 @@ app.get('/:id/tops', async (c) => {
 
   const cacheKey = `tops:${id}`;
 
-  const cached = await client.get(cacheKey);
+  /* const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
     });
-  }
+  } */
 
-  const topWishlisted = await CollectionOffer.findOne({
-    _id: 'top-wishlisted',
-    'offers._id': id,
-  });
-
-  const topSellers = await CollectionOffer.findOne({
-    _id: 'top-sellers',
-    'offers._id': id,
-  });
+  const [topWishlisted, topSellers] = await Promise.all([
+    CollectionOffer.findOne({
+      _id: 'top-wishlisted',
+      'offers._id': id,
+    }),
+    CollectionOffer.findOne({
+      _id: 'top-sellers',
+      'offers._id': id,
+    }),
+  ]);
 
   const result = {
-    topWishlisted: topWishlisted?.offers.findIndex((o) => o._id === id) + 1,
-    topSellers: topSellers?.offers.findIndex((o) => o._id === id) + 1,
+    topWishlisted: topWishlisted?.offers.find((o) => o._id === id)?.position,
+    topSellers: topSellers?.offers.find((o) => o._id === id)?.position,
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
