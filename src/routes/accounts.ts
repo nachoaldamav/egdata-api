@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { jwtMiddleware } from '../middlewares/jwt';
 import { decrypt } from '../utils/tokens';
-import { EpicAuth } from '../db/schemas/epic-auth';
+import GoogleAuth from '../db/schemas/google-auth';
 
 const app = new Hono();
 
@@ -12,31 +12,35 @@ app.get('/', async (c) => {
 
   const id = decrypt(user.id);
 
-  const epicInfo = await EpicAuth.findOne({ _id: id });
+  const googleInfo = await GoogleAuth.findOne({ _id: id });
 
-  if (!epicInfo) {
+  if (!googleInfo) {
     return c.json({ error: 'User not found' }, 403);
   }
 
-  const accountEpicUrl = new URL(
-    'https://api.epicgames.dev/epic/id/v2/accounts'
+  const googleAccountUrl = new URL(
+    'https://www.googleapis.com/oauth2/v3/userinfo'
   );
 
-  accountEpicUrl.searchParams.append('accountId', epicInfo.account_id);
-
-  const response = await fetch(accountEpicUrl.toString(), {
+  const response = await fetch(googleAccountUrl.toString(), {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${epicInfo.access_token}`,
+      Authorization: `Bearer ${googleInfo.access_token}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
   });
 
   const data = await response.json();
 
-  if ('error' in data) {
+  if (response.status !== 200) {
     console.error(`Failed to get account info`, data);
-    return c.json(data);
+    return c.json(
+      { error: 'Failed to get account info', details: data },
+      {
+        status: response.status,
+        statusText: response.statusText,
+      }
+    );
   }
 
   return c.json({

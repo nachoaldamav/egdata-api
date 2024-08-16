@@ -1637,4 +1637,44 @@ app.get('/:id/ratings', async (c) => {
   });
 });
 
+/**
+ * This endpoint returns the number where the offer is in the top wishlisted / top sellers collections
+ */
+app.get('/:id/tops', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `tops:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const topWishlisted = await CollectionOffer.findOne({
+    _id: 'top-wishlisted',
+    'offers._id': id,
+  });
+
+  const topSellers = await CollectionOffer.findOne({
+    _id: 'top-sellers',
+    'offers._id': id,
+  });
+
+  const result = {
+    topWishlisted: topWishlisted?.offers.findIndex((o) => o._id === id) + 1,
+    topSellers: topSellers?.offers.findIndex((o) => o._id === id) + 1,
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 export default app;

@@ -10,6 +10,7 @@ export async function jwtMiddleware(c: Context, next: Next) {
   const token = authHeader.split(' ')[1];
   const payload = verifyJWT(token);
   if (!payload) {
+    console.error('Invalid token');
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
