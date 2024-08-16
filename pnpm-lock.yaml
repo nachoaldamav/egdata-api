@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@egdata/core.schemas.ratings':
+        specifier: 1.1.0
+        version: 1.1.0(mongoose@8.5.2)
       '@hono/node-server':
         specifier: 1.12.0
         version: 1.12.0
@@ -30,8 +33,8 @@ importers:
         specifier: ^0.41.0
         version: 0.41.0
       mongoose:
-        specifier: 8.5.1
-        version: 8.5.1
+        specifier: 8.5.2
+        version: 8.5.2
       nanoid:
         specifier: ^5.0.7
         version: 5.0.7
@@ -56,6 +59,11 @@ importers:
         version: 5.5.3
 
 packages:
+
+  '@egdata/core.schemas.ratings@1.1.0':
+    resolution: {integrity: sha512-zOdiOoasgO+1VOWGr137fI/opK9FTEVsjuekbhh+u1Nw9Yf+gs4pYgchtera+P8fm7KYAE2Vr6G7kKmaFL4v0w==}
+    peerDependencies:
+      mongoose: ^8.5.2
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -882,8 +890,8 @@ packages:
       socks:
         optional: true
 
-  mongoose@8.5.1:
-    resolution: {integrity: sha512-OhVcwVl91A1G6+XpjDcpkGP7l7ikZkxa0DylX7NT/lcEqAjggzSdqDxb48A+xsDxqNAr0ntSJ1yiE3+KJTOd5Q==}
+  mongoose@8.5.2:
+    resolution: {integrity: sha512-GZB4rHMdYfGatV+23IpCrqFbyCOjCNOHXgWbirr92KRwTEncBrtW3kgU9vmpKjsGf7nMmnAy06SwWUv1vhDkSg==}
     engines: {node: '>=16.20.1'}
 
   mpath@0.9.0:
@@ -1174,6 +1182,10 @@ packages:
     hasBin: true
 
 snapshots:
+
+  '@egdata/core.schemas.ratings@1.1.0(mongoose@8.5.2)':
+    dependencies:
+      mongoose: 8.5.2
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
@@ -1822,7 +1834,7 @@ snapshots:
       bson: 6.7.0
       mongodb-connection-string-url: 3.0.1
 
-  mongoose@8.5.1:
+  mongoose@8.5.2:
     dependencies:
       bson: 6.7.0
       kareem: 2.6.3

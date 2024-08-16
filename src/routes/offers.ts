@@ -22,6 +22,8 @@ import { Media } from '../db/schemas/media';
 import { CollectionOffer } from '../db/schemas/collections';
 import { Sandbox } from '../db/schemas/sandboxes';
 import { FreeGames } from '../db/schemas/freegames';
+import { db } from '../db';
+import { Ratings } from '@egdata/core.schemas.ratings';
 
 const app = new Hono();
 
@@ -1566,6 +1568,71 @@ app.get('/:id/giveaways', async (c) => {
   });
 
   return c.json(giveaways, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
+app.get('/:id/ratings', async (c) => {
+  const { id } = c.req.param();
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const cacheKey = `ratings:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const sandbox = await Sandbox.findOne({
+    _id: offer.namespace,
+  });
+
+  if (!sandbox) {
+    c.status(404);
+    return c.json({
+      message: 'Sandbox not found',
+    });
+  }
+
+  const product = await db.db.collection('products').findOne({
+    // @ts-expect-error - _id in products is a string
+    _id: sandbox.parent,
+  });
+
+  if (!product) {
+    c.status(404);
+    return c.json({
+      message: 'Product not found',
+    });
+  }
+
+  const ratings = await Ratings.findOne({
+    _id: product.slug,
+  });
+
+  if (!ratings) {
+    c.status(404);
+    return c.json({
+      message: 'Ratings not found',
+    });
+  }
+
+  await client.set(cacheKey, JSON.stringify(ratings), {
+    EX: 3600,
+  });
+
+  return c.json(ratings, 200, {
     'Cache-Control': 'public, max-age=60',
   });
 });
