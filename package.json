@@ -1,8 +1,8 @@
 {
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts ",
-    "build": "tsup-node src/index.ts",
-    "start": "node dist/index.js"
+    "build": "tsup-node src/index.ts --format esm --sourcemap",
+    "start": "node --enable-source-maps dist/index.js"
   },
   "dependencies": {
     "@egdata/core.schemas.ratings": "1.1.0",
