@@ -1,4 +1,7 @@
-import { type JwtPayload, sign, verify } from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
+import type { JwtPayload } from 'jsonwebtoken';
+
+const { sign, verify } = jwt;
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
