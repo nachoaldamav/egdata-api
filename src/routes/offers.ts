@@ -1645,13 +1645,13 @@ app.get('/:id/tops', async (c) => {
 
   const cacheKey = `tops:${id}`;
 
-  /* const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       'Cache-Control': 'public, max-age=60',
     });
-  } */
+  }
 
   const [topWishlisted, topSellers] = await Promise.all([
     CollectionOffer.findOne({
