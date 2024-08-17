@@ -2,7 +2,7 @@
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts ",
     "build": "tsup-node src/index.ts --format esm --sourcemap --splitting --target node22 --minify --cjsInterop",
-    "start": "node --enable-source-maps --env-file=.env dist/index.mjs"
+    "start": "node --enable-source-maps --env-file=.env dist/index.js"
   },
   "type": "module",
   "dependencies": {
