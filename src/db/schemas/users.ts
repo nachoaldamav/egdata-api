@@ -6,6 +6,7 @@ export interface IUser {
   displayName: string;
   avatarUrl: string;
   epicId: string | null;
+  registrationDate: Date;
 }
 
 const userSchema = new mongoose.Schema<IUser>({
@@ -31,6 +32,11 @@ const userSchema = new mongoose.Schema<IUser>({
     type: String,
     required: false,
     unique: true,
+  },
+  registrationDate: {
+    type: Date,
+    required: true,
+    default: Date.now,
   },
 });
 

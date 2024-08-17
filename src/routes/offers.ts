@@ -1,29 +1,34 @@
 import { Hono } from 'hono';
-import { regions } from '../utils/countries';
-import client from '../clients/redis';
+import { regions } from '../utils/countries.js';
+import client from '../clients/redis.js';
 import {
   PriceEngine,
   PriceEngineHistorical,
   PriceType,
-} from '../db/schemas/price-engine';
+} from '../db/schemas/price-engine.js';
 import { getCookie } from 'hono/cookie';
-import { AchievementSet } from '../db/schemas/achievements';
-import { Asset, AssetType } from '../db/schemas/assets';
-import { Changelog } from '../db/schemas/changelog';
-import { Item } from '../db/schemas/item';
-import { Mappings } from '../db/schemas/mappings';
-import { Offer, OfferType } from '../db/schemas/offer';
-import { attributesToObject } from '../utils/attributes-to-object';
-import { getGameFeatures } from '../utils/game-features';
-import { TagModel, Tags } from '../db/schemas/tags';
-import { orderOffersObject } from '../utils/order-offers-object';
-import { getImage } from '../utils/get-image';
-import { Media } from '../db/schemas/media';
-import { CollectionOffer } from '../db/schemas/collections';
-import { Sandbox } from '../db/schemas/sandboxes';
-import { FreeGames } from '../db/schemas/freegames';
-import { db } from '../db';
+import { AchievementSet } from '../db/schemas/achievements.js';
+import { Asset, AssetType } from '../db/schemas/assets.js';
+import { Changelog } from '../db/schemas/changelog.js';
+import { Item } from '../db/schemas/item.js';
+import { Mappings } from '../db/schemas/mappings.js';
+import { Offer, OfferType } from '../db/schemas/offer.js';
+import { attributesToObject } from '../utils/attributes-to-object.js';
+import { getGameFeatures } from '../utils/game-features.js';
+import { TagModel, Tags } from '../db/schemas/tags.js';
+import { orderOffersObject } from '../utils/order-offers-object.js';
+import { getImage } from '../utils/get-image.js';
+import { Media } from '../db/schemas/media.js';
+import { CollectionOffer } from '../db/schemas/collections.js';
+import { Sandbox } from '../db/schemas/sandboxes.js';
+import { FreeGames } from '../db/schemas/freegames.js';
+import { db } from '../db/index.js';
 import { Ratings } from '@egdata/core.schemas.ratings';
+import { IReview, Review } from '../db/schemas/reviews.js';
+import { getDiscordUser } from '../utils/get-discord-user.js';
+import { getProduct } from '../utils/get-product.js';
+import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
+import { User } from '../db/schemas/users.js';
 
 const app = new Hono();
 
@@ -1637,9 +1642,6 @@ app.get('/:id/ratings', async (c) => {
   });
 });
 
-/**
- * This endpoint returns the number where the offer is in the top wishlisted / top sellers collections
- */
 app.get('/:id/tops', async (c) => {
   const { id } = c.req.param();
 
@@ -1674,6 +1676,356 @@ app.get('/:id/tops', async (c) => {
   });
 
   return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
+app.get('/:id/reviews', async (c) => {
+  const { id } = c.req.param();
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 25);
+  const skip = (page - 1) * limit;
+  const onlyVerified = c.req.query('verified') === 'true';
+
+  const cacheKey = `reviews:${id}:${page}:${limit}:${
+    onlyVerified ? 'verified' : 'all'
+  }`;
+
+  // const cached = await client.get(cacheKey);
+
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
+
+  const reviews = await Review.find(
+    {
+      id: id,
+      ...(onlyVerified && {
+        verified: true,
+      }),
+    },
+    undefined,
+    {
+      sort: {
+        createdAt: -1,
+      },
+      limit,
+      skip,
+    }
+  );
+
+  if (!reviews) {
+    c.status(200);
+    return c.json({
+      elements: [],
+      page: 1,
+      total: 0,
+      limit,
+    });
+  }
+
+  const result = {
+    elements: reviews,
+    page,
+    total: await Review.countDocuments({
+      id,
+      ...(onlyVerified && {
+        verified: true,
+      }),
+    }),
+    limit,
+  };
+
+  if (reviews.length > 0) {
+    await client.set(cacheKey, JSON.stringify(result), {
+      EX: 3600,
+    });
+  }
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
+app.post('/:id/reviews', async (c) => {
+  const { id } = c.req.param();
+  const body = await c.req.json<
+    Omit<IReview, 'id' | 'createdAt' | 'verified' | 'userId'>
+  >();
+  const Authorization = c.req.header('Authorization');
+
+  if (!Authorization) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  if (!body || !body.rating || !body.title || !body.content) {
+    c.status(400);
+    return c.json({
+      message: 'Missing required fields',
+    });
+  }
+
+  const token = Authorization.replace('Bearer ', '');
+
+  const user = await getDiscordUser(token);
+
+  if (!user) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const dbUser = await User.findOne({
+    id: user.id,
+  });
+
+  if (!dbUser) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  // Check if the user already reviewed the product
+  const existingReview = await Review.findOne({
+    userId: dbUser.id,
+    id,
+  });
+
+  if (existingReview) {
+    c.status(400);
+    return c.json({
+      message: 'User already reviewed this product',
+    });
+  }
+
+  const product = await getProduct(id);
+
+  if (!product) {
+    c.status(404);
+    return c.json({
+      message: 'Product not found',
+    });
+  }
+
+  const isOwned = dbUser?.epicId
+    ? await verifyGameOwnership(
+        dbUser?.epicId,
+        product._id as unknown as string
+      )
+    : false;
+
+  const review: IReview = {
+    id,
+    rating: body.rating,
+    title: body.title,
+    content: body.content,
+    tags: body.tags.slice(0, 5),
+    verified: isOwned,
+    userId: dbUser.id,
+    createdAt: new Date(),
+  };
+
+  await Review.create(review);
+
+  return c.json(
+    {
+      status: 'ok',
+    },
+    201
+  );
+});
+
+app.patch('/:id/reviews', async (c) => {
+  const { id } = c.req.param();
+  const body = await c.req.json<Omit<IReview, 'id' | 'createdAt' | 'userId'>>();
+  const Authorization = c.req.header('Authorization');
+
+  if (!Authorization) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  if (!body || !body.rating || !body.title || !body.content) {
+    c.status(400);
+    return c.json({
+      message: 'Missing required fields',
+    });
+  }
+
+  const token = Authorization.replace('Bearer ', '');
+
+  const user = await getDiscordUser(token);
+
+  if (!user) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const dbUser = await User.findOne({
+    id: user.id,
+  });
+
+  if (!dbUser) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const product = await getProduct(id);
+
+  if (!product) {
+    c.status(404);
+    return c.json({
+      message: 'Product not found',
+    });
+  }
+
+  const isOwned = dbUser?.epicId
+    ? await verifyGameOwnership(
+        dbUser?.epicId,
+        product._id as unknown as string
+      )
+    : false;
+
+  const review: IReview = {
+    id,
+    rating: body.rating,
+    title: body.title,
+    content: body.content,
+    tags: body.tags.slice(0, 5),
+    verified: isOwned,
+    userId: dbUser.id,
+    createdAt: new Date(),
+  };
+
+  await Review.findOneAndUpdate(
+    {
+      userId: dbUser.id,
+      id,
+    },
+    review
+  );
+
+  return c.json(
+    {
+      status: 'ok',
+    },
+    200
+  );
+});
+
+app.delete('/:id/reviews', async (c) => {
+  const { id } = c.req.param();
+  const Authorization = c.req.header('Authorization');
+
+  if (!Authorization) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const token = Authorization.replace('Bearer ', '');
+
+  const user = await getDiscordUser(token);
+
+  if (!user) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const dbUser = await User.findOne({
+    id: user.id,
+  });
+
+  if (!dbUser) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const review = await Review.findOne({
+    userId: dbUser.id,
+    id,
+  });
+
+  if (!review) {
+    c.status(404);
+    return c.json({
+      message: 'Review not found',
+    });
+  }
+
+  await Review.deleteOne({
+    userId: dbUser.id,
+  });
+
+  return c.json(
+    {
+      status: 'ok',
+    },
+    200
+  );
+});
+
+app.get('/:id/reviews-summary', async (c) => {
+  const { id } = c.req.param();
+  const onlyVerified = c.req.query('verified') === 'true';
+
+  const cacheKey = `reviews-summary:${id}:${onlyVerified ? 'verified' : 'all'}`;
+
+  // const cached = await client.get(cacheKey);
+
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
+
+  const reviews = await Review.find({
+    id,
+    ...(onlyVerified && {
+      verified: true,
+    }),
+  });
+
+  if (!reviews) {
+    c.status(200);
+    return c.json({
+      totalReviews: 0,
+      averageRating: 0,
+    });
+  }
+
+  const totalReviews = reviews.length;
+  const totalRating = reviews.reduce((acc, r) => acc + r.rating, 0);
+  const averageRating = totalRating / totalReviews;
+
+  const summary = {
+    totalReviews,
+    averageRating,
+  };
+
+  await client.set(cacheKey, JSON.stringify(summary), {
+    EX: 3600,
+  });
+
+  return c.json(summary, 200, {
     'Cache-Control': 'public, max-age=60',
   });
 });
