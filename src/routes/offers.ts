@@ -1666,9 +1666,14 @@ app.get('/:id/tops', async (c) => {
     }),
   ]);
 
+  const whishlistedPosition =
+    topWishlisted?.offers.find((o) => o._id === id)?.position ?? 0;
+  const sellersPosition =
+    topSellers?.offers.find((o) => o._id === id)?.position ?? 0;
+
   const result = {
-    topWishlisted: topWishlisted?.offers.find((o) => o._id === id)?.position,
-    topSellers: topSellers?.offers.find((o) => o._id === id)?.position,
+    topWishlisted: whishlistedPosition === 0 ? undefined : whishlistedPosition,
+    topSellers: sellersPosition === 0 ? undefined : sellersPosition,
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
