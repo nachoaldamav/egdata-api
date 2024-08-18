@@ -16,6 +16,7 @@ export const verifyGameOwnership = async (
   );
 
   if (
+    productAchievements?.__typename === 'ServiceError' ||
     !productAchievements ||
     productAchievements.data?.playerAchievements?.length === 0
   ) {

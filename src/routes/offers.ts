@@ -1745,8 +1745,18 @@ app.get('/:id/reviews', async (c) => {
     });
   }
 
+  const users = await User.find({
+    id: { $in: reviews.map((r) => r.userId) },
+  });
+
   const result = {
-    elements: reviews,
+    elements: reviews.map((r) => {
+      const user = users.find((u) => u.id === r.userId);
+      return {
+        ...r.toObject(),
+        user: user ? user.toObject() : null,
+      };
+    }),
     page,
     total: await Review.countDocuments({
       id,
@@ -1849,6 +1859,8 @@ app.post('/:id/reviews', async (c) => {
     verified: isOwned,
     userId: dbUser.id,
     createdAt: new Date(),
+    recommended: body.recommended,
+    updatedAt: new Date(),
   };
 
   await Review.create(review);
@@ -2002,6 +2014,13 @@ app.delete('/:id/reviews', async (c) => {
   );
 });
 
+type ReviewSummary = {
+  overallScore: number;
+  recommendedPercentage: number;
+  notRecommendedPercentage: number;
+  totalReviews: number;
+};
+
 app.get('/:id/reviews-summary', async (c) => {
   const { id } = c.req.param();
   const onlyVerified = c.req.query('verified') === 'true';
@@ -2032,12 +2051,18 @@ app.get('/:id/reviews-summary', async (c) => {
   }
 
   const totalReviews = reviews.length;
-  const totalRating = reviews.reduce((acc, r) => acc + r.rating, 0);
-  const averageRating = totalRating / totalReviews;
+  const averageRating =
+    reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews;
+  const recommendedPercentage =
+    reviews.filter((r) => r.recommended).length / totalReviews;
+  const notRecommendedPercentage =
+    reviews.filter((r) => !r.recommended).length / totalReviews;
 
-  const summary = {
+  const summary: ReviewSummary = {
+    overallScore: averageRating,
+    recommendedPercentage,
+    notRecommendedPercentage,
     totalReviews,
-    averageRating,
   };
 
   await client.set(cacheKey, JSON.stringify(summary), {
@@ -2046,6 +2071,101 @@ app.get('/:id/reviews-summary', async (c) => {
 
   return c.json(summary, 200, {
     'Cache-Control': 'public, max-age=60',
+  });
+});
+
+app.get('/:id/reviews/permissions', async (c) => {
+  const { id } = c.req.param();
+  console.log(id);
+  const Authorization = c.req.header('Authorization');
+
+  if (!Authorization) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const token = Authorization.replace('Bearer ', '');
+
+  const user = await getDiscordUser(token);
+
+  if (!user) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const dbUser = await User.findOne({
+    id: user.id,
+  });
+
+  if (!dbUser) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const existingReview = await Review.findOne({
+    userId: dbUser.id,
+    id,
+  });
+
+  return c.json({
+    canReview: !existingReview,
+  });
+});
+
+app.get('/:id/ownership', async (c) => {
+  const { id } = c.req.param();
+  const Authorization = c.req.header('Authorization');
+
+  if (!Authorization) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const token = Authorization.replace('Bearer ', '');
+
+  const user = await getDiscordUser(token);
+
+  if (!user) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const dbUser = await User.findOne({
+    id: user.id,
+  });
+
+  if (!dbUser) {
+    c.status(401);
+    return c.json({
+      message: 'Unauthorized',
+    });
+  }
+
+  const product = await getProduct(id);
+
+  if (!product) {
+    c.status(404);
+    return c.json({
+      message: 'Product not found',
+    });
+  }
+
+  const isOwned = dbUser.epicId
+    ? await verifyGameOwnership(dbUser.epicId, product._id as unknown as string)
+    : false;
+
+  return c.json({
+    isOwned,
   });
 });
 

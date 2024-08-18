@@ -4,17 +4,27 @@ export interface IReview {
   id: string;
   userId: string;
   rating: number;
+  recommended: boolean;
   content: string;
   title: string;
   tags: string[];
   createdAt: Date;
   verified: boolean;
+  updatedAt: Date;
+  editions?: {
+    title: string;
+    content: string;
+    createdAt: Date;
+    rating: number;
+    tags: string[];
+  }[];
 }
 
 const reviewSchema = new mongoose.Schema<IReview>({
   id: {
     type: String,
     required: true,
+    unique: false,
   },
   userId: {
     type: String,
@@ -22,6 +32,12 @@ const reviewSchema = new mongoose.Schema<IReview>({
   },
   rating: {
     type: Number,
+    required: true,
+    max: 10,
+    min: 1,
+  },
+  recommended: {
+    type: Boolean,
     required: true,
   },
   content: {
@@ -32,7 +48,7 @@ const reviewSchema = new mongoose.Schema<IReview>({
   title: {
     type: String,
     required: true,
-    maxlength: 100,
+    maxlength: 200,
   },
   tags: {
     type: [String],
@@ -42,10 +58,29 @@ const reviewSchema = new mongoose.Schema<IReview>({
   createdAt: {
     type: Date,
     required: true,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
   },
   verified: {
     type: Boolean,
     required: true,
+    default: false,
+  },
+  editions: {
+    type: [
+      {
+        title: String,
+        content: String,
+        createdAt: Date,
+        rating: Number,
+        tags: [String],
+      },
+    ],
+    required: false,
   },
 });
 
