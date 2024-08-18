@@ -398,7 +398,7 @@ app.get('/genres', async (c) => {
 });
 
 app.get('/top-wishlisted', async (c) => {
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 1);
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 10);
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const skip = (page - 1) * limit;
 
@@ -423,7 +423,11 @@ app.get('/top-wishlisted', async (c) => {
     {
       $project: {
         offers: {
-          $slice: ['$offers', skip, limit],
+          $filter: {
+            input: { $slice: ['$offers', skip, limit] },
+            as: 'offer',
+            cond: { $ne: ['$$offer.position', 0] },
+          },
         },
       },
     },
@@ -527,6 +531,11 @@ app.get('/top-sellers', async (c) => {
       $unwind: '$offers',
     },
     {
+      $match: {
+        'offers.position': { $ne: 0 },
+      },
+    },
+    {
       $sort: {
         'offers.position': 1, // Sort by position in ascending order
       },
@@ -596,6 +605,11 @@ app.get('/top-sellers', async (c) => {
       'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
     });
   }
+
+  return c.json({ elements: [], page, limit, total: 0 }, 200, {
+    'Cache-Control': 'public, max-age=60',
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
 });
 
 app.get('/featured-discounts', async (c) => {
