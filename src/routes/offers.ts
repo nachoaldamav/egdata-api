@@ -404,7 +404,7 @@ app.get('/top-wishlisted', async (c) => {
 
   const start = new Date();
 
-  const cacheKey = `top-wishlisted:${page}:${limit}`;
+  const cacheKey = `top-wishlisted:${page}:${limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 

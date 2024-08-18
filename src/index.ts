@@ -5,37 +5,41 @@ import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
 import { logger } from 'hono/logger';
-import { db } from './db';
-import { Offer, OfferType } from './db/schemas/offer';
-import { Item } from './db/schemas/item';
-import { orderOffersObject } from './utils/order-offers-object';
-import { getFeaturedGames } from './utils/get-featured-games';
-import { countries, regions } from './utils/countries';
-import { TagModel, Tags } from './db/schemas/tags';
-import { attributesToObject } from './utils/attributes-to-object';
-import { Asset } from './db/schemas/assets';
-import { PriceEngine, PriceType } from './db/schemas/price-engine';
-import { Changelog } from './db/schemas/changelog';
-import client from './clients/redis';
-import SandboxRoute from './routes/sandbox';
-import SearchRoute from './routes/search';
-import OffersRoute from './routes/offers';
-import PromotionsRoute from './routes/promotions';
-import FreeGamesRoute from './routes/free-games';
-import MultisearchRoute from './routes/multisearch';
-import AuthRoute from './routes/auth';
-import AccountsRoute from './routes/accounts';
-import UsersRoute from './routes/users';
+import { db } from './db/index.js';
+import { Offer, OfferType } from './db/schemas/offer.js';
+import { Item } from './db/schemas/item.js';
+import { orderOffersObject } from './utils/order-offers-object.js';
+import { getFeaturedGames } from './utils/get-featured-games.js';
+import { countries, regions } from './utils/countries.js';
+import { TagModel, Tags } from './db/schemas/tags.js';
+import { attributesToObject } from './utils/attributes-to-object.js';
+import { Asset } from './db/schemas/assets.js';
+import { PriceEngine, PriceType } from './db/schemas/price-engine.js';
+import { Changelog } from './db/schemas/changelog.js';
+import client from './clients/redis.js';
+import SandboxRoute from './routes/sandbox.js';
+import SearchRoute from './routes/search.js';
+import OffersRoute from './routes/offers.js';
+import PromotionsRoute from './routes/promotions.js';
+import FreeGamesRoute from './routes/free-games.js';
+import MultisearchRoute from './routes/multisearch.js';
+import AuthRoute from './routes/auth.js';
+import AccountsRoute from './routes/accounts.js';
+import UsersRoute from './routes/users.js';
 import { config } from 'dotenv';
-import { gaClient } from './clients/ga';
-import { Event } from './db/schemas/events';
-import { meiliSearchClient } from './clients/meilisearch';
-import { CollectionOffer } from './db/schemas/collections';
-import { Seller } from './db/schemas/sellers';
+import { gaClient } from './clients/ga.js';
+import { Event } from './db/schemas/events.js';
+import { meiliSearchClient } from './clients/meilisearch.js';
+import { CollectionOffer } from './db/schemas/collections.js';
+import { Seller } from './db/schemas/sellers.js';
 
 config();
 
-const ALLOWED_ORIGINS = ['https://egdata.app', 'http://localhost:5173'];
+const ALLOWED_ORIGINS = [
+  'https://egdata.app',
+  'http://localhost:5173',
+  'https://user-reviews-pr.egdata.app/',
+];
 
 const app = new Hono();
 
