@@ -1987,7 +1987,7 @@ app.patch('/:id/reviews', async (c) => {
         content: oldReview.content,
         tags: oldReview.tags,
         recommended: oldReview.recommended,
-        createdAt: oldReview.createdAt,
+        createdAt: oldReview.updatedAt,
       },
     ],
   };
