@@ -1700,6 +1700,7 @@ app.get('/:id/tops', async (c) => {
 });
 
 app.get('/:id/reviews', async (c) => {
+  const auth = c.req.header('Authorization');
   const { id } = c.req.param();
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 25);
@@ -1718,12 +1719,17 @@ app.get('/:id/reviews', async (c) => {
   //   });
   // }
 
+  const currentUser = auth
+    ? await getDiscordUser(auth.replace('Bearer ', ''))
+    : null;
+
   const reviews = await Review.find(
     {
       id: id,
       ...(onlyVerified && {
         verified: true,
       }),
+      userId: { $ne: currentUser?.id },
     },
     undefined,
     {
@@ -1734,6 +1740,17 @@ app.get('/:id/reviews', async (c) => {
       skip,
     }
   );
+
+  const userReview = currentUser
+    ? await Review.findOne({
+        userId: currentUser.id,
+        id,
+      })
+    : null;
+
+  if (userReview) {
+    reviews.unshift(userReview);
+  }
 
   if (!reviews) {
     c.status(200);
@@ -1930,15 +1947,37 @@ app.patch('/:id/reviews', async (c) => {
       )
     : false;
 
-  const review: IReview = {
+  const oldReview = await Review.findOne({
+    userId: dbUser.id,
     id,
+  });
+
+  if (!oldReview) {
+    c.status(404);
+    return c.json({
+      message: 'Review not found',
+    });
+  }
+
+  const review: Omit<IReview, 'id' | 'createdAt' | 'userId'> = {
     rating: body.rating,
     title: body.title,
     content: body.content,
     tags: body.tags.slice(0, 5),
     verified: isOwned,
-    userId: dbUser.id,
-    createdAt: new Date(),
+    recommended: body.recommended,
+    updatedAt: new Date(),
+    editions: [
+      ...(oldReview.editions || []),
+      {
+        rating: oldReview.rating,
+        title: oldReview.title,
+        content: oldReview.content,
+        tags: oldReview.tags,
+        recommended: oldReview.recommended,
+        createdAt: oldReview.createdAt,
+      },
+    ],
   };
 
   await Review.findOneAndUpdate(

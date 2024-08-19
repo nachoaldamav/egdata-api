@@ -17,6 +17,7 @@ export interface IReview {
     createdAt: Date;
     rating: number;
     tags: string[];
+    recommended: boolean;
   }[];
 }
 
