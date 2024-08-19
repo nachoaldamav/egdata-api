@@ -1851,6 +1851,18 @@ app.post('/:id/reviews', async (c) => {
     });
   }
 
+  const offer = await Offer.findOne({ id });
+
+  if (
+    !offer ||
+    (offer.releaseDate || (offer.effectiveDate as Date)) > new Date()
+  ) {
+    c.status(400);
+    return c.json({
+      message: 'Product not released',
+    });
+  }
+
   const product = await getProduct(id);
 
   if (!product) {
