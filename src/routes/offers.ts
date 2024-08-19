@@ -2043,6 +2043,7 @@ app.delete('/:id/reviews', async (c) => {
 
   await Review.deleteOne({
     userId: dbUser.id,
+    id,
   });
 
   return c.json(
