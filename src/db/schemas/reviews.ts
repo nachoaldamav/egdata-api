@@ -44,7 +44,7 @@ const reviewSchema = new mongoose.Schema<IReview>({
   content: {
     type: String,
     required: true,
-    maxlength: 5000,
+    maxlength: 50_000,
   },
   title: {
     type: String,
