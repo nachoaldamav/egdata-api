@@ -1093,20 +1093,24 @@ app.get('/:id/regional-price', async (c) => {
       });
     }
 
-    const price = await PriceEngineHistorical.find(
-      {
-        offerId: id,
-        region,
-      },
-      undefined,
-      {
-        sort: {
-          updatedAt: -1,
-        },
-      }
-    );
+    const offer = await Offer.findOne({ id }).lean();
 
-    if (!price) {
+    const releaseDate = offer?.releaseDate ?? (offer?.effectiveDate as Date);
+    const currentDate = new Date();
+
+    let priceQuery = { offerId: id, region } as any;
+
+    if (releaseDate && releaseDate <= currentDate) {
+      priceQuery.updatedAt = { $gte: releaseDate, $lte: currentDate };
+    }
+
+    const price = await PriceEngineHistorical.find(priceQuery, undefined, {
+      sort: {
+        updatedAt: -1,
+      },
+    });
+
+    if (!price || price.length === 0) {
       c.status(404);
       return c.json({
         message: 'Price not found',
@@ -1137,18 +1141,22 @@ app.get('/:id/regional-price', async (c) => {
     });
   }
 
-  // Iterate over all the regions (faster than aggregating) to get the last price, max and min for each region
-  const prices = await PriceEngineHistorical.find(
-    {
-      offerId: id,
+  const offer = await Offer.findOne({ id }).lean();
+
+  const releaseDate = offer?.releaseDate ?? (offer?.effectiveDate as Date);
+  const currentDate = new Date();
+
+  let priceQuery = { offerId: id } as any;
+
+  if (releaseDate && releaseDate <= currentDate) {
+    priceQuery.updatedAt = { $gte: releaseDate, $lte: currentDate };
+  }
+
+  const prices = await PriceEngineHistorical.find(priceQuery, undefined, {
+    sort: {
+      updatedAt: -1,
     },
-    undefined,
-    {
-      sort: {
-        updatedAt: -1,
-      },
-    }
-  );
+  });
 
   const regionsKeys = Object.keys(regions);
 
@@ -1167,7 +1175,6 @@ app.get('/:id/regional-price', async (c) => {
       const allPrices = regionPrices.map((p) => p.price.discountPrice ?? 0);
 
       const maxPrice = Math.max(...allPrices);
-
       const minPrice = Math.min(...allPrices);
 
       acc[r] = {
@@ -1188,7 +1195,13 @@ app.get('/:id/regional-price', async (c) => {
     >
   );
 
-  return c.json(result);
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
 });
 
 app.get('/:id/changelog', async (c) => {
