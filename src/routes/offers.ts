@@ -1712,17 +1712,64 @@ app.get('/:id/tops', async (c) => {
   });
 });
 
+app.get('/:id/polls', async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `polls:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const sandbox = await Sandbox.findOne({ _id: offer.namespace });
+
+  if (!sandbox) {
+    c.status(404);
+    return c.json({
+      message: 'Sandbox not found',
+    });
+  }
+
+  const polls = await db.db
+    .collection('ratings_polls')
+    .find({
+      // @ts-expect-error - _id in polls is a string
+      _id: offer.namespace,
+    })
+    .toArray();
+
+  await client.set(cacheKey, JSON.stringify(polls[0]), {
+    EX: 3600,
+  });
+
+  return c.json(polls[0], 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 app.get('/:id/reviews', async (c) => {
   const auth = c.req.header('Authorization');
   const { id } = c.req.param();
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 25);
   const skip = (page - 1) * limit;
-  const onlyVerified = c.req.query('verified') === 'true';
 
-  const cacheKey = `reviews:${id}:${page}:${limit}:${
-    onlyVerified ? 'verified' : 'all'
-  }`;
+  const verifiedFilter = c.req.query('verified');
+
+  const cacheKey = `reviews:${id}:${page}:${limit}:${verifiedFilter}`;
 
   // const cached = await client.get(cacheKey);
 
@@ -1736,23 +1783,24 @@ app.get('/:id/reviews', async (c) => {
     ? await getDiscordUser(auth.replace('Bearer ', ''))
     : null;
 
-  const reviews = await Review.find(
-    {
-      id: id,
-      ...(onlyVerified && {
-        verified: true,
-      }),
-      userId: { $ne: currentUser?.id },
+  const query: any = {
+    id: id,
+    userId: { $ne: currentUser?.id },
+  };
+
+  if (verifiedFilter === 'true') {
+    query.verified = true;
+  } else if (verifiedFilter === 'false') {
+    query.verified = false;
+  }
+
+  const reviews = await Review.find(query, undefined, {
+    sort: {
+      createdAt: -1,
     },
-    undefined,
-    {
-      sort: {
-        createdAt: -1,
-      },
-      limit,
-      skip,
-    }
-  );
+    limit,
+    skip,
+  });
 
   const userReview = currentUser
     ? await Review.findOne({
@@ -1788,12 +1836,7 @@ app.get('/:id/reviews', async (c) => {
       };
     }),
     page,
-    total: await Review.countDocuments({
-      id,
-      ...(onlyVerified && {
-        verified: true,
-      }),
-    }),
+    total: await Review.countDocuments(query),
     limit,
   };
 
@@ -2088,9 +2131,9 @@ type ReviewSummary = {
 
 app.get('/:id/reviews-summary', async (c) => {
   const { id } = c.req.param();
-  const onlyVerified = c.req.query('verified') === 'true';
+  const verifiedFilter = c.req.query('verified');
 
-  const cacheKey = `reviews-summary:${id}:${onlyVerified ? 'verified' : 'all'}`;
+  const cacheKey = `reviews-summary:${id}:${verifiedFilter}`;
 
   // const cached = await client.get(cacheKey);
 
@@ -2100,18 +2143,23 @@ app.get('/:id/reviews-summary', async (c) => {
   //   });
   // }
 
-  const reviews = await Review.find({
-    id,
-    ...(onlyVerified && {
-      verified: true,
-    }),
-  });
+  const query: any = { id };
 
-  if (!reviews) {
+  if (verifiedFilter === 'true') {
+    query.verified = true;
+  } else if (verifiedFilter === 'false') {
+    query.verified = false;
+  }
+
+  const reviews = await Review.find(query);
+
+  if (!reviews || reviews.length === 0) {
     c.status(200);
     return c.json({
       totalReviews: 0,
       averageRating: 0,
+      recommendedPercentage: 0,
+      notRecommendedPercentage: 0,
     });
   }
 
