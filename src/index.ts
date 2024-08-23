@@ -737,9 +737,22 @@ app.get('/base-game/:namespace', async (c) => {
   const game = await Offer.findOne({
     namespace,
     offerType: 'BASE_GAME',
+    // Either null or false
+    prePurchase: { $ne: true },
   });
 
   if (!game) {
+    // Try again with prePurchase = true
+    const gameWithPrePurchase = await Offer.findOne({
+      namespace,
+      offerType: 'BASE_GAME',
+      prePurchase: true,
+    });
+
+    if (gameWithPrePurchase) {
+      return c.json(orderOffersObject(gameWithPrePurchase));
+    }
+
     c.status(404);
     return c.json({
       message: 'Game not found',
