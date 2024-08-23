@@ -719,6 +719,13 @@ app.get('/sales', async (c) => {
 app.get('/base-game/:namespace', async (c) => {
   const { namespace } = c.req.param();
 
+  if (namespace === 'epic') {
+    c.status(404);
+    return c.json({
+      message: 'Game not found',
+    });
+  }
+
   const game = await Offer.findOne({
     namespace,
     offerType: 'BASE_GAME',
