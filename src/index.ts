@@ -35,6 +35,12 @@ import { Seller } from './db/schemas/sellers.js';
 
 config();
 
+const internalNamespaces = [
+  'epic',
+  'SeaQA',
+  'd5241c76f178492ea1540fce45616757',
+];
+
 const ALLOWED_ORIGINS = [
   'https://egdata.app',
   'http://localhost:5173',
@@ -719,11 +725,13 @@ app.get('/sales', async (c) => {
 app.get('/base-game/:namespace', async (c) => {
   const { namespace } = c.req.param();
 
-  if (namespace === 'epic') {
-    c.status(404);
-    return c.json({
-      message: 'Game not found',
-    });
+  if (internalNamespaces.includes(namespace)) {
+    return c.json(
+      {
+        error: 'Internal namespace',
+      },
+      404
+    );
   }
 
   const game = await Offer.findOne({
