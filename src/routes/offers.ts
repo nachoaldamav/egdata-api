@@ -1682,7 +1682,7 @@ app.get('/:id/tops', async (c) => {
   //   });
   // }
 
-  const [topWishlisted, topSellers] = await Promise.all([
+  const [topWishlisted, topSellers, topDemos] = await Promise.all([
     CollectionOffer.findOne({
       _id: 'top-wishlisted',
       'offers._id': id,
@@ -1691,16 +1691,23 @@ app.get('/:id/tops', async (c) => {
       _id: 'top-sellers',
       'offers._id': id,
     }),
+    CollectionOffer.findOne({
+      _id: 'top-demos',
+      'offers._id': id,
+    }),
   ]);
 
   const whishlistedPosition =
     topWishlisted?.offers.find((o) => o._id === id)?.position ?? 0;
   const sellersPosition =
     topSellers?.offers.find((o) => o._id === id)?.position ?? 0;
+  const demosPosition =
+    topDemos?.offers.find((o) => o._id === id)?.position ?? 0;
 
   const result = {
     topWishlisted: whishlistedPosition === 0 ? undefined : whishlistedPosition,
     topSellers: sellersPosition === 0 ? undefined : sellersPosition,
+    topDemos: demosPosition === 0 ? undefined : demosPosition,
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
