@@ -1104,17 +1104,32 @@ app.get('/:id/regional-price', async (c) => {
       priceQuery.updatedAt = { $gte: releaseDate, $lte: currentDate };
     }
 
-    const price = await PriceEngineHistorical.find(priceQuery, undefined, {
+    let price = await PriceEngineHistorical.find(priceQuery, undefined, {
       sort: {
         updatedAt: -1,
       },
     });
 
     if (!price || price.length === 0) {
-      c.status(404);
-      return c.json({
-        message: 'Price not found',
-      });
+      // Try to find the price in the historical data
+      price = await PriceEngineHistorical.find(
+        {
+          offerId: id,
+        },
+        undefined,
+        {
+          sort: {
+            updatedAt: -1,
+          },
+        }
+      );
+
+      if (price.length === 0) {
+        c.status(404);
+        return c.json({
+          message: 'Price not found',
+        });
+      }
     }
 
     const result = {
@@ -1132,7 +1147,7 @@ app.get('/:id/regional-price', async (c) => {
     });
   }
 
-  const cacheKey = `regional-price:${id}:all:v0.1`;
+  const cacheKey = `regional-price:${id}:all`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -1148,15 +1163,32 @@ app.get('/:id/regional-price', async (c) => {
 
   let priceQuery = { offerId: id } as any;
 
+  console.log('releaseDate', releaseDate);
+
   if (releaseDate && releaseDate <= currentDate) {
-    priceQuery.updatedAt = { $gte: releaseDate, $lte: currentDate };
+    priceQuery.updatedAt = { $gte: releaseDate };
   }
 
-  const prices = await PriceEngineHistorical.find(priceQuery, undefined, {
+  let prices = await PriceEngineHistorical.find(priceQuery, undefined, {
     sort: {
       updatedAt: -1,
     },
   });
+
+  if (prices.length === 0) {
+    console.log('prices.length === 0');
+    prices = await PriceEngineHistorical.find(
+      {
+        offerId: id,
+      },
+      undefined,
+      {
+        sort: {
+          updatedAt: -1,
+        },
+      }
+    );
+  }
 
   const regionsKeys = Object.keys(regions);
 
