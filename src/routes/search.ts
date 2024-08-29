@@ -1,16 +1,16 @@
 import { createHash } from 'crypto';
 import { Hono } from 'hono';
-import client from '../clients/redis';
-import { Offer } from '../db/schemas/offer';
-import { Tags } from '../db/schemas/tags';
+import client from '../clients/redis.js';
+import { Offer } from '../db/schemas/offer.js';
+import { Tags } from '../db/schemas/tags.js';
 import { PipelineStage } from 'mongoose';
-import { regions } from '../utils/countries';
+import { regions } from '../utils/countries.js';
 import { getCookie } from 'hono/cookie';
-import { db } from '../db';
-import { ChangelogType } from '../db/schemas/changelog';
-import { meiliSearchClient } from '../clients/meilisearch';
-import { Item } from '../db/schemas/item';
-import { Asset } from '../db/schemas/assets';
+import { db } from '../db/index.js';
+import { ChangelogType } from '../db/schemas/changelog.js';
+import { meiliSearchClient } from '../clients/meilisearch.js';
+import { Item } from '../db/schemas/item.js';
+import { Asset } from '../db/schemas/assets.js';
 
 interface SearchBody {
   title?: string;
@@ -54,6 +54,7 @@ interface SearchBody {
     max?: number;
   };
   onSale?: boolean;
+  categories?: string[];
 }
 
 const app = new Hono();
@@ -171,6 +172,10 @@ app.post('/', async (c) => {
     mongoQuery.customAttributes = {
       $elemMatch: { id: { $in: query.customAttributes } },
     };
+  }
+
+  if (query.categories) {
+    mongoQuery['categories'] = { $all: query.categories };
   }
 
   /**
@@ -548,6 +553,10 @@ app.get('/:id/count', async (c) => {
     mongoQuery.customAttributes = {
       $elemMatch: { id: { $in: query.customAttributes } },
     };
+  }
+
+  if (query.categories) {
+    mongoQuery['categories'] = { $all: query.categories };
   }
 
   if (query.seller) {
