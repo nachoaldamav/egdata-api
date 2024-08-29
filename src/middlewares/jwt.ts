@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono';
-import { verifyJWT } from '../utils/jwt';
+import { verifyJWT } from '../utils/jwt.js';
 
 export async function jwtMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');

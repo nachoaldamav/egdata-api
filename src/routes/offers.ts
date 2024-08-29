@@ -29,6 +29,7 @@ import { getDiscordUser } from '../utils/get-discord-user.js';
 import { getProduct } from '../utils/get-product.js';
 import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
 import { User } from '../db/schemas/users.js';
+import { Hltb } from '@egdata/core.schemas.hltb';
 
 const app = new Hono();
 
@@ -2318,6 +2319,60 @@ app.get('/:id/ownership', async (c) => {
 
   return c.json({
     isOwned,
+  });
+});
+
+app.get('/:id/hltb', async (c) => {
+  const { id } = c.req.param();
+
+  if (!id) {
+    c.status(400);
+    return c.json({
+      message: 'Missing id parameter',
+    });
+  }
+
+  const start = new Date();
+
+  const cacheKey = `hltb:${id}`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const hltb = await Hltb.findOne({
+    _id: id,
+  });
+
+  if (!hltb || !hltb.hltbId || hltb.hltbId === '00000') {
+    return c.json(
+      {
+        error: 'HowLongToBeat data not found for this offer',
+      },
+      {
+        status: 404,
+      }
+    );
+  }
+
+  await client.set(cacheKey, JSON.stringify(hltb), {
+    EX: 3600,
+  });
+
+  return c.json(hltb, 200, {
+    'Cache-Control': 'public, max-age=60',
   });
 });
 

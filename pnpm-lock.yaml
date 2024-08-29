@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@egdata/core.schemas.hltb':
+        specifier: ^0.0.1
+        version: 0.0.1(mongoose@8.5.2)
       '@egdata/core.schemas.ratings':
         specifier: 1.1.0
         version: 1.1.0(mongoose@8.5.2)
@@ -68,6 +71,11 @@ importers:
         version: 5.5.3
 
 packages:
+
+  '@egdata/core.schemas.hltb@0.0.1':
+    resolution: {integrity: sha512-N5G2VITGF0M3CfiMen6DWiluST6f63GvghV/jrc96C84eRuTrDvDpdxl6Is8Z31Rui4+1L4H1dQFStGTV5LrLg==}
+    peerDependencies:
+      mongoose: ^8.5.2
 
   '@egdata/core.schemas.ratings@1.1.0':
     resolution: {integrity: sha512-zOdiOoasgO+1VOWGr137fI/opK9FTEVsjuekbhh+u1Nw9Yf+gs4pYgchtera+P8fm7KYAE2Vr6G7kKmaFL4v0w==}
@@ -1295,6 +1303,10 @@ packages:
     resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
 
 snapshots:
+
+  '@egdata/core.schemas.hltb@0.0.1(mongoose@8.5.2)':
+    dependencies:
+      mongoose: 8.5.2
 
   '@egdata/core.schemas.ratings@1.1.0(mongoose@8.5.2)':
     dependencies:
