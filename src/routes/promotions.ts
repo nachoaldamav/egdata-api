@@ -58,15 +58,15 @@ app.get('/:id', async (c) => {
 
   const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:${
     query ?? 'no-query'
-  }`;
+  }:v0.1`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   const event = await Tags.findOne({
     id,
