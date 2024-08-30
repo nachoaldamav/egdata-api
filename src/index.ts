@@ -26,6 +26,7 @@ import MultisearchRoute from './routes/multisearch.js';
 import AuthRoute from './routes/auth.js';
 import AccountsRoute from './routes/accounts.js';
 import UsersRoute from './routes/users.js';
+import CollectionsRoute from './routes/collections.js';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
@@ -1391,6 +1392,8 @@ app.route('/auth', AuthRoute);
 app.route('/accounts', AccountsRoute);
 
 app.route('/users', UsersRoute);
+
+app.route('/collections', CollectionsRoute);
 
 serve(
   {
