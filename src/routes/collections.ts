@@ -31,7 +31,7 @@ app.get('/:slug', async (c) => {
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `tops:${region}:${page}:${limit}`;
+  const cacheKey = `tops:${region}:${page}:${limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
