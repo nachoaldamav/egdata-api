@@ -33,13 +33,13 @@ app.get('/:slug', async (c) => {
 
   const cacheKey = `tops:${region}:${page}:${limit}`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   const collection = await CollectionOffer.findOne({
     _id: slug,
