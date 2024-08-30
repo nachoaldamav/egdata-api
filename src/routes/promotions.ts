@@ -60,13 +60,13 @@ app.get('/:id', async (c) => {
     query ?? 'no-query'
   }`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   const event = await Tags.findOne({
     id,
@@ -104,10 +104,8 @@ app.get('/:id', async (c) => {
               ? [
                   {
                     $match: {
-                      $text: {
-                        $search: query,
-                        $caseSensitive: false,
-                        $diacriticSensitive: false,
+                      title: {
+                        $regex: new RegExp(query, 'i'),
                       },
                     },
                   },
@@ -144,7 +142,7 @@ app.get('/:id', async (c) => {
       },
       {
         $project: {
-          'price.offer': 0, // Remove the redundant 'offer' field from the price object
+          'price.offer': 0,
         },
       },
     ];
@@ -157,10 +155,8 @@ app.get('/:id', async (c) => {
           tags: { $elemMatch: { id } },
           ...(query
             ? {
-                $text: {
-                  $search: query,
-                  $caseSensitive: false,
-                  $diacriticSensitive: false,
+                title: {
+                  $regex: new RegExp(query, 'i'),
                 },
               }
             : {}),
