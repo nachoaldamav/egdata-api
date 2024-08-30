@@ -91,7 +91,7 @@ app.get('/:slug', async (c) => {
         return {
           ...o.toObject(),
           price: price ?? null,
-          position: collectionOffer?.position ?? null,
+          position: collectionOffer?.position ?? totalOffersCount,
         };
       })
       .sort(
