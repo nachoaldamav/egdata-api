@@ -1,11 +1,10 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
-import client from '../clients/redis';
-import { Offer } from '../db/schemas/offer';
-import { PriceEngine } from '../db/schemas/price-engine';
-import { Tags } from '../db/schemas/tags';
-import { regions } from '../utils/countries';
-import { orderOffersObject } from '../utils/order-offers-object';
+import client from '../clients/redis.js';
+import { Offer } from '../db/schemas/offer.js';
+import { PriceEngine } from '../db/schemas/price-engine.js';
+import { Tags } from '../db/schemas/tags.js';
+import { regions } from '../utils/countries.js';
 import { PipelineStage } from 'mongoose';
 
 type SortBy =
@@ -39,6 +38,7 @@ app.get('/:id', async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const skip = (page - 1) * limit;
+  const query = c.req.query('q');
 
   const selectedCountry = country ?? cookieCountry ?? 'US';
 
@@ -56,7 +56,9 @@ app.get('/:id', async (c) => {
   const sortBy = (c.req.query('sortBy') ?? 'lastModifiedDate') as SortBy;
   const sortDir = (c.req.query('sortDir') ?? 'desc') as 'asc' | 'desc';
 
-  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:v0.1`;
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:${
+    query ?? 'no-query'
+  }`;
 
   const cached = await client.get(cacheKey);
 
@@ -97,6 +99,21 @@ app.get('/:id', async (c) => {
           localField: 'offerId',
           foreignField: 'id',
           as: 'offer',
+          pipeline: [
+            ...(query
+              ? [
+                  {
+                    $match: {
+                      $text: {
+                        $search: query,
+                        $caseSensitive: false,
+                        $diacriticSensitive: false,
+                      },
+                    },
+                  },
+                ]
+              : []),
+          ],
         },
       },
       {
@@ -138,6 +155,15 @@ app.get('/:id', async (c) => {
       {
         $match: {
           tags: { $elemMatch: { id } },
+          ...(query
+            ? {
+                $text: {
+                  $search: query,
+                  $caseSensitive: false,
+                  $diacriticSensitive: false,
+                },
+              }
+            : {}),
         },
       },
       {
@@ -193,6 +219,15 @@ app.get('/:id', async (c) => {
     page,
     count: await Offer.countDocuments({
       tags: { $elemMatch: { id } },
+      ...(query
+        ? {
+            $text: {
+              $search: query,
+              $caseSensitive: false,
+              $diacriticSensitive: false,
+            },
+          }
+        : {}),
     }),
   };
 
