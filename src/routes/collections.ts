@@ -33,13 +33,13 @@ app.get('/:slug', async (c) => {
 
   const cacheKey = `tops:${region}:${page}:${limit}`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   const collection = await CollectionOffer.findOne({
     _id: slug,
@@ -53,7 +53,16 @@ app.get('/:slug', async (c) => {
   }
 
   const totalOffersCount = collection.offers.length;
+
+  console.log({
+    totalOffersCount,
+    skip,
+    limit,
+  });
+
   const offersIds = collection.offers
+    .filter((o) => o.position !== 0)
+    .sort((a, b) => a.position - b.position)
     .map((o) => o.id)
     .filter((o) => o)
     .slice(skip, skip + limit);
@@ -72,13 +81,23 @@ app.get('/:slug', async (c) => {
   const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
 
   const result = {
-    elements: offers.map((o) => {
-      const price = prices.find((p) => p.offerId === o.id);
-      return {
-        ...o.toObject(),
-        price: price ?? null,
-      };
-    }),
+    elements: offers
+      .map((o) => {
+        const price = prices.find((p) => p.offerId === o.id);
+        const collectionOffer = collection.offers.find(
+          (collectionOffer) => collectionOffer._id === o.id
+        );
+
+        return {
+          ...o.toObject(),
+          price: price ?? null,
+          position: collectionOffer?.position ?? null,
+        };
+      })
+      .sort(
+        (a, b) =>
+          (a.position ?? totalOffersCount) - (b.position ?? totalOffersCount)
+      ),
     page,
     limit,
     title: collection.name,
