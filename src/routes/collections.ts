@@ -81,6 +81,7 @@ app.get('/:slug', async (c) => {
     }),
     page,
     limit,
+    title: collection.name,
     total: totalOffersCount,
   };
 
