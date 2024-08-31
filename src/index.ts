@@ -45,6 +45,8 @@ const internalNamespaces = [
 const ALLOWED_ORIGINS = [
   'https://egdata.app',
   'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:4000',
   'https://user-reviews-pr.egdata.app/',
 ];
 
