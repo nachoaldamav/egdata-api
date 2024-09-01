@@ -2376,4 +2376,95 @@ app.get('/:id/hltb', async (c) => {
   });
 });
 
+app.get('/:id/collection', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const { categories, customAttributes } = offer;
+
+  if (!categories || !(categories.findIndex((c) => c === 'collections') > -1)) {
+    c.status(404);
+    return c.json({
+      message: 'Selected offer does not have a collection',
+    });
+  }
+
+  const cacheKey = `collection-offers:${id}`;
+
+  // const cached = await client.get(cacheKey);
+
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
+
+  // Get the IDs of the collection offers
+  const collectionOfferIds = customAttributes
+    .filter(
+      (a) => a.key && a.key.startsWith('com.epicgames.app.collectionOfferIds.')
+    )
+    .map((a) => a.value);
+
+  if (!collectionOfferIds.length || collectionOfferIds.length === 0) {
+    c.status(404);
+    return c.json({
+      message: 'Selected offer does not have a collection',
+    });
+  }
+
+  const [offersData, pricesData] = await Promise.allSettled([
+    Offer.find({
+      id: { $in: collectionOfferIds },
+    }),
+    PriceEngine.find({
+      offerId: { $in: collectionOfferIds },
+      region,
+    }),
+  ]);
+
+  const offers = offersData.status === 'fulfilled' ? offersData.value : [];
+  const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
+
+  const result = offers.map((o) => {
+    const price = prices.find((p) => p.offerId === o.id);
+    return {
+      ...orderOffersObject(o),
+      price: price ?? null,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 export default app;
