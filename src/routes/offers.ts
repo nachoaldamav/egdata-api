@@ -2415,13 +2415,13 @@ app.get('/:id/collection', async (c) => {
 
   const cacheKey = `collection-offers:${id}`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   // Get the IDs of the collection offers
   const collectionOfferIds = customAttributes
