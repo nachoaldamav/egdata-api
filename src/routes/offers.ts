@@ -2413,7 +2413,7 @@ app.get('/:id/collection', async (c) => {
     });
   }
 
-  const cacheKey = `collection-offers:${id}`;
+  const cacheKey = `collection-offers:${id}:${region}`;
 
   const cached = await client.get(cacheKey);
 
@@ -2457,6 +2457,154 @@ app.get('/:id/collection', async (c) => {
       price: price ?? null,
     };
   });
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
+type BUNDLE_RESPONSE = {
+  offers: OfferType[];
+  bundlePrice: PriceType;
+  totalPrice: PriceType;
+};
+
+app.get('/:id/bundle', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `bundle-offers:${id}:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const [mainOfferData, mainPriceData] = await Promise.allSettled([
+    Offer.findOne({ id }),
+    PriceEngine.findOne({
+      offerId: id,
+      region,
+    }),
+  ]);
+
+  const offer =
+    mainOfferData.status === 'fulfilled' ? mainOfferData.value : null;
+  const mainPrice =
+    mainPriceData.status === 'fulfilled' ? mainPriceData.value : null;
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const { offerType, items } = offer;
+
+  if (!offerType || (offerType !== 'BUNDLE' && offerType !== 'Bundle')) {
+    c.status(404);
+    return c.json({
+      message: 'Selected offer is not a bundle',
+    });
+  }
+
+  const bundleItems = items.filter((i) => i.id).map((i) => i.id);
+  const bundleOffers = await Offer.find({
+    'items.id': { $in: bundleItems },
+    offerType: { $nin: ['BUNDLE', 'Bundle'] },
+  });
+
+  const bundleOfferIds = bundleOffers.map((o) => o.id);
+
+  const [bundlePricesData] = await Promise.allSettled([
+    PriceEngine.find({
+      offerId: { $in: bundleOfferIds },
+      region,
+    }),
+  ]);
+  const bundlePrices =
+    bundlePricesData.status === 'fulfilled' ? bundlePricesData.value : [];
+
+  const offers = bundleOffers.map((o) => {
+    const price = bundlePrices.find((p) => p.offerId === o.id);
+    return {
+      ...orderOffersObject(o),
+      price: price ?? null,
+    };
+  });
+
+  const result: BUNDLE_RESPONSE = {
+    offers: offers,
+    // @ts-expect-error
+    totalPrice: offers.reduce(
+      (acc, offer) => {
+        const price = bundlePrices.find((p) => p.offerId === offer.id);
+
+        // If there's no price for the offer, skip it
+        if (!price) return acc;
+
+        // Accumulate the price fields within the nested price object
+        return {
+          ...acc,
+          price: {
+            ...acc.price,
+            currencyCode: price.price.currencyCode,
+            discount: acc.price.discount + (price.price.discount ?? 0),
+            discountPrice:
+              acc.price.discountPrice + (price.price.discountPrice ?? 0),
+            originalPrice:
+              acc.price.originalPrice + (price.price.originalPrice ?? 0),
+            basePayoutCurrencyCode: price.price.basePayoutCurrencyCode,
+            basePayoutPrice:
+              acc.price.basePayoutPrice + (price.price.basePayoutPrice ?? 0),
+            payoutCurrencyExchangeRate: price.price.payoutCurrencyExchangeRate,
+          },
+        };
+      },
+      {
+        country: mainPrice?.country ?? 'US',
+        offerId: id,
+        region: mainPrice?.region ?? 'US',
+        namespace: mainPrice?.namespace ?? 'epic',
+        updatedAt: mainPrice?.updatedAt ?? new Date(),
+        price: {
+          discount: 0,
+          discountPrice: 0,
+          originalPrice: 0,
+          basePayoutPrice: 0,
+          currencyCode: 'USD',
+          basePayoutCurrencyCode: 'USD',
+          payoutCurrencyExchangeRate: 1,
+        },
+        appliedRules: [] as any[],
+      }
+    ),
+    // @ts-expect-error
+    bundlePrice: mainPrice,
+  };
 
   await client.set(cacheKey, JSON.stringify(result), {
     EX: 3600,
