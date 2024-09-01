@@ -30,6 +30,7 @@ import { getProduct } from '../utils/get-product.js';
 import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
 import { User } from '../db/schemas/users.js';
 import { Hltb } from '@egdata/core.schemas.hltb';
+import { Bundles } from '@egdata/core.schemas.bundles';
 
 const app = new Hono();
 
@@ -2492,7 +2493,7 @@ app.get('/:id/bundle', async (c) => {
     });
   }
 
-  const cacheKey = `bundle-offers:${id}:${region}`;
+  const cacheKey = `bundle:${id}:${region}`;
 
   const cached = await client.get(cacheKey);
 
@@ -2522,7 +2523,7 @@ app.get('/:id/bundle', async (c) => {
     });
   }
 
-  const { offerType, items } = offer;
+  const { offerType } = offer;
 
   if (!offerType || (offerType !== 'BUNDLE' && offerType !== 'Bundle')) {
     c.status(404);
@@ -2531,20 +2532,29 @@ app.get('/:id/bundle', async (c) => {
     });
   }
 
-  const bundleItems = items.filter((i) => i.id).map((i) => i.id);
-  const bundleOffers = await Offer.find({
-    'items.id': { $in: bundleItems },
-    offerType: { $nin: ['BUNDLE', 'Bundle'] },
-  });
+  const bundleData = await Bundles.findOne({ _id: offer.id });
 
-  const bundleOfferIds = bundleOffers.map((o) => o.id);
+  if (!bundleData) {
+    c.status(404);
+    return c.json({
+      message: 'Bundle not found',
+    });
+  }
 
-  const [bundlePricesData] = await Promise.allSettled([
+  const bundleOfferIds = bundleData?.offers ?? [];
+
+  const [bundleOffersData, bundlePricesData] = await Promise.allSettled([
+    Offer.find({
+      id: { $in: bundleOfferIds },
+    }),
     PriceEngine.find({
       offerId: { $in: bundleOfferIds },
       region,
     }),
   ]);
+
+  const bundleOffers =
+    bundleOffersData.status === 'fulfilled' ? bundleOffersData.value : [];
   const bundlePrices =
     bundlePricesData.status === 'fulfilled' ? bundlePricesData.value : [];
 
