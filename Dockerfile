@@ -3,6 +3,9 @@
 FROM oven/bun:1 AS base
 WORKDIR /usr/src/app
 
+# Set permissions for the bun user
+RUN chown -R bun:bun /usr/src/app
+
 # install dependencies into temp directory
 # this will cache them and speed up future builds
 FROM base AS install
@@ -29,6 +32,9 @@ RUN bun run build
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/ .
+
+# Ensure the 'bun' user has permission to access everything
+RUN chown -R bun:bun /usr/src/app
 
 # run the app
 USER bun
