@@ -1,4 +1,4 @@
-FROM oven/bun:1 AS base
+FROM oven/bun:alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN apk --no-cache add curl
