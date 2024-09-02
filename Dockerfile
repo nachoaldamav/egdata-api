@@ -32,5 +32,5 @@ RUN chown -R bun:bun /usr/src/app
 
 # run the app
 USER bun
-EXPOSE 4000/tcp
+EXPOSE 4000
 ENTRYPOINT [ "bun", "run", "src/index.ts" ]
