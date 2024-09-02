@@ -1,8 +1,8 @@
-FROM node:22-alpine3.19 AS base
+FROM oven/bun:1 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
 RUN apk --no-cache add curl
+RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.bashrc" SHELL="$(which bash)" bash -
 COPY . /app
 WORKDIR /app
 
@@ -20,4 +20,4 @@ EXPOSE 4000
 
 RUN touch .env
 
-CMD ["pnpm", "start"]
+CMD ["bun", "run", "dist/index.js"]
