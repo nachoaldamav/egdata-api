@@ -23,6 +23,7 @@
     "redis": "4.6.15"
   },
   "devDependencies": {
+    "@biomejs/biome": "1.8.3",
     "@types/jsonwebtoken": "9.0.3",
     "@types/jwk-to-pem": "^2.0.3",
     "@types/node": "20.14.11",
