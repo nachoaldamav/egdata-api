@@ -1,4 +1,4 @@
-import { serve } from '@hono/node-server';
+import type { Serve } from 'bun';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
@@ -6,7 +6,7 @@ import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
 import { logger } from 'hono/logger';
 import { db } from './db/index.js';
-import { Offer, OfferType } from './db/schemas/offer.js';
+import { Offer, type OfferType } from './db/schemas/offer.js';
 import { Item } from './db/schemas/item.js';
 import { orderOffersObject } from './utils/order-offers-object.js';
 import { getFeaturedGames } from './utils/get-featured-games.js';
@@ -14,7 +14,7 @@ import { countries, regions } from './utils/countries.js';
 import { TagModel, Tags } from './db/schemas/tags.js';
 import { attributesToObject } from './utils/attributes-to-object.js';
 import { Asset } from './db/schemas/assets.js';
-import { PriceEngine, PriceType } from './db/schemas/price-engine.js';
+import { PriceEngine, type PriceType } from './db/schemas/price-engine.js';
 import { Changelog } from './db/schemas/changelog.js';
 import client from './clients/redis.js';
 import SandboxRoute from './routes/sandbox.js';
@@ -1399,5 +1399,6 @@ app.route('/collections', CollectionsRoute);
 
 export default {
   port: 4000,
+  hostname: '0.0.0.0',
   fetch: app.fetch,
-};
+} satisfies Serve;

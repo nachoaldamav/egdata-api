@@ -1,6 +1,8 @@
 FROM oven/bun:1 AS base
 WORKDIR /usr/src/app
 
+RUN apt-get update && apt-get install -y curl
+
 # Set permissions for the bun user
 RUN chown -R bun:bun /usr/src/app
 
