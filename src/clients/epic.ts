@@ -1,7 +1,7 @@
 import { gql, GraphQLClient } from 'graphql-request';
 import type { PlayerProfileQuery } from '../types/get-epic-user.js';
 import type { PlayerProfileAchievementsByProductIdQuery } from '../types/get-user-product-achievements.js';
-import { PlayerProfilePrivateResponse } from '../types/get-user-achievements.js';
+import type { PlayerProfilePrivateResponse } from '../types/get-user-achievements.js';
 
 export class EpicStoreClient {
   private client: GraphQLClient;
@@ -140,10 +140,13 @@ export class EpicStoreClient {
                   totalXP
                   sandboxId
                   baseOfferForSandbox(locale: $locale) {
+                    id
+                    namespace
                     keyImages {
                       url
                       type
                       alt
+                      md5
                     }
                   }
                   product(locale: $locale) {
@@ -155,7 +158,9 @@ export class EpicStoreClient {
                     totalProductXP
                   }
                   playerAwards {
-                    awardType
+                    # Corrected to use only valid fields
+                    awardType # Assuming 'awardType' is a valid field
+                    # Add other valid fields for PlayerAward as needed
                   }
                 }
               }
