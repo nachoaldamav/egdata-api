@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/index.ts",
+    "dev": "bun run --watch src/index.ts",
     "build": "tsup-node src/index.ts --format esm --sourcemap --splitting --target node22 --minify --cjsInterop",
     "start": "node --enable-source-maps --env-file=.env dist/index.js"
   },

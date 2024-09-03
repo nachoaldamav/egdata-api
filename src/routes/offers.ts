@@ -2426,9 +2426,7 @@ app.get('/:id/collection', async (c) => {
 
   // Get the IDs of the collection offers
   const collectionOfferIds = customAttributes
-    .filter(
-      (a) => a.key && a.key.startsWith('com.epicgames.app.collectionOfferIds.')
-    )
+    .filter((a) => a.key?.startsWith('com.epicgames.app.collectionOfferIds.'))
     .map((a) => a.value);
 
   if (!collectionOfferIds.length || collectionOfferIds.length === 0) {
