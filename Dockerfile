@@ -29,9 +29,6 @@ FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/ .
 
-# Ensure the 'bun' user has permission to access everything
-RUN chown -R bun:bun /usr/src/app
-
 # run the app
 USER bun
 EXPOSE 4000
