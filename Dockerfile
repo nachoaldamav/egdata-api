@@ -3,7 +3,7 @@ WORKDIR /usr/src/app
 
 RUN apt-get update && apt-get install -y curl
 
-# Set permissions for the bun user
+# Set permissions for the bun user once, at the beginning
 RUN chown -R bun:bun /usr/src/app
 
 # install dependencies into temp directory
@@ -21,13 +21,13 @@ RUN cd /temp/prod && bun install --frozen-lockfile --production
 # copy node_modules from temp directory
 # then copy all (non-ignored) project files into the image
 FROM base AS prerelease
-COPY --from=install /temp/dev/node_modules node_modules
-COPY . .
+COPY --from=install --chown=bun:bun /temp/dev/node_modules node_modules
+COPY --chown=bun:bun . .
 
 # copy production dependencies and source code into final image
 FROM base AS release
-COPY --from=install /temp/prod/node_modules node_modules
-COPY --from=prerelease /usr/src/app/ .
+COPY --from=install --chown=bun:bun /temp/prod/node_modules node_modules
+COPY --from=prerelease --chown=bun:bun /usr/src/app/ .
 
 # run the app
 USER bun
