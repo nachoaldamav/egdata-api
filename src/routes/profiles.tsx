@@ -67,7 +67,7 @@ app.get("/:id", async (c) => {
 		});
 	}
 
-	const cacheKey = `epic-profile:${id}`;
+	const cacheKey = `epic-profile:${id}:v0.1`;
 
 	const cached = await client.get(cacheKey);
 
