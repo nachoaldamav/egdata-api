@@ -1,25 +1,25 @@
-import { Hono } from 'hono';
-import type mongoose from 'mongoose';
-import client from '../clients/redis.js';
-import { AchievementSet } from '../db/schemas/achievements.js';
-import { Namespace } from '../db/schemas/namespace.js';
-import { Item } from '../db/schemas/item.js';
-import { Offer } from '../db/schemas/offer.js';
-import { Asset } from '../db/schemas/assets.js';
-import { db } from '../db/index.js';
-import { PriceEngine } from '../db/schemas/price-engine.js';
-import { regions } from '../utils/countries.js';
-import { getCookie } from 'hono/cookie';
-import { orderOffersObject } from '../utils/order-offers-object.js';
+import { Hono } from "hono";
+import type mongoose from "mongoose";
+import client from "../clients/redis.js";
+import { AchievementSet } from "../db/schemas/achievements.js";
+import { Namespace } from "../db/schemas/namespace.js";
+import { Item } from "../db/schemas/item.js";
+import { Offer } from "../db/schemas/offer.js";
+import { Asset } from "../db/schemas/assets.js";
+import { db } from "../db/index.js";
+import { PriceEngine } from "../db/schemas/price-engine.js";
+import { regions } from "../utils/countries.js";
+import { getCookie } from "hono/cookie";
+import { orderOffersObject } from "../utils/order-offers-object.js";
 
 const app = new Hono();
 
-app.get('/', async (ctx) => {
+app.get("/", async (ctx) => {
   const start = Date.now();
-  const page = Number.parseInt(ctx.req.query('page') || '1', 10);
+  const page = Number.parseInt(ctx.req.query("page") || "1", 10);
   const limit = Math.min(
-    Number.parseInt(ctx.req.query('limit') || '10', 10),
-    100
+    Number.parseInt(ctx.req.query("limit") || "10", 10),
+    100,
   );
   const skip = (page - 1) * limit;
 
@@ -32,7 +32,7 @@ app.get('/', async (ctx) => {
     {
       skip,
       limit,
-    }
+    },
   );
 
   const count = await Namespace.countDocuments();
@@ -46,15 +46,15 @@ app.get('/', async (ctx) => {
     },
     200,
     {
-      'Server-Timing': `db;dur=${Date.now() - start}`,
-    }
+      "Server-Timing": `db;dur=${Date.now() - start}`,
+    },
   );
 });
 
-app.get('/:sandboxId', async (c) => {
+app.get("/:sandboxId", async (c) => {
   const { sandboxId } = c.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -63,14 +63,14 @@ app.get('/:sandboxId', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
   return c.json(sandbox);
 });
 
-app.get('/:sandboxId/achievements', async (ctx) => {
+app.get("/:sandboxId/achievements", async (ctx) => {
   const start = Date.now();
   const { sandboxId } = ctx.req.param();
 
@@ -90,7 +90,7 @@ app.get('/:sandboxId/achievements', async (ctx) => {
       ctx.status(404);
 
       return ctx.json({
-        message: 'Sandbox not found',
+        message: "Sandbox not found",
       });
     }
 
@@ -101,7 +101,7 @@ app.get('/:sandboxId/achievements', async (ctx) => {
       {
         _id: false,
         __v: false,
-      }
+      },
     );
 
     await client.set(cacheKey, JSON.stringify(achievementSets), {
@@ -116,15 +116,15 @@ app.get('/:sandboxId/achievements', async (ctx) => {
     },
     200,
     {
-      'Server-Timing': `db;dur=${Date.now() - start}`,
-    }
+      "Server-Timing": `db;dur=${Date.now() - start}`,
+    },
   );
 });
 
-app.get('/:sandboxId/items', async (ctx) => {
+app.get("/:sandboxId/items", async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -133,7 +133,7 @@ app.get('/:sandboxId/items', async (ctx) => {
     ctx.status(404);
 
     return ctx.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -146,18 +146,18 @@ app.get('/:sandboxId/items', async (ctx) => {
       sort: {
         lastModified: -1,
       },
-    }
+    },
   );
 
   return ctx.json(items, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:sandboxId/offers', async (ctx) => {
+app.get("/:sandboxId/offers", async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -166,7 +166,7 @@ app.get('/:sandboxId/offers', async (ctx) => {
     ctx.status(404);
 
     return ctx.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -192,16 +192,16 @@ app.get('/:sandboxId/offers', async (ctx) => {
       sort: {
         lastModified: -1,
       },
-    }
+    },
   );
 
   return ctx.json(offers);
 });
 
-app.get('/:sandboxId/assets', async (ctx) => {
+app.get("/:sandboxId/assets", async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -210,7 +210,7 @@ app.get('/:sandboxId/assets', async (ctx) => {
     ctx.status(404);
 
     return ctx.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -223,32 +223,32 @@ app.get('/:sandboxId/assets', async (ctx) => {
       sort: {
         lastModified: -1,
       },
-    }
+    },
   );
 
   return ctx.json(assets);
 });
 
-app.get('/:sandboxId/base-game', async (c) => {
+app.get("/:sandboxId/base-game", async (c) => {
   const { sandboxId } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -257,7 +257,7 @@ app.get('/:sandboxId/base-game', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -267,13 +267,13 @@ app.get('/:sandboxId/base-game', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   let baseGame = await Offer.findOne({
     namespace: sandboxId,
-    offerType: 'BASE_GAME',
+    offerType: "BASE_GAME",
     prePurchase: { $ne: true },
   });
 
@@ -281,7 +281,7 @@ app.get('/:sandboxId/base-game', async (c) => {
     // If no game found, try to find a pre-purchase game
     const prePurchaseGame = await Offer.findOne({
       namespace: sandboxId,
-      offerType: 'BASE_GAME',
+      offerType: "BASE_GAME",
       prePurchase: true,
     });
 
@@ -291,7 +291,7 @@ app.get('/:sandboxId/base-game', async (c) => {
       c.status(404);
 
       return c.json({
-        message: 'Base game not found',
+        message: "Base game not found",
       });
     }
   }

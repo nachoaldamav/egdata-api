@@ -12,6 +12,6 @@
   "formatter": {
     "enabled": true,
     "formatWithErrors": false,
-    "indentStyle": "tab"
+    "indentStyle": "space"
   }
 }

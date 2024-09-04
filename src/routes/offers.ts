@@ -1,64 +1,64 @@
-import { Hono } from 'hono';
-import { regions } from '../utils/countries.js';
-import client from '../clients/redis.js';
+import { Hono } from "hono";
+import { regions } from "../utils/countries.js";
+import client from "../clients/redis.js";
 import {
   PriceEngine,
   PriceEngineHistorical,
   type PriceType,
-} from '../db/schemas/price-engine.js';
-import { getCookie } from 'hono/cookie';
-import { AchievementSet } from '../db/schemas/achievements.js';
-import { Asset, type AssetType } from '../db/schemas/assets.js';
-import { Changelog } from '../db/schemas/changelog.js';
-import { Item } from '../db/schemas/item.js';
-import { Mappings } from '../db/schemas/mappings.js';
-import { Offer, type OfferType } from '../db/schemas/offer.js';
-import { attributesToObject } from '../utils/attributes-to-object.js';
-import { getGameFeatures } from '../utils/game-features.js';
-import { TagModel, Tags } from '../db/schemas/tags.js';
-import { orderOffersObject } from '../utils/order-offers-object.js';
-import { getImage } from '../utils/get-image.js';
-import { Media } from '../db/schemas/media.js';
-import { CollectionOffer } from '../db/schemas/collections.js';
-import { Sandbox } from '../db/schemas/sandboxes.js';
-import { FreeGames } from '../db/schemas/freegames.js';
-import { db } from '../db/index.js';
-import { Ratings } from '@egdata/core.schemas.ratings';
-import { type IReview, Review } from '../db/schemas/reviews.js';
-import { getDiscordUser } from '../utils/get-discord-user.js';
-import { getProduct } from '../utils/get-product.js';
-import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
-import { User } from '../db/schemas/users.js';
-import { Hltb } from '@egdata/core.schemas.hltb';
-import { Bundles } from '@egdata/core.schemas.bundles';
+} from "../db/schemas/price-engine.js";
+import { getCookie } from "hono/cookie";
+import { AchievementSet } from "../db/schemas/achievements.js";
+import { Asset, type AssetType } from "../db/schemas/assets.js";
+import { Changelog } from "../db/schemas/changelog.js";
+import { Item } from "../db/schemas/item.js";
+import { Mappings } from "../db/schemas/mappings.js";
+import { Offer, type OfferType } from "../db/schemas/offer.js";
+import { attributesToObject } from "../utils/attributes-to-object.js";
+import { getGameFeatures } from "../utils/game-features.js";
+import { TagModel, Tags } from "../db/schemas/tags.js";
+import { orderOffersObject } from "../utils/order-offers-object.js";
+import { getImage } from "../utils/get-image.js";
+import { Media } from "../db/schemas/media.js";
+import { CollectionOffer } from "../db/schemas/collections.js";
+import { Sandbox } from "../db/schemas/sandboxes.js";
+import { FreeGames } from "../db/schemas/freegames.js";
+import { db } from "../db/index.js";
+import { Ratings } from "@egdata/core.schemas.ratings";
+import { type IReview, Review } from "../db/schemas/reviews.js";
+import { getDiscordUser } from "../utils/get-discord-user.js";
+import { getProduct } from "../utils/get-product.js";
+import { verifyGameOwnership } from "../utils/verify-game-ownership.js";
+import { User } from "../db/schemas/users.js";
+import { Hltb } from "@egdata/core.schemas.hltb";
+import { Bundles } from "@egdata/core.schemas.bundles";
 
 const app = new Hono();
 
-app.get('/', async (c) => {
+app.get("/", async (c) => {
   const start = new Date();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
   const MAX_LIMIT = 50;
   const limit = Math.min(
-    Number.parseInt(c.req.query('limit') || '10'),
-    MAX_LIMIT
+    Number.parseInt(c.req.query("limit") || "10"),
+    MAX_LIMIT,
   );
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
 
   const cacheKey = `offers:${region}:${page}:${limit}`;
 
@@ -66,7 +66,7 @@ app.get('/', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -101,43 +101,43 @@ app.get('/', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Cache-Control": "public, max-age=60",
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
-app.get('/events', async (c) => {
+app.get("/events", async (c) => {
   const events = await Tags.find({
-    groupName: 'event',
-    status: 'ACTIVE',
+    groupName: "event",
+    status: "ACTIVE",
   });
 
   return c.json(events, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/events/:id', async (c) => {
+app.get("/events/:id", async (c) => {
   // Same as the /promotions/:id endpoint
   const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 50);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
   const start = new Date();
@@ -148,19 +148,19 @@ app.get('/events/:id', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   const event = await Tags.findOne({
     id,
-    groupName: 'event',
+    groupName: "event",
   });
 
   if (!event) {
     c.status(404);
     return c.json({
-      message: 'Event not found',
+      message: "Event not found",
     });
   }
 
@@ -168,15 +168,15 @@ app.get('/events/:id', async (c) => {
     { $match: { tags: { $elemMatch: { id } } } },
     {
       $lookup: {
-        from: 'pricev2',
-        let: { offerId: '$id' },
+        from: "pricev2",
+        let: { offerId: "$id" },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ['$offerId', '$$offerId'] },
-                  { $eq: ['$region', region] },
+                  { $eq: ["$offerId", "$$offerId"] },
+                  { $eq: ["$region", region] },
                 ],
               },
             },
@@ -188,17 +188,17 @@ app.get('/events/:id', async (c) => {
             $limit: 1,
           },
         ],
-        as: 'price',
+        as: "price",
       },
     },
     {
       $unwind: {
-        path: '$price',
+        path: "$price",
         preserveNullAndEmptyArrays: true,
       },
     },
     {
-      $sort: { 'price.price.discount': -1 },
+      $sort: { "price.price.discount": -1 },
     },
     {
       $skip: skip,
@@ -223,7 +223,7 @@ app.get('/events/:id', async (c) => {
 
   const result = {
     elements: offers,
-    title: event.name ?? '',
+    title: event.name ?? "",
     limit,
     start: skip,
     page,
@@ -237,30 +237,30 @@ app.get('/events/:id', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    'Cache-Control': 'public, max-age=60',
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/upcoming', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+app.get("/upcoming", async (c) => {
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '15'), 50);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "15"), 50);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
   const start = new Date();
@@ -271,7 +271,7 @@ app.get('/upcoming', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -281,25 +281,25 @@ app.get('/upcoming', async (c) => {
         releaseDate: {
           $gt: new Date(),
           $ne: null,
-          $lt: new Date('2099-01-01'),
+          $lt: new Date("2099-01-01"),
         },
         // Only show "BASE_GAME" and "DLC" offers
         offerType: {
-          $in: ['BASE_GAME', 'DLC'],
+          $in: ["BASE_GAME", "DLC"],
         },
       },
     },
     {
       $lookup: {
-        from: 'pricev2',
-        let: { offerId: '$id' },
+        from: "pricev2",
+        let: { offerId: "$id" },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ['$offerId', '$$offerId'] },
-                  { $eq: ['$region', region] },
+                  { $eq: ["$offerId", "$$offerId"] },
+                  { $eq: ["$region", region] },
                 ],
               },
             },
@@ -308,12 +308,12 @@ app.get('/upcoming', async (c) => {
             $limit: 1,
           },
         ],
-        as: 'price',
+        as: "price",
       },
     },
     {
       $unwind: {
-        path: '$price',
+        path: "$price",
         preserveNullAndEmptyArrays: true,
       },
     },
@@ -348,15 +348,15 @@ app.get('/upcoming', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    'Cache-Control': 'public, max-age=60',
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/genres', async (c) => {
+app.get("/genres", async (c) => {
   const genres = await Tags.find({
-    groupName: 'genre',
-    status: 'ACTIVE',
+    groupName: "genre",
+    status: "ACTIVE",
   });
 
   const result = await Promise.all(
@@ -364,7 +364,7 @@ app.get('/genres', async (c) => {
       const offers = await Offer.find(
         {
           tags: { $elemMatch: { id: genre.id } },
-          offerType: 'BASE_GAME',
+          offerType: "BASE_GAME",
           releaseDate: { $lte: new Date() },
         },
         undefined,
@@ -373,7 +373,7 @@ app.get('/genres', async (c) => {
           sort: {
             releaseDate: -1,
           },
-        }
+        },
       );
 
       return {
@@ -383,25 +383,25 @@ app.get('/genres', async (c) => {
             id: o.id,
             title: o.title,
             image: getImage(o.keyImages, [
-              'OfferImageTall',
-              'Thumbnail',
-              'DieselGameBoxTall',
-              'DieselStoreFrontTall',
+              "OfferImageTall",
+              "Thumbnail",
+              "DieselGameBoxTall",
+              "DieselStoreFrontTall",
             ]),
           };
         }),
       };
-    })
+    }),
   );
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/top-wishlisted', async (c) => {
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 10);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+app.get("/top-wishlisted", async (c) => {
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 10);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
   const start = new Date();
@@ -412,41 +412,41 @@ app.get('/top-wishlisted', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   const result = await CollectionOffer.aggregate([
     {
       $match: {
-        _id: 'top-wishlisted',
+        _id: "top-wishlisted",
       },
     },
     {
       $project: {
         offers: {
           $filter: {
-            input: { $slice: ['$offers', skip, limit] },
-            as: 'offer',
-            cond: { $ne: ['$$offer.position', 0] },
+            input: { $slice: ["$offers", skip, limit] },
+            as: "offer",
+            cond: { $ne: ["$$offer.position", 0] },
           },
         },
       },
     },
     {
       $lookup: {
-        from: 'offers',
-        localField: 'offers._id',
-        foreignField: 'id',
-        as: 'offerDetails',
+        from: "offers",
+        localField: "offers._id",
+        foreignField: "id",
+        as: "offerDetails",
       },
     },
     {
-      $unwind: '$offerDetails',
+      $unwind: "$offerDetails",
     },
     {
       $sort: {
-        'offerDetails.id': -1,
+        "offerDetails.id": -1,
       },
     },
     {
@@ -454,11 +454,11 @@ app.get('/top-wishlisted', async (c) => {
         _id: null,
         total: {
           $first: {
-            $size: '$offers',
+            $size: "$offers",
           },
         },
         elements: {
-          $push: '$offerDetails',
+          $push: "$offerDetails",
         },
       },
     },
@@ -485,7 +485,7 @@ app.get('/top-wishlisted', async (c) => {
       total:
         (
           await CollectionOffer.findOne({
-            _id: 'top-wishlisted',
+            _id: "top-wishlisted",
           }).exec()
         )?.offers.length ?? 0,
     };
@@ -495,20 +495,20 @@ app.get('/top-wishlisted', async (c) => {
     });
 
     return c.json(response, 200, {
-      'Cache-Control': 'public, max-age=60',
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+      "Cache-Control": "public, max-age=60",
+      "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
     });
   }
 
   return c.json({ elements: [], page, limit, total: 0 }, 200, {
-    'Cache-Control': 'public, max-age=60',
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Cache-Control": "public, max-age=60",
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
-app.get('/top-sellers', async (c) => {
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+app.get("/top-sellers", async (c) => {
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 50);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
   const start = new Date();
@@ -519,59 +519,59 @@ app.get('/top-sellers', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   const result = await CollectionOffer.aggregate([
     {
       $match: {
-        _id: 'top-sellers',
+        _id: "top-sellers",
       },
     },
     {
-      $unwind: '$offers',
+      $unwind: "$offers",
     },
     {
       $match: {
-        'offers.position': { $ne: 0 },
+        "offers.position": { $ne: 0 },
       },
     },
     {
       $sort: {
-        'offers.position': 1, // Sort by position in ascending order
+        "offers.position": 1, // Sort by position in ascending order
       },
     },
     {
       $group: {
-        _id: '$_id',
-        offers: { $push: '$offers' },
+        _id: "$_id",
+        offers: { $push: "$offers" },
       },
     },
     {
       $project: {
-        offers: { $slice: ['$offers', skip, limit] },
+        offers: { $slice: ["$offers", skip, limit] },
       },
     },
     {
-      $unwind: '$offers',
+      $unwind: "$offers",
     },
     {
       $lookup: {
-        from: 'offers',
-        localField: 'offers._id',
-        foreignField: 'id',
-        as: 'offerDetails',
+        from: "offers",
+        localField: "offers._id",
+        foreignField: "id",
+        as: "offerDetails",
       },
     },
     {
-      $unwind: '$offerDetails',
+      $unwind: "$offerDetails",
     },
     {
       $group: {
         _id: null,
         total: { $sum: 1 },
-        elements: { $push: '$offerDetails' },
+        elements: { $push: "$offerDetails" },
       },
     },
     {
@@ -593,7 +593,7 @@ app.get('/top-sellers', async (c) => {
       total:
         (
           await CollectionOffer.findOne({
-            _id: 'top-sellers',
+            _id: "top-sellers",
           }).exec()
         )?.offers.length ?? 0,
     };
@@ -603,31 +603,31 @@ app.get('/top-sellers', async (c) => {
     });
 
     return c.json(response, 200, {
-      'Cache-Control': 'public, max-age=60',
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+      "Cache-Control": "public, max-age=60",
+      "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
     });
   }
 
   return c.json({ elements: [], page, limit, total: 0 }, 200, {
-    'Cache-Control': 'public, max-age=60',
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Cache-Control": "public, max-age=60",
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
-app.get('/featured-discounts', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+app.get("/featured-discounts", async (c) => {
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -637,25 +637,25 @@ app.get('/featured-discounts', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
-  const featuredOffers = await CollectionOffer.find({}, 'offers._id').lean();
+  const featuredOffers = await CollectionOffer.find({}, "offers._id").lean();
   const offersIds = featuredOffers.flatMap((o) => o.offers.map((o) => o._id));
 
   const offers = await Offer.find({
     id: { $in: offersIds },
     // Only show "BASE_GAME" and "DLC" offers
     offerType: {
-      $in: ['BASE_GAME', 'DLC'],
+      $in: ["BASE_GAME", "DLC"],
     },
   });
 
   const prices = await PriceEngine.find({
     offerId: { $in: offers.map((o) => o.id) },
     region,
-    'price.discount': { $gt: 0 },
+    "price.discount": { $gt: 0 },
   });
 
   const result = offers
@@ -676,24 +676,24 @@ app.get('/featured-discounts', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/latest-achievements', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+app.get("/latest-achievements", async (c) => {
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -703,7 +703,7 @@ app.get('/latest-achievements', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -713,8 +713,8 @@ app.get('/latest-achievements', async (c) => {
 
   while (result.length < 20) {
     const offers = await Offer.find({
-      offerType: { $in: ['BASE_GAME'] },
-      'tags.id': '19847',
+      offerType: { $in: ["BASE_GAME"] },
+      "tags.id": "19847",
       effectiveDate: { $lte: new Date() },
     })
       .sort({ effectiveDate: -1 })
@@ -733,14 +733,14 @@ app.get('/latest-achievements', async (c) => {
     ]);
 
     const achievements =
-      achievementsData.status === 'fulfilled' ? achievementsData.value : [];
-    const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
+      achievementsData.status === "fulfilled" ? achievementsData.value : [];
+    const prices = pricesData.status === "fulfilled" ? pricesData.value : [];
 
     const pageResults = offers
       .map((o) => {
         const price = prices.find((p) => p.offerId === o.id);
         const achievement = achievements.find(
-          (a) => a.sandboxId === o.namespace
+          (a) => a.sandboxId === o.namespace,
         );
         return {
           ...orderOffersObject(o),
@@ -766,17 +766,17 @@ app.get('/latest-achievements', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id', async (c) => {
+app.get("/:id", async (c) => {
   const { id } = c.req.param();
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -787,7 +787,7 @@ app.get('/:id', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -800,7 +800,7 @@ app.get('/:id', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found or Price not found',
+      message: "Offer not found or Price not found",
     });
   }
 
@@ -816,16 +816,16 @@ app.get('/:id', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
-app.get('/:id/price-history', async (c) => {
+app.get("/:id/price-history", async (c) => {
   const { id } = c.req.param();
-  const since = c.req.query('since');
+  const since = c.req.query("since");
 
-  const country = c.req.query('country');
-  const usrRegion = c.req.query('region');
+  const country = c.req.query("country");
+  const usrRegion = c.req.query("region");
 
   const region =
     usrRegion ||
@@ -833,13 +833,13 @@ app.get('/:id/price-history', async (c) => {
 
   if (region) {
     const cacheKey = `price-history:${id}:${region}:${
-      since ?? 'unlimited'
+      since ?? "unlimited"
     }:v0.1`;
     const cached = await client.get(cacheKey);
 
     if (cached) {
       return c.json(JSON.parse(cached), 200, {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       });
     }
 
@@ -862,11 +862,11 @@ app.get('/:id/price-history', async (c) => {
     });
 
     return c.json(prices, 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
-  const cacheKey = `price-history:${id}:all:${since ?? 'unlimited'}:v0.1`;
+  const cacheKey = `price-history:${id}:all:${since ?? "unlimited"}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -882,17 +882,20 @@ app.get('/:id/price-history', async (c) => {
   }).sort({ date: -1 });
 
   // Structure the data, Record<string, PriceHistoryType[]>
-  const pricesByRegion = prices.reduce((acc, price) => {
-    if (!price?.region) return acc;
+  const pricesByRegion = prices.reduce(
+    (acc, price) => {
+      if (!price?.region) return acc;
 
-    if (!acc[price.region]) {
-      acc[price.region] = [];
-    }
+      if (!acc[price.region]) {
+        acc[price.region] = [];
+      }
 
-    acc[price.region].push(price);
+      acc[price.region].push(price);
 
-    return acc;
-  }, {} as Record<string, PriceType[]>);
+      return acc;
+    },
+    {} as Record<string, PriceType[]>,
+  );
 
   if (!pricesByRegion || Object.keys(pricesByRegion).length === 0) {
     c.status(200);
@@ -904,11 +907,11 @@ app.get('/:id/price-history', async (c) => {
   });
 
   return c.json(pricesByRegion, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/features', async (c) => {
+app.get("/:id/features", async (c) => {
   const { id } = c.req.param();
 
   // We need to get the offers and items for that offer
@@ -917,7 +920,7 @@ app.get('/:id/features', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -946,7 +949,7 @@ app.get('/:id/features', async (c) => {
   return c.json(gameFeatures);
 });
 
-app.get('/:id/assets', async (c) => {
+app.get("/:id/assets", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `assets:offer:${id}:v0.2`;
@@ -955,7 +958,7 @@ app.get('/:id/assets', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -967,14 +970,14 @@ app.get('/:id/assets', async (c) => {
     },
     {
       $lookup: {
-        from: 'assets',
-        localField: 'id',
-        foreignField: 'itemId',
-        as: 'assets',
+        from: "assets",
+        localField: "id",
+        foreignField: "itemId",
+        as: "assets",
       },
     },
     {
-      $unwind: '$assets',
+      $unwind: "$assets",
     },
     {
       $project: {
@@ -991,11 +994,11 @@ app.get('/:id/assets', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/items', async (c) => {
+app.get("/:id/items", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `items:offer:${id}:v0.1`;
@@ -1004,7 +1007,7 @@ app.get('/:id/items', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1017,26 +1020,26 @@ app.get('/:id/items', async (c) => {
   });
 
   return c.json(items, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/price', async (c) => {
+app.get("/:id/price", async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -1045,7 +1048,7 @@ app.get('/:id/price', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1057,7 +1060,7 @@ app.get('/:id/price', async (c) => {
   if (!price) {
     c.status(404);
     return c.json({
-      message: 'Price not found',
+      message: "Price not found",
     });
   }
 
@@ -1066,23 +1069,23 @@ app.get('/:id/price', async (c) => {
   });
 
   return c.json(price, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/regional-price', async (c) => {
+app.get("/:id/regional-price", async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
+  const country = c.req.query("country");
 
   if (country) {
     const region = Object.keys(regions).find((r) =>
-      regions[r].countries.includes(country)
+      regions[r].countries.includes(country),
     );
 
     if (!region) {
       c.status(404);
       return c.json({
-        message: 'Country not found',
+        message: "Country not found",
       });
     }
 
@@ -1091,7 +1094,7 @@ app.get('/:id/regional-price', async (c) => {
 
     if (cached) {
       return c.json(JSON.parse(cached), 200, {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       });
     }
 
@@ -1123,13 +1126,13 @@ app.get('/:id/regional-price', async (c) => {
           sort: {
             updatedAt: -1,
           },
-        }
+        },
       );
 
       if (price.length === 0) {
         c.status(404);
         return c.json({
-          message: 'Price not found',
+          message: "Price not found",
         });
       }
     }
@@ -1145,7 +1148,7 @@ app.get('/:id/regional-price', async (c) => {
     });
 
     return c.json(result, 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1154,7 +1157,7 @@ app.get('/:id/regional-price', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1165,7 +1168,7 @@ app.get('/:id/regional-price', async (c) => {
 
   let priceQuery = { offerId: id } as any;
 
-  console.log('releaseDate', releaseDate);
+  console.log("releaseDate", releaseDate);
 
   if (releaseDate && releaseDate <= currentDate) {
     priceQuery.updatedAt = { $gte: releaseDate };
@@ -1178,7 +1181,7 @@ app.get('/:id/regional-price', async (c) => {
   });
 
   if (prices.length === 0) {
-    console.log('prices.length === 0');
+    console.log("prices.length === 0");
     prices = await PriceEngineHistorical.find(
       {
         offerId: id,
@@ -1188,7 +1191,7 @@ app.get('/:id/regional-price', async (c) => {
         sort: {
           updatedAt: -1,
         },
-      }
+      },
     );
   }
 
@@ -1203,7 +1206,7 @@ app.get('/:id/regional-price', async (c) => {
       }
 
       const lastPrice = regionPrices.sort(
-        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
       )[0];
 
       const allPrices = regionPrices.map((p) => p.price.discountPrice ?? 0);
@@ -1226,7 +1229,7 @@ app.get('/:id/regional-price', async (c) => {
         maxPrice: number;
         minPrice: number;
       }
-    >
+    >,
   );
 
   await client.set(cacheKey, JSON.stringify(result), {
@@ -1234,15 +1237,15 @@ app.get('/:id/regional-price', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/changelog', async (c) => {
+app.get("/:id/changelog", async (c) => {
   const { id } = c.req.param();
 
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 50);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
   const cacheKey = `changelog:${id}:${page}:${limit}:v0.1`;
@@ -1250,7 +1253,7 @@ app.get('/:id/changelog', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1261,13 +1264,13 @@ app.get('/:id/changelog', async (c) => {
     }),
   ]);
 
-  const offer = offerData.status === 'fulfilled' ? offerData.value : null;
-  const items = itemsData.status === 'fulfilled' ? itemsData.value : [];
+  const offer = offerData.status === "fulfilled" ? offerData.value : null;
+  const items = itemsData.status === "fulfilled" ? itemsData.value : [];
 
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1280,7 +1283,7 @@ app.get('/:id/changelog', async (c) => {
 
   const changelist = await Changelog.find(
     {
-      'metadata.contextId': { $in: allIds },
+      "metadata.contextId": { $in: allIds },
     },
     undefined,
     {
@@ -1289,13 +1292,13 @@ app.get('/:id/changelog', async (c) => {
       },
       limit,
       skip,
-    }
+    },
   );
 
   if (!changelist) {
     c.status(404);
     return c.json({
-      message: 'Changelist not found',
+      message: "Changelist not found",
     });
   }
 
@@ -1306,13 +1309,13 @@ app.get('/:id/changelog', async (c) => {
   return c.json(changelist);
 });
 
-app.get('/:id/achievements', async (c) => {
+app.get("/:id/achievements", async (c) => {
   const { id } = c.req.param();
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -1321,13 +1324,13 @@ app.get('/:id/achievements', async (c) => {
     {
       namespace: 1,
       offerType: 1,
-    }
+    },
   );
 
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1336,13 +1339,13 @@ app.get('/:id/achievements', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   const achievements = await AchievementSet.find({
     sandboxId: offer.namespace,
-    isBase: offer.offerType === 'BASE_GAME',
+    isBase: offer.offerType === "BASE_GAME",
   });
 
   if (achievements.length === 0) {
@@ -1355,11 +1358,11 @@ app.get('/:id/achievements', async (c) => {
   });
 
   return c.json(achievements, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/related', async (c) => {
+app.get("/:id/related", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `related-offers:${id}`;
@@ -1368,7 +1371,7 @@ app.get('/:id/related', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1377,7 +1380,7 @@ app.get('/:id/related', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1397,7 +1400,7 @@ app.get('/:id/related', async (c) => {
       viewableDate: 1,
       effectiveDate: 1,
       offerType: 1,
-    }
+    },
   );
 
   await client.set(cacheKey, JSON.stringify(related), {
@@ -1405,11 +1408,11 @@ app.get('/:id/related', async (c) => {
   });
 
   return c.json(related, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/mappings', async (c) => {
+app.get("/:id/mappings", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `mappings:${id}`;
@@ -1418,7 +1421,7 @@ app.get('/:id/mappings', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1429,7 +1432,7 @@ app.get('/:id/mappings', async (c) => {
   if (!mappings) {
     c.status(404);
     return c.json({
-      message: 'Mappings not found',
+      message: "Mappings not found",
     });
   }
 
@@ -1439,11 +1442,11 @@ app.get('/:id/mappings', async (c) => {
   });
 
   return c.json(mappings, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/media', async (c) => {
+app.get("/:id/media", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `media:${id}`;
@@ -1452,7 +1455,7 @@ app.get('/:id/media', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1463,7 +1466,7 @@ app.get('/:id/media', async (c) => {
   if (!media) {
     c.status(404);
     return c.json({
-      message: 'Media not found',
+      message: "Media not found",
     });
   }
 
@@ -1473,26 +1476,26 @@ app.get('/:id/media', async (c) => {
   });
 
   return c.json(media, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/suggestions', async (c) => {
+app.get("/:id/suggestions", async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -1502,7 +1505,7 @@ app.get('/:id/suggestions', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1511,7 +1514,7 @@ app.get('/:id/suggestions', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1520,14 +1523,14 @@ app.get('/:id/suggestions', async (c) => {
     id: { $in: tagsIds },
   });
 
-  const genres = tagsInformation.filter((t) => t.groupName === 'genre');
+  const genres = tagsInformation.filter((t) => t.groupName === "genre");
 
   const suggestions = await Offer.find(
     {
       tags: { $elemMatch: { id: { $in: genres.map((g) => g.id) } } },
       id: { $ne: id },
       namespace: { $ne: offer.namespace },
-      offerType: { $in: ['BASE_GAME', 'DLC'] },
+      offerType: { $in: ["BASE_GAME", "DLC"] },
     },
     undefined,
     {
@@ -1535,7 +1538,7 @@ app.get('/:id/suggestions', async (c) => {
       sort: {
         lastModifiedDate: -1,
       },
-    }
+    },
   );
 
   const prices = await PriceEngine.find({
@@ -1556,11 +1559,11 @@ app.get('/:id/suggestions', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/age-rating', async (c) => {
+app.get("/:id/age-rating", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `age-rating:${id}`;
@@ -1569,7 +1572,7 @@ app.get('/:id/age-rating', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1578,7 +1581,7 @@ app.get('/:id/age-rating', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1589,7 +1592,7 @@ app.get('/:id/age-rating', async (c) => {
   if (!sandbox) {
     c.status(404);
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -1600,11 +1603,11 @@ app.get('/:id/age-rating', async (c) => {
   });
 
   return c.json(ageRatings, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/giveaways', async (c) => {
+app.get("/:id/giveaways", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `giveaways:${id}`;
@@ -1613,7 +1616,7 @@ app.get('/:id/giveaways', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1626,7 +1629,7 @@ app.get('/:id/giveaways', async (c) => {
       sort: {
         startDate: -1,
       },
-    }
+    },
   );
 
   await client.set(cacheKey, JSON.stringify(giveaways), {
@@ -1634,11 +1637,11 @@ app.get('/:id/giveaways', async (c) => {
   });
 
   return c.json(giveaways, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/ratings', async (c) => {
+app.get("/:id/ratings", async (c) => {
   const { id } = c.req.param();
 
   const offer = await Offer.findOne({ id });
@@ -1646,7 +1649,7 @@ app.get('/:id/ratings', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1656,7 +1659,7 @@ app.get('/:id/ratings', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1667,11 +1670,11 @@ app.get('/:id/ratings', async (c) => {
   if (!sandbox) {
     c.status(404);
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
-  const product = await db.db.collection('products').findOne({
+  const product = await db.db.collection("products").findOne({
     // @ts-expect-error - _id in products is a string
     _id: sandbox.parent,
   });
@@ -1679,7 +1682,7 @@ app.get('/:id/ratings', async (c) => {
   if (!product) {
     c.status(404);
     return c.json({
-      message: 'Product not found',
+      message: "Product not found",
     });
   }
 
@@ -1690,7 +1693,7 @@ app.get('/:id/ratings', async (c) => {
   if (!ratings) {
     c.status(404);
     return c.json({
-      message: 'Ratings not found',
+      message: "Ratings not found",
     });
   }
 
@@ -1699,11 +1702,11 @@ app.get('/:id/ratings', async (c) => {
   });
 
   return c.json(ratings, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/tops', async (c) => {
+app.get("/:id/tops", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `tops:${id}`;
@@ -1718,16 +1721,16 @@ app.get('/:id/tops', async (c) => {
 
   const [topWishlisted, topSellers, topDemos] = await Promise.all([
     CollectionOffer.findOne({
-      _id: 'top-wishlisted',
-      'offers._id': id,
+      _id: "top-wishlisted",
+      "offers._id": id,
     }),
     CollectionOffer.findOne({
-      _id: 'top-sellers',
-      'offers._id': id,
+      _id: "top-sellers",
+      "offers._id": id,
     }),
     CollectionOffer.findOne({
-      _id: 'top-demos',
-      'offers._id': id,
+      _id: "top-demos",
+      "offers._id": id,
     }),
   ]);
 
@@ -1749,11 +1752,11 @@ app.get('/:id/tops', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/polls', async (c) => {
+app.get("/:id/polls", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `polls:${id}`;
@@ -1762,7 +1765,7 @@ app.get('/:id/polls', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -1771,7 +1774,7 @@ app.get('/:id/polls', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1780,12 +1783,12 @@ app.get('/:id/polls', async (c) => {
   if (!sandbox) {
     c.status(404);
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
   const polls = await db.db
-    .collection('ratings_polls')
+    .collection("ratings_polls")
     .find({
       // @ts-expect-error - _id in polls is a string
       _id: offer.namespace,
@@ -1797,18 +1800,18 @@ app.get('/:id/polls', async (c) => {
   });
 
   return c.json(polls[0], 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/reviews', async (c) => {
-  const auth = c.req.header('Authorization');
+app.get("/:id/reviews", async (c) => {
+  const auth = c.req.header("Authorization");
   const { id } = c.req.param();
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 25);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 25);
   const skip = (page - 1) * limit;
 
-  const verifiedFilter = c.req.query('verified');
+  const verifiedFilter = c.req.query("verified");
 
   const cacheKey = `reviews:${id}:${page}:${limit}:${verifiedFilter}`;
 
@@ -1821,7 +1824,7 @@ app.get('/:id/reviews', async (c) => {
   // }
 
   const currentUser = auth
-    ? await getDiscordUser(auth.replace('Bearer ', ''))
+    ? await getDiscordUser(auth.replace("Bearer ", ""))
     : null;
 
   const query: any = {
@@ -1829,9 +1832,9 @@ app.get('/:id/reviews', async (c) => {
     userId: { $ne: currentUser?.id },
   };
 
-  if (verifiedFilter === 'true') {
+  if (verifiedFilter === "true") {
     query.verified = true;
-  } else if (verifiedFilter === 'false') {
+  } else if (verifiedFilter === "false") {
     query.verified = false;
   }
 
@@ -1888,39 +1891,40 @@ app.get('/:id/reviews', async (c) => {
   }
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.post('/:id/reviews', async (c) => {
+app.post("/:id/reviews", async (c) => {
   const { id } = c.req.param();
-  const body = await c.req.json<
-    Omit<IReview, 'id' | 'createdAt' | 'verified' | 'userId'>
-  >();
-  const Authorization = c.req.header('Authorization');
+  const body =
+    await c.req.json<
+      Omit<IReview, "id" | "createdAt" | "verified" | "userId">
+    >();
+  const Authorization = c.req.header("Authorization");
 
   if (!Authorization) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
   if (!body || !body.rating || !body.title || !body.content) {
     c.status(400);
     return c.json({
-      message: 'Missing required fields',
+      message: "Missing required fields",
     });
   }
 
-  const token = Authorization.replace('Bearer ', '');
+  const token = Authorization.replace("Bearer ", "");
 
   const user = await getDiscordUser(token);
 
   if (!user) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -1931,7 +1935,7 @@ app.post('/:id/reviews', async (c) => {
   if (!dbUser) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -1944,7 +1948,7 @@ app.post('/:id/reviews', async (c) => {
   if (existingReview) {
     c.status(400);
     return c.json({
-      message: 'User already reviewed this product',
+      message: "User already reviewed this product",
     });
   }
 
@@ -1956,7 +1960,7 @@ app.post('/:id/reviews', async (c) => {
   ) {
     c.status(400);
     return c.json({
-      message: 'Product not released',
+      message: "Product not released",
     });
   }
 
@@ -1965,14 +1969,14 @@ app.post('/:id/reviews', async (c) => {
   if (!product) {
     c.status(404);
     return c.json({
-      message: 'Product not found',
+      message: "Product not found",
     });
   }
 
   const isOwned = dbUser?.epicId
     ? await verifyGameOwnership(
         dbUser?.epicId,
-        product._id as unknown as string
+        product._id as unknown as string,
       )
     : false;
 
@@ -1993,39 +1997,39 @@ app.post('/:id/reviews', async (c) => {
 
   return c.json(
     {
-      status: 'ok',
+      status: "ok",
     },
-    201
+    201,
   );
 });
 
-app.patch('/:id/reviews', async (c) => {
+app.patch("/:id/reviews", async (c) => {
   const { id } = c.req.param();
-  const body = await c.req.json<Omit<IReview, 'id' | 'createdAt' | 'userId'>>();
-  const Authorization = c.req.header('Authorization');
+  const body = await c.req.json<Omit<IReview, "id" | "createdAt" | "userId">>();
+  const Authorization = c.req.header("Authorization");
 
   if (!Authorization) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
   if (!body || !body.rating || !body.title || !body.content) {
     c.status(400);
     return c.json({
-      message: 'Missing required fields',
+      message: "Missing required fields",
     });
   }
 
-  const token = Authorization.replace('Bearer ', '');
+  const token = Authorization.replace("Bearer ", "");
 
   const user = await getDiscordUser(token);
 
   if (!user) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2036,7 +2040,7 @@ app.patch('/:id/reviews', async (c) => {
   if (!dbUser) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2045,14 +2049,14 @@ app.patch('/:id/reviews', async (c) => {
   if (!product) {
     c.status(404);
     return c.json({
-      message: 'Product not found',
+      message: "Product not found",
     });
   }
 
   const isOwned = dbUser?.epicId
     ? await verifyGameOwnership(
         dbUser?.epicId,
-        product._id as unknown as string
+        product._id as unknown as string,
       )
     : false;
 
@@ -2064,11 +2068,11 @@ app.patch('/:id/reviews', async (c) => {
   if (!oldReview) {
     c.status(404);
     return c.json({
-      message: 'Review not found',
+      message: "Review not found",
     });
   }
 
-  const review: Omit<IReview, 'id' | 'createdAt' | 'userId'> = {
+  const review: Omit<IReview, "id" | "createdAt" | "userId"> = {
     rating: body.rating,
     title: body.title,
     content: body.content,
@@ -2094,36 +2098,36 @@ app.patch('/:id/reviews', async (c) => {
       userId: dbUser.id,
       id,
     },
-    review
+    review,
   );
 
   return c.json(
     {
-      status: 'ok',
+      status: "ok",
     },
-    200
+    200,
   );
 });
 
-app.delete('/:id/reviews', async (c) => {
+app.delete("/:id/reviews", async (c) => {
   const { id } = c.req.param();
-  const Authorization = c.req.header('Authorization');
+  const Authorization = c.req.header("Authorization");
 
   if (!Authorization) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
-  const token = Authorization.replace('Bearer ', '');
+  const token = Authorization.replace("Bearer ", "");
 
   const user = await getDiscordUser(token);
 
   if (!user) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2134,7 +2138,7 @@ app.delete('/:id/reviews', async (c) => {
   if (!dbUser) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2146,7 +2150,7 @@ app.delete('/:id/reviews', async (c) => {
   if (!review) {
     c.status(404);
     return c.json({
-      message: 'Review not found',
+      message: "Review not found",
     });
   }
 
@@ -2157,9 +2161,9 @@ app.delete('/:id/reviews', async (c) => {
 
   return c.json(
     {
-      status: 'ok',
+      status: "ok",
     },
-    200
+    200,
   );
 });
 
@@ -2170,9 +2174,9 @@ type ReviewSummary = {
   totalReviews: number;
 };
 
-app.get('/:id/reviews-summary', async (c) => {
+app.get("/:id/reviews-summary", async (c) => {
   const { id } = c.req.param();
-  const verifiedFilter = c.req.query('verified');
+  const verifiedFilter = c.req.query("verified");
 
   const cacheKey = `reviews-summary:${id}:${verifiedFilter}`;
 
@@ -2186,9 +2190,9 @@ app.get('/:id/reviews-summary', async (c) => {
 
   const query: any = { id };
 
-  if (verifiedFilter === 'true') {
+  if (verifiedFilter === "true") {
     query.verified = true;
-  } else if (verifiedFilter === 'false') {
+  } else if (verifiedFilter === "false") {
     query.verified = false;
   }
 
@@ -2224,30 +2228,30 @@ app.get('/:id/reviews-summary', async (c) => {
   });
 
   return c.json(summary, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/reviews/permissions', async (c) => {
+app.get("/:id/reviews/permissions", async (c) => {
   const { id } = c.req.param();
   console.log(id);
-  const Authorization = c.req.header('Authorization');
+  const Authorization = c.req.header("Authorization");
 
   if (!Authorization) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
-  const token = Authorization.replace('Bearer ', '');
+  const token = Authorization.replace("Bearer ", "");
 
   const user = await getDiscordUser(token);
 
   if (!user) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2258,7 +2262,7 @@ app.get('/:id/reviews/permissions', async (c) => {
   if (!dbUser) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2272,25 +2276,25 @@ app.get('/:id/reviews/permissions', async (c) => {
   });
 });
 
-app.get('/:id/ownership', async (c) => {
+app.get("/:id/ownership", async (c) => {
   const { id } = c.req.param();
-  const Authorization = c.req.header('Authorization');
+  const Authorization = c.req.header("Authorization");
 
   if (!Authorization) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
-  const token = Authorization.replace('Bearer ', '');
+  const token = Authorization.replace("Bearer ", "");
 
   const user = await getDiscordUser(token);
 
   if (!user) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2301,7 +2305,7 @@ app.get('/:id/ownership', async (c) => {
   if (!dbUser) {
     c.status(401);
     return c.json({
-      message: 'Unauthorized',
+      message: "Unauthorized",
     });
   }
 
@@ -2310,7 +2314,7 @@ app.get('/:id/ownership', async (c) => {
   if (!product) {
     c.status(404);
     return c.json({
-      message: 'Product not found',
+      message: "Product not found",
     });
   }
 
@@ -2323,13 +2327,13 @@ app.get('/:id/ownership', async (c) => {
   });
 });
 
-app.get('/:id/hltb', async (c) => {
+app.get("/:id/hltb", async (c) => {
   const { id } = c.req.param();
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -2340,7 +2344,7 @@ app.get('/:id/hltb', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -2349,7 +2353,7 @@ app.get('/:id/hltb', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -2357,14 +2361,14 @@ app.get('/:id/hltb', async (c) => {
     _id: id,
   });
 
-  if (!hltb || !hltb.hltbId || hltb.hltbId === '00000') {
+  if (!hltb || !hltb.hltbId || hltb.hltbId === "00000") {
     return c.json(
       {
-        error: 'HowLongToBeat data not found for this offer',
+        error: "HowLongToBeat data not found for this offer",
       },
       {
         status: 404,
-      }
+      },
     );
   }
 
@@ -2373,26 +2377,26 @@ app.get('/:id/hltb', async (c) => {
   });
 
   return c.json(hltb, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id/collection', async (c) => {
+app.get("/:id/collection", async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -2401,16 +2405,16 @@ app.get('/:id/collection', async (c) => {
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
   const { categories, customAttributes } = offer;
 
-  if (!categories || !(categories.findIndex((c) => c === 'collections') > -1)) {
+  if (!categories || !(categories.findIndex((c) => c === "collections") > -1)) {
     c.status(404);
     return c.json({
-      message: 'Selected offer does not have a collection',
+      message: "Selected offer does not have a collection",
     });
   }
 
@@ -2420,19 +2424,19 @@ app.get('/:id/collection', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   // Get the IDs of the collection offers
   const collectionOfferIds = customAttributes
-    .filter((a) => a.key?.startsWith('com.epicgames.app.collectionOfferIds.'))
+    .filter((a) => a.key?.startsWith("com.epicgames.app.collectionOfferIds."))
     .map((a) => a.value);
 
   if (!collectionOfferIds.length || collectionOfferIds.length === 0) {
     c.status(404);
     return c.json({
-      message: 'Selected offer does not have a collection',
+      message: "Selected offer does not have a collection",
     });
   }
 
@@ -2446,8 +2450,8 @@ app.get('/:id/collection', async (c) => {
     }),
   ]);
 
-  const offers = offersData.status === 'fulfilled' ? offersData.value : [];
-  const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
+  const offers = offersData.status === "fulfilled" ? offersData.value : [];
+  const prices = pricesData.status === "fulfilled" ? pricesData.value : [];
 
   const result = offers.map((o) => {
     const price = prices.find((p) => p.offerId === o.id);
@@ -2462,7 +2466,7 @@ app.get('/:id/collection', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
@@ -2472,22 +2476,22 @@ type BUNDLE_RESPONSE = {
   totalPrice: PriceType;
 };
 
-app.get('/:id/bundle', async (c) => {
+app.get("/:id/bundle", async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -2497,7 +2501,7 @@ app.get('/:id/bundle', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -2510,23 +2514,23 @@ app.get('/:id/bundle', async (c) => {
   ]);
 
   const offer =
-    mainOfferData.status === 'fulfilled' ? mainOfferData.value : null;
+    mainOfferData.status === "fulfilled" ? mainOfferData.value : null;
   const mainPrice =
-    mainPriceData.status === 'fulfilled' ? mainPriceData.value : null;
+    mainPriceData.status === "fulfilled" ? mainPriceData.value : null;
 
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
   const { offerType } = offer;
 
-  if (!offerType || (offerType !== 'BUNDLE' && offerType !== 'Bundle')) {
+  if (!offerType || (offerType !== "BUNDLE" && offerType !== "Bundle")) {
     c.status(404);
     return c.json({
-      message: 'Selected offer is not a bundle',
+      message: "Selected offer is not a bundle",
     });
   }
 
@@ -2535,7 +2539,7 @@ app.get('/:id/bundle', async (c) => {
   if (!bundleData) {
     c.status(404);
     return c.json({
-      message: 'Bundle not found',
+      message: "Bundle not found",
     });
   }
 
@@ -2552,9 +2556,9 @@ app.get('/:id/bundle', async (c) => {
   ]);
 
   const bundleOffers =
-    bundleOffersData.status === 'fulfilled' ? bundleOffersData.value : [];
+    bundleOffersData.status === "fulfilled" ? bundleOffersData.value : [];
   const bundlePrices =
-    bundlePricesData.status === 'fulfilled' ? bundlePricesData.value : [];
+    bundlePricesData.status === "fulfilled" ? bundlePricesData.value : [];
 
   const offers = bundleOffers.map((o) => {
     const price = bundlePrices.find((p) => p.offerId === o.id);
@@ -2593,22 +2597,22 @@ app.get('/:id/bundle', async (c) => {
         };
       },
       {
-        country: mainPrice?.country ?? 'US',
+        country: mainPrice?.country ?? "US",
         offerId: id,
-        region: mainPrice?.region ?? 'US',
-        namespace: mainPrice?.namespace ?? 'epic',
+        region: mainPrice?.region ?? "US",
+        namespace: mainPrice?.namespace ?? "epic",
         updatedAt: mainPrice?.updatedAt ?? new Date(),
         price: {
           discount: 0,
           discountPrice: 0,
           originalPrice: 0,
           basePayoutPrice: 0,
-          currencyCode: 'USD',
-          basePayoutCurrencyCode: 'USD',
+          currencyCode: "USD",
+          basePayoutCurrencyCode: "USD",
           payoutCurrencyExchangeRate: 1,
         },
         appliedRules: [] as any[],
-      }
+      },
     ),
     // @ts-expect-error
     bundlePrice: mainPrice,
@@ -2619,29 +2623,29 @@ app.get('/:id/bundle', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
 /**
  * Checks if the selected offer is part of 1 or multiple bundles
  */
-app.get('/:id/in-bundle', async (c) => {
+app.get("/:id/in-bundle", async (c) => {
   const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -2651,7 +2655,7 @@ app.get('/:id/in-bundle', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -2660,7 +2664,7 @@ app.get('/:id/in-bundle', async (c) => {
   if (!bundleData) {
     c.status(404);
     return c.json({
-      message: 'Bundle not found',
+      message: "Bundle not found",
     });
   }
 
@@ -2675,15 +2679,15 @@ app.get('/:id/in-bundle', async (c) => {
         }),
       ]);
 
-      const b = bundleData.status === 'fulfilled' ? bundleData.value : null;
+      const b = bundleData.status === "fulfilled" ? bundleData.value : null;
       const bp =
-        bundlePriceData.status === 'fulfilled' ? bundlePriceData.value : null;
+        bundlePriceData.status === "fulfilled" ? bundlePriceData.value : null;
 
       return {
         ...orderOffersObject(b),
         price: bp ?? null,
       };
-    })
+    }),
   );
 
   await client.set(cacheKey, JSON.stringify(bundles), {
@@ -2691,7 +2695,7 @@ app.get('/:id/in-bundle', async (c) => {
   });
 
   return c.json(bundles, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 

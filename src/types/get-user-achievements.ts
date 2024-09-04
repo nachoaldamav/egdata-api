@@ -19,7 +19,7 @@ export interface PlayerProfilePrivateResponse {
   };
 }
 
-interface AchievementsSummary {
+export interface AchievementsSummary {
   __typename: string;
   status?: string;
   data?: {
@@ -27,10 +27,13 @@ interface AchievementsSummary {
     totalXP: number;
     sandboxId: string;
     baseOfferForSandbox: {
+      id: string;
+      namespace: string;
       keyImages: {
         url: string;
         type: string;
         alt: string;
+        md5: string;
       }[];
     };
     product: {

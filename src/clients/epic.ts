@@ -1,14 +1,14 @@
-import { gql, GraphQLClient } from 'graphql-request';
-import type { PlayerProfileQuery } from '../types/get-epic-user.js';
-import type { PlayerProfileAchievementsByProductIdQuery } from '../types/get-user-product-achievements.js';
-import type { PlayerProfilePrivateResponse } from '../types/get-user-achievements.js';
+import { gql, GraphQLClient } from "graphql-request";
+import type { PlayerProfileQuery } from "../types/get-epic-user.js";
+import type { PlayerProfileAchievementsByProductIdQuery } from "../types/get-user-product-achievements.js";
+import type { PlayerProfilePrivateResponse } from "../types/get-user-achievements.js";
 
 export class EpicStoreClient {
   private client: GraphQLClient;
 
   constructor() {
-    this.client = new GraphQLClient('https://store.epicgames.com/graphql', {
-      errorPolicy: 'ignore',
+    this.client = new GraphQLClient("https://store.epicgames.com/graphql", {
+      errorPolicy: "ignore",
     });
   }
 
@@ -30,8 +30,8 @@ export class EpicStoreClient {
     `;
 
     this.client.setHeader(
-      'User-Agent',
-      'EpicGames/16.11.0-35427934+++Portal+Release-Live-Windows'
+      "User-Agent",
+      "EpicGames/16.11.0-35427934+++Portal+Release-Live-Windows",
     );
 
     try {
@@ -40,7 +40,7 @@ export class EpicStoreClient {
       });
       return data.PlayerProfile?.playerProfile;
     } catch (err) {
-      console.error('Error fetching Epic user data', err);
+      console.error("Error fetching Epic user data", err);
       return null;
     }
   }
@@ -102,8 +102,8 @@ export class EpicStoreClient {
     `;
 
     this.client.setHeader(
-      'User-Agent',
-      'EpicGames/16.11.0-35427934+++Portal+Release-Live-Windows'
+      "User-Agent",
+      "EpicGames/16.11.0-35427934+++Portal+Release-Live-Windows",
     );
 
     try {
@@ -113,11 +113,11 @@ export class EpicStoreClient {
           {
             epicAccountId: accountId,
             productId,
-          }
+          },
         );
       return data.PlayerProfile?.playerProfile?.productAchievements;
     } catch (err) {
-      console.error('Error fetching Epic user data', err);
+      console.error("Error fetching Epic user data", err);
       return null;
     }
   }
@@ -180,12 +180,12 @@ export class EpicStoreClient {
         query,
         {
           epicAccountId: accountId,
-          locale: 'en-US',
-        }
+          locale: "en-US",
+        },
       );
       return data.PlayerProfile?.playerProfile?.achievementsSummaries;
     } catch (err) {
-      console.error('Error fetching Epic user data', err);
+      console.error("Error fetching Epic user data", err);
       return null;
     }
   }
