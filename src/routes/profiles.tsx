@@ -205,6 +205,54 @@ app.get("/:id", async (c) => {
   }
 });
 
+app.get("/:id/achievements/:sandboxId", async (c) => {
+  const { id, sandboxId } = c.req.param();
+
+  if (!id || !sandboxId) {
+    c.status(400);
+    return c.json({
+      message: "Missing id or sandboxId parameter",
+    });
+  }
+
+  const cacheKey = `epic-profile:${id}:${sandboxId}:v0.1`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), {
+      headers: {
+        "Cache-Control": "public, max-age=60",
+      },
+    });
+  }
+
+  const playerAchievements = await db.db
+    .collection("player-achievements")
+    .find<PlayerProductAchievements>({
+      epicAccountId: id,
+      sandboxId: sandboxId,
+    })
+    .toArray();
+
+  const achievementsSets = playerAchievements.flatMap((p) =>
+    p.achievementSets.map((a) => a.achievementSetId),
+  );
+
+  const dedupedAchievementsSets = [...new Set(achievementsSets)];
+
+  const sandboxAchievements = await AchievementSet.find({
+    achievementSetId: {
+      $in: dedupedAchievementsSets,
+    },
+  });
+
+  return c.json({
+    playerAchievements,
+    sandboxAchievements,
+  });
+});
+
 app.get("/:id/og", async (c) => {
   const { id } = c.req.param();
 
