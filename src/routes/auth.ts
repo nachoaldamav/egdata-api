@@ -423,9 +423,17 @@ app.get('/refresh', async (c) => {
 
   const decoded = jwt.decode(authToken) as {
     sub: string;
+    iss: string;
   };
 
-  if (!decoded || !decoded.sub) {
+  if (!decoded || !decoded.sub || !decoded.iss) {
+    console.error('Invalid token');
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+
+  const epicIss = 'https://api.epicgames.dev/epic/oauth/v2';
+
+  if (decoded.iss !== epicIss) {
     console.error('Invalid token');
     return c.json({ error: 'Invalid token' }, 401);
   }
@@ -501,6 +509,8 @@ app.get('/refresh', async (c) => {
       _id: new ObjectId(id),
     });
   }
+
+  console.log(`Refreshed token for ${decoded.sub}`);
 
   return c.json(
     {
