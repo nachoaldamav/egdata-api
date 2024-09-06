@@ -421,7 +421,7 @@ app.get('/refresh', async (c) => {
     return c.json({ error: 'Missing token' }, 401);
   }
 
-  const decoded = jwt.decode(authToken) as {
+  const decoded = jwt.decode(authToken, {}) as {
     sub: string;
     iss: string;
   };
@@ -431,10 +431,8 @@ app.get('/refresh', async (c) => {
     return c.json({ error: 'Invalid token' }, 401);
   }
 
-  const epicIss = 'https://api.epicgames.dev/epic/oauth/v2';
-
-  if (decoded.iss !== epicIss) {
-    console.error('Invalid token');
+  if (!decoded.iss.startsWith('https://api.epicgames.dev/epic/')) {
+    console.error('Token issuer invalid', decoded.iss);
     return c.json({ error: 'Invalid token' }, 401);
   }
 
