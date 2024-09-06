@@ -9,7 +9,10 @@ import { Resvg } from "@resvg/resvg-js";
 import { db } from "../db/index.js";
 import { Sandbox } from "../db/schemas/sandboxes.js";
 import { Offer } from "../db/schemas/offer.js";
-import { AchievementSet, AchievementType } from "../db/schemas/achievements.js";
+import {
+  AchievementSet,
+  type AchievementType,
+} from "../db/schemas/achievements.js";
 
 export interface PlayerProductAchievements {
   _id: Id;
@@ -67,7 +70,7 @@ app.get("/:id", async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:v0.2`;
+  const cacheKey = `epic-profile:${id}:v0.3`;
 
   const cached = await client.get(cacheKey);
 
@@ -98,6 +101,10 @@ app.get("/:id", async (c) => {
         },
       );
     }
+
+    const reviewsCount = await db.db
+      .collection("reviews")
+      .countDocuments({ userId: id });
 
     if (!profile) {
       c.status(404);
@@ -191,6 +198,7 @@ app.get("/:id", async (c) => {
         },
         linkedAccounts: dbProfile?.linkedAccounts,
         creationDate: dbProfile?.creationDate,
+        reviews: reviewsCount,
       };
 
       await client.set(cacheKey, JSON.stringify(result), {
@@ -216,6 +224,7 @@ app.get("/:id", async (c) => {
       },
       linkedAccounts: dbProfile?.linkedAccounts,
       creationDate: dbProfile?.creationDate,
+      reviews: reviewsCount,
     };
 
     await client.set(cacheKey, JSON.stringify(result), {
