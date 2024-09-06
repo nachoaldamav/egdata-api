@@ -110,8 +110,6 @@ export const epic = createMiddleware<EpicAuthMiddleware>(async (c, next) => {
       access_token: epicAuth,
     });
 
-    console.log('EPIC_AUTH token verified successfully');
-
     return next();
   } catch (err) {
     console.error('Error verifying EPIC_AUTH token', err);
@@ -183,8 +181,6 @@ export const epicInfo = createMiddleware<EpicAuthMiddleware>(
         access_token: epicAuth,
       });
 
-      console.log('EPIC_AUTH token verified successfully');
-
       return next();
     } catch (err) {
       console.error('Error verifying EPIC_AUTH token', err);
@@ -230,6 +226,65 @@ app.get('/', epic, async (c) => {
   });
 
   return c.json(epicProfile);
+});
+
+app.post('/avatar', epic, async (c) => {
+  const epicVar = c.var.epic;
+
+  if (!epicVar || !epicVar.account_id) {
+    console.error('Missing EPIC_ACCOUNT_ID', epicVar);
+    return c.json({ error: 'Missing EPIC_ACCOUNT_ID' }, 401);
+  }
+
+  console.log('Content type:', c.req.header('Content-Type'));
+
+  const body = await c.req.parseBody();
+
+  const file = body.file as File;
+
+  if (!file) {
+    console.error('Missing file');
+    return c.json({ error: 'Missing file' }, 400);
+  }
+
+  const cfImagesUrl =
+    'https://api.cloudflare.com/client/v4/accounts/7da0b3179a5b5ef4f1a2d1189f072d0b/images/v1';
+  const accessToken = process.env.CF_IMAGES_KEY;
+
+  const formData = new FormData();
+  formData.set(
+    'file',
+    file,
+    `${epicVar.account_id}.${file.name.split('.').pop()}`
+  );
+
+  const response = await fetch(cfImagesUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    console.error('Failed to upload avatar', await response.json());
+    return c.json({ error: 'Failed to upload avatar' }, 400);
+  }
+
+  const responseData = await response.json();
+
+  await db.db.collection('epic').updateOne(
+    {
+      accountId: epicVar.account_id,
+    },
+    {
+      $set: {
+        avatarUrl: responseData.result,
+      },
+    }
+  );
+
+  return c.json(responseData.result);
 });
 
 export default app;
