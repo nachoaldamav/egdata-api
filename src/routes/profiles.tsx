@@ -85,6 +85,20 @@ app.get("/:id", async (c) => {
       accountId: id,
     });
 
+    if (dbProfile && !dbProfile.creationDate) {
+      dbProfile.creationDate = new Date();
+      await db.db.collection("epic").updateOne(
+        {
+          accountId: id,
+        },
+        {
+          $set: {
+            creationDate: dbProfile.creationDate,
+          },
+        },
+      );
+    }
+
     if (!profile) {
       c.status(404);
       return c.json({
@@ -176,6 +190,7 @@ app.get("/:id", async (c) => {
           large: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.large,
         },
         linkedAccounts: dbProfile?.linkedAccounts,
+        creationDate: dbProfile?.creationDate,
       };
 
       await client.set(cacheKey, JSON.stringify(result), {
@@ -200,6 +215,7 @@ app.get("/:id", async (c) => {
         large: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.large,
       },
       linkedAccounts: dbProfile?.linkedAccounts,
+      creationDate: dbProfile?.creationDate,
     };
 
     await client.set(cacheKey, JSON.stringify(result), {

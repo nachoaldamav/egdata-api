@@ -223,6 +223,7 @@ app.get('/', epic, async (c) => {
 
   await db.db.collection('epic').insertOne({
     ...epicProfile,
+    creationDate: new Date(),
   });
 
   return c.json(epicProfile);
