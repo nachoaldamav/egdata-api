@@ -127,7 +127,7 @@ export const epicInfo = createMiddleware<EpicAuthMiddleware>(
 
     if (!epicAuth) {
       console.error('Missing EPIC_AUTH header or cookie');
-      return c.json({ error: 'Missing EPIC_AUTH header or cookie' }, 401);
+      return next();
     }
 
     if (epicAuth.startsWith('Bearer ')) {
@@ -144,7 +144,7 @@ export const epicInfo = createMiddleware<EpicAuthMiddleware>(
 
       if (!decoded || !decoded.sub || !decoded.appid) {
         console.error('Invalid EPIC_AUTH token');
-        return c.json({ error: 'Invalid EPIC_AUTH token' }, 401);
+        return next();
       }
 
       // Verify the token
@@ -166,14 +166,14 @@ export const epicInfo = createMiddleware<EpicAuthMiddleware>(
           'Failed to verify EPIC_AUTH token',
           await epicTokenInfo.json()
         );
-        return c.json({ error: 'Failed to verify EPIC_AUTH token' }, 401);
+        return next();
       }
 
       const epicTokenInfoData = (await epicTokenInfo.json()) as EpicTokenInfo;
 
       if (!epicTokenInfoData.account_id || epicTokenInfoData.active !== true) {
         console.error('Failed to verify EPIC_AUTH token', epicTokenInfoData);
-        return c.json({ error: 'Failed to verify EPIC_AUTH token' }, 401);
+        return next();
       }
 
       c.set('epic', {
