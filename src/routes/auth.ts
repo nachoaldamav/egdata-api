@@ -3,6 +3,7 @@ import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { cors } from 'hono/cors';
 import * as jwt from 'jsonwebtoken';
+import { ObjectId } from 'mongodb';
 import { db } from '../db/index.js';
 
 interface EpicProfileResponse {
@@ -31,6 +32,8 @@ const getEpicAccount = async (accessToken: string, accountId: string) => {
 };
 
 const app = new Hono();
+
+app.use(cors());
 
 interface EpicTokenInfo {
   active: boolean;
@@ -189,8 +192,6 @@ export const epicInfo = createMiddleware<EpicAuthMiddleware>(
   }
 );
 
-app.use(cors());
-
 app.get('/', epic, async (c) => {
   const epic = c.var.epic;
 
@@ -286,6 +287,337 @@ app.post('/avatar', epic, async (c) => {
   );
 
   return c.json(responseData.result);
+});
+
+app.post('/persist', epic, async (c) => {
+  const epicVar = c.var.epic;
+
+  if (!epicVar || !epicVar.account_id) {
+    console.error('Missing EPIC_ACCOUNT_ID', epicVar);
+    return c.json({ error: 'Missing EPIC_ACCOUNT_ID' }, 401);
+  }
+
+  const body = await c.req.json();
+
+  const { refreshToken } = body;
+
+  const decoded = jwt.decode(refreshToken) as {
+    jti: string;
+  };
+
+  const tokenId = decoded.jti;
+
+  if (!refreshToken || !tokenId) {
+    console.error('Malformed request');
+    return c.json({ error: 'Malformed request' }, 400);
+  }
+
+  const accessTokenIntrospection = await fetch(
+    'https://api.epicgames.dev/epic/oauth/v2/tokenInfo',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        token: epicVar.access_token,
+      }),
+    }
+  ).then(
+    (r) =>
+      r.json() as Promise<{
+        active: boolean;
+        scope: string;
+        token_type: string;
+        expires_in: number;
+        expires_at: string;
+        account_id: string;
+        client_id: string;
+        application_id: string;
+      }>
+  );
+
+  const refreshTokenIntrospection = await fetch(
+    'https://api.epicgames.dev/epic/oauth/v2/tokenInfo',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        token: refreshToken,
+      }),
+    }
+  ).then(
+    (r) =>
+      r.json() as Promise<{
+        active: boolean;
+        scope: string;
+        token_type: string;
+        expires_in: number;
+        expires_at: string;
+        account_id: string;
+        client_id: string;
+        application_id: string;
+      }>
+  );
+
+  if (!accessTokenIntrospection.active || !refreshTokenIntrospection.active) {
+    console.error('Invalid tokens');
+    return c.json({ error: 'Invalid tokens' }, 401);
+  }
+
+  if (
+    accessTokenIntrospection.account_id !== refreshTokenIntrospection.account_id
+  ) {
+    console.error('Tokens are not for the same account');
+    return c.json({ error: 'Tokens are not for the same account' }, 401);
+  }
+
+  const entry = await db.db.collection('tokens').updateOne(
+    {
+      tokenId,
+    },
+    {
+      $set: {
+        accessToken: epicVar.access_token,
+        refreshToken: refreshToken,
+        expiresAt: new Date(
+          Date.now() + accessTokenIntrospection.expires_in * 1000
+        ),
+        refreshExpiresAt: new Date(
+          Date.now() + refreshTokenIntrospection.expires_in * 1000
+        ),
+        accountId: epicVar.account_id,
+      },
+    },
+    {
+      upsert: true,
+    }
+  );
+
+  return c.json(
+    {
+      id: entry.upsertedId,
+      status: 'ok',
+    },
+    200
+  );
+});
+
+app.get('/refresh', async (c) => {
+  // Decode JWT token from authorization header manually as the tokens is probably expired
+  const authorization = c.req.header('Authorization');
+
+  if (!authorization) {
+    console.error('Missing authorization header');
+    return c.json({ error: 'Missing authorization header' }, 401);
+  }
+
+  const authToken = authorization.replace('Bearer ', '');
+
+  if (!authToken) {
+    console.error('Missing token');
+    return c.json({ error: 'Missing token' }, 401);
+  }
+
+  const decoded = jwt.decode(authToken) as {
+    sub: string;
+  };
+
+  if (!decoded || !decoded.sub) {
+    console.error('Invalid token');
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+
+  const id = c.req.query('id');
+
+  if (!id) {
+    console.error('Missing id parameter');
+    return c.json({ error: 'Missing id parameter' }, 400);
+  }
+
+  let token = await db.db.collection('tokens').findOne({
+    _id: new ObjectId(id),
+    accountId: decoded.sub,
+  });
+
+  if (!token) {
+    console.error('Token not found');
+    return c.json({ error: 'Token not found' }, 404);
+  }
+
+  let expired = false;
+
+  // Check if the token is expired, if so, refresh it
+  if (token.expiresAt < new Date()) {
+    expired = true;
+    const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
+    url.searchParams.append('grant_type', 'refresh_token');
+    url.searchParams.append('refresh_token', token.refreshToken);
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        token: token.refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to refresh token', await response.json());
+      return c.json({ error: 'Failed to refresh token' }, 401);
+    }
+
+    const responseData = (await response.json()) as {
+      access_token: string;
+      refresh_token: string;
+      refresh_expires_at: string;
+      expires_at: string;
+    };
+
+    await db.db.collection('tokens').updateOne(
+      {
+        _id: new ObjectId(id),
+      },
+      {
+        $set: {
+          accessToken: responseData.access_token,
+          refreshToken: responseData.refresh_token,
+          expiresAt: new Date(responseData.expires_at),
+          refreshExpiresAt: new Date(responseData.refresh_expires_at),
+        },
+      },
+      {
+        upsert: true,
+      }
+    );
+  }
+
+  if (expired) {
+    token = await db.db.collection('tokens').findOne({
+      _id: new ObjectId(id),
+    });
+  }
+
+  return c.json(
+    {
+      accessToken: token?.accessToken,
+      refreshToken: token?.refreshToken,
+      expiresAt: token?.expiresAt,
+      refreshExpiresAt: token?.refreshExpiresAt,
+    },
+    200
+  );
+});
+
+app.patch('/refresh', async (c) => {
+  // Get the authorization header and compare it to 'JWT_SECRET' env variable
+  const authorization = c.req.header('Authorization');
+
+  if (!authorization) {
+    console.error('Missing authorization header');
+    return c.json({ error: 'Missing authorization header' }, 401);
+  }
+
+  const token = authorization.replace('Bearer ', '');
+
+  if (!token) {
+    console.error('Missing token');
+    return c.json({ error: 'Missing token' }, 401);
+  }
+
+  if (token !== process.env.JWT_SECRET) {
+    console.error('Invalid token');
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+
+  // Refresh tokens that are expired or about to expire (within 10 minutes)
+  const tokens = await db.db
+    .collection('tokens')
+    .find({
+      expiresAt: { $lt: new Date() },
+      refreshExpiresAt: { $lt: new Date(Date.now() + 10 * 60 * 1000) },
+    })
+    .toArray();
+
+  for (const token of tokens) {
+    try {
+      const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
+      url.searchParams.append('grant_type', 'refresh_token');
+      url.searchParams.append('refresh_token', token.refreshToken);
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          token: token.refreshToken,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to refresh token', await response.json());
+        continue;
+      }
+
+      const responseData = (await response.json()) as {
+        access_token: string;
+        refresh_token: string;
+        refresh_expires_at: string;
+        expires_at: string;
+      };
+
+      const expiresAt = new Date(responseData.expires_at);
+      const refreshExpiresAt = new Date(responseData.refresh_expires_at);
+
+      await db.db.collection('tokens').updateOne(
+        {
+          tokenId: token.tokenId,
+        },
+        {
+          $set: {
+            accessToken: responseData.access_token,
+            refreshToken: responseData.refresh_token,
+            expiresAt,
+            refreshExpiresAt,
+          },
+        },
+        {
+          upsert: false,
+        }
+      );
+    } catch (err) {
+      // Revoke the token and delete it from the database
+      const url = new URL('https://api.epicgames.dev/epic/oauth/v2/revoke');
+      url.searchParams.append('token', token.refreshToken);
+      await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          token: token.refreshToken,
+        }),
+      }).catch((err) => {
+        console.error('Failed to revoke token', err);
+      });
+
+      await db.db.collection('tokens').deleteOne({
+        tokenId: token.tokenId,
+      });
+    }
+  }
+
+  return c.json(
+    {
+      status: 'ok',
+    },
+    200
+  );
 });
 
 export default app;
