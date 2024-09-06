@@ -294,7 +294,7 @@ app.get("/:id/rare-achievements", async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:rare`;
+  const cacheKey = `epic-profile:${id}:rare-achievements`;
 
   const cached = await client.get(cacheKey);
 
