@@ -9,7 +9,7 @@ import { Resvg } from "@resvg/resvg-js";
 import { db } from "../db/index.js";
 import { Sandbox } from "../db/schemas/sandboxes.js";
 import { Offer } from "../db/schemas/offer.js";
-import { AchievementSet } from "../db/schemas/achievements.js";
+import { AchievementSet, AchievementType } from "../db/schemas/achievements.js";
 
 export interface PlayerProductAchievements {
   _id: Id;
@@ -281,6 +281,101 @@ app.get("/:id/achievements/:sandboxId", async (c) => {
   return c.json({
     playerAchievements,
     sandboxAchievements,
+  });
+});
+
+app.get("/:id/rare-achievements", async (c) => {
+  const { id } = c.req.param();
+
+  if (!id) {
+    c.status(400);
+    return c.json({
+      message: "Missing id parameter",
+    });
+  }
+
+  const cacheKey = `epic-profile:${id}:rare`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), {
+      headers: {
+        "Cache-Control": "public, max-age=60",
+      },
+    });
+  }
+
+  // Get all the achievements for the player
+  const playerAchievements = await db.db
+    .collection("player-achievements")
+    .find<PlayerProductAchievements>({
+      epicAccountId: id,
+    })
+    .toArray();
+
+  const achievementsSetsIds = playerAchievements.flatMap((p) =>
+    p.achievementSets.map((a) => a.achievementSetId),
+  );
+
+  const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
+
+  const sandboxAchievements = await AchievementSet.find({
+    achievementSetId: {
+      $in: dedupedAchievementsSets,
+    },
+  });
+
+  // Extract, inject achievementSetId, and flatten all achievements
+  const allAchievements = sandboxAchievements.flatMap((set) =>
+    set.achievements.map((achievement) => ({
+      ...achievement.toObject(),
+      achievementSetId: set.achievementSetId, // Inject achievementSetId
+    })),
+  );
+
+  // Sort by rarity (completedPercent)
+  const sortedAchievements = allAchievements.sort(
+    (a, b) => a.completedPercent - b.completedPercent,
+  );
+
+  const allPlayerAchievements = playerAchievements.flatMap(
+    (p) => p.playerAchievements,
+  );
+
+  const result: (AchievementType & {
+    unlocked: boolean;
+    unlockDate: string;
+  })[] = [];
+
+  for (const achievement of sortedAchievements) {
+    const playerAchievement = allPlayerAchievements.find(
+      (p) =>
+        p.playerAchievement.achievementName === achievement.name &&
+        p.playerAchievement.achievementSetId === achievement.achievementSetId,
+    );
+
+    if (!playerAchievement) {
+      continue;
+    }
+
+    result.push({
+      ...achievement,
+      unlocked: playerAchievement.playerAchievement.unlocked,
+      unlockDate: playerAchievement.playerAchievement.unlockDate,
+    });
+  }
+
+  const response = result.filter((a) => a.unlocked).slice(0, 25);
+
+  await client.set(cacheKey, JSON.stringify(response), {
+    EX: 3600,
+  });
+
+  return c.json(response, {
+    headers: {
+      "Cache-Control": "public, max-age=60",
+    },
   });
 });
 
