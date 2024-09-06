@@ -69,15 +69,15 @@ app.get("/:id", async (c) => {
 
   const cacheKey = `epic-profile:${id}:v0.2`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    return c.json(JSON.parse(cached), {
-      headers: {
-        "Cache-Control": "public, max-age=60",
-      },
-    });
-  }
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), {
+  //     headers: {
+  //       "Cache-Control": "public, max-age=60",
+  //     },
+  //   });
+  // }
 
   try {
     const profile = await epicStoreClient.getUser(id);
@@ -175,6 +175,7 @@ app.get("/:id", async (c) => {
           medium: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.medium,
           large: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.large,
         },
+        linkedAccounts: dbProfile?.linkedAccounts,
       };
 
       await client.set(cacheKey, JSON.stringify(result), {
@@ -198,6 +199,7 @@ app.get("/:id", async (c) => {
         medium: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.medium,
         large: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.large,
       },
+      linkedAccounts: dbProfile?.linkedAccounts,
     };
 
     await client.set(cacheKey, JSON.stringify(result), {
