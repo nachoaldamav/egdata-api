@@ -326,11 +326,12 @@ app.get("/:id/rare-achievements", async (c) => {
     },
   });
 
-  // Extract, inject achievementSetId, and flatten all achievements
+  // Extract, inject achievementSetId and sandboxId, and flatten all achievements
   const allAchievements = sandboxAchievements.flatMap((set) =>
     set.achievements.map((achievement) => ({
       ...achievement.toObject(),
       achievementSetId: set.achievementSetId, // Inject achievementSetId
+      sandboxId: set.sandboxId, // Inject sandboxId
     })),
   );
 
@@ -346,6 +347,7 @@ app.get("/:id/rare-achievements", async (c) => {
   const result: (AchievementType & {
     unlocked: boolean;
     unlockDate: string;
+    sandboxId: string; // Include sandboxId type in the result
   })[] = [];
 
   for (const achievement of sortedAchievements) {
@@ -368,11 +370,29 @@ app.get("/:id/rare-achievements", async (c) => {
 
   const response = result.filter((a) => a.unlocked).slice(0, 25);
 
-  await client.set(cacheKey, JSON.stringify(response), {
+  const offers = await Offer.find({
+    namespace: {
+      $in: response.map((r) => r.sandboxId),
+    },
+    offerType: ["BASE_GAME", "DLC"],
+    prePurchase: { $ne: true },
+  });
+
+  const selectedAchievements = response.map((r) => {
+    const offer = offers
+      .sort((a, b) => (a.offerType === "BASE_GAME" ? -1 : 1))
+      .find((o) => o.namespace === r.sandboxId);
+    return {
+      ...r,
+      offer: offer ?? null,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(selectedAchievements), {
     EX: 3600,
   });
 
-  return c.json(response, {
+  return c.json(selectedAchievements, {
     headers: {
       "Cache-Control": "public, max-age=60",
     },
