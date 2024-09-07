@@ -551,19 +551,25 @@ app.patch('/refresh', async (c) => {
     })
     .toArray();
 
+  const clientId = process.env.EPIC_CLIENT_ID;
+  const clientSecret = process.env.EPIC_CLIENT_SECRET;
+
   for (const token of tokens) {
     try {
       const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
-      url.searchParams.append('grant_type', 'refresh_token');
-      url.searchParams.append('refresh_token', token.refreshToken);
 
       const response = await fetch(url.toString(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Basic ${Buffer.from(
+            `${clientId}:${clientSecret}`
+          ).toString('base64')}`,
         },
         body: new URLSearchParams({
-          token: token.refreshToken,
+          grant_type: 'refresh_token',
+          refresh_token: token.refreshToken,
+          scope: 'basic_profile',
         }),
       });
 
