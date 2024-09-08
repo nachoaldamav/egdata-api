@@ -555,6 +555,16 @@ app.patch('/refresh', async (c) => {
   const clientSecret = process.env.EPIC_CLIENT_SECRET;
 
   for (const token of tokens) {
+    console.log('Refreshing token', token.tokenId);
+
+    if (token.refreshExpiresAt < new Date()) {
+      console.log('Refresh token expired, removing from DB');
+      await db.db.collection('tokens').deleteOne({
+        tokenId: token.tokenId,
+      });
+      continue;
+    }
+
     try {
       const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
 
