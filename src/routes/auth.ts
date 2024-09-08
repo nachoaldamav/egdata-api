@@ -575,6 +575,12 @@ app.patch('/refresh', async (c) => {
 
       if (!response.ok) {
         console.error('Failed to refresh token', await response.json());
+
+        // Remove the token from the DB
+        await db.db.collection('tokens').deleteOne({
+          tokenId: token.tokenId,
+        });
+
         continue;
       }
 
