@@ -424,15 +424,23 @@ app.get('/refresh', async (c) => {
   const decoded = jwt.decode(authToken, {}) as {
     sub: string;
     iss: string;
+    aud: string;
   };
 
   if (!decoded || !decoded.sub || !decoded.iss) {
-    console.error('Invalid token');
+    console.error('Invalid token', decoded);
     return c.json({ error: 'Invalid token' }, 401);
   }
 
   if (!decoded.iss.startsWith('https://api.epicgames.dev/epic/')) {
     console.error('Token issuer invalid', decoded.iss);
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+
+  const aud = decoded.aud;
+
+  if (aud !== process.env.EPIC_CLIENT_ID) {
+    console.error('Client issuer invalid', aud);
     return c.json({ error: 'Invalid token' }, 401);
   }
 
