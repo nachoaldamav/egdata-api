@@ -119,8 +119,6 @@ app.get("/:id", async (c) => {
       .toArray();
 
     if (savedPlayerAchievements) {
-      console.log(`Found ${savedPlayerAchievements.length} saved achievements`);
-
       const achievements: AchievementsSummary[] = [];
 
       await Promise.all(
@@ -146,7 +144,6 @@ app.get("/:id", async (c) => {
           ]);
 
           if (!product || !offer) {
-            console.error("Product or offer not found", entry.sandboxId);
             return;
           }
 
@@ -396,6 +393,76 @@ app.get("/:id/rare-achievements", async (c) => {
       offer: offer ?? null,
     };
   });
+
+  await client.set(cacheKey, JSON.stringify(selectedAchievements), {
+    EX: 3600,
+  });
+
+  return c.json(selectedAchievements, {
+    headers: {
+      "Cache-Control": "public, max-age=60",
+    },
+  });
+});
+
+app.get("/:id/rare-achievements/:sandboxId", async (c) => {
+  const { id, sandboxId } = c.req.param();
+
+  if (!id || !sandboxId) {
+    c.status(400);
+    return c.json({
+      message: "Missing id or sandboxId parameter",
+    });
+  }
+
+  const cacheKey = `epic-profile:${id}:${sandboxId}:rare-achievements`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), {
+      headers: {
+        "Cache-Control": "public, max-age=60",
+      },
+    });
+  }
+
+  // Get all the achievements for the player
+  const playerAchievements = await db.db
+    .collection("player-achievements")
+    .find<PlayerProductAchievements>({
+      epicAccountId: id,
+      sandboxId: sandboxId,
+    })
+    .toArray();
+
+  const achievementsSetsIds = playerAchievements.flatMap((p) =>
+    p.achievementSets.map((a) => a.achievementSetId),
+  );
+
+  const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
+
+  const sandboxAchievements = await AchievementSet.find({
+    achievementSetId: {
+      $in: dedupedAchievementsSets,
+    },
+  });
+
+  // Extract, inject achievementSetId and sandboxId, and flatten all achievements
+  const allAchievements = sandboxAchievements.flatMap((set) =>
+    set.achievements.map((achievement) => ({
+      ...achievement.toObject(),
+      achievementSetId: set.achievementSetId, // Inject achievementSetId
+      sandboxId: set.sandboxId, // Inject sandboxId
+    })),
+  );
+
+  // Sort by rarity (completedPercent)
+  const sortedAchievements = allAchievements.sort(
+    (a, b) => a.completedPercent - b.completedPercent,
+  );
+
+  const selectedAchievements = sortedAchievements.slice(0, 25);
 
   await client.set(cacheKey, JSON.stringify(selectedAchievements), {
     EX: 3600,
