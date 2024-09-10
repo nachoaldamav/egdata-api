@@ -462,7 +462,7 @@ app.get("/:id/rare-achievements/:sandboxId", async (c) => {
     (a, b) => a.completedPercent - b.completedPercent,
   );
 
-  const selectedAchievements = sortedAchievements.slice(0, 25);
+  const selectedAchievements = sortedAchievements.slice(0, 3);
 
   await client.set(cacheKey, JSON.stringify(selectedAchievements), {
     EX: 3600,
