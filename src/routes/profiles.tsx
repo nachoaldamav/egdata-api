@@ -415,7 +415,7 @@ app.get("/:id/rare-achievements/:sandboxId", async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:${sandboxId}:rare-achievements`;
+  const cacheKey = `epic-profile:${id}:${sandboxId}:rare-achievements:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -454,13 +454,31 @@ app.get("/:id/rare-achievements/:sandboxId", async (c) => {
       ...achievement.toObject(),
       achievementSetId: set.achievementSetId, // Inject achievementSetId
       sandboxId: set.sandboxId, // Inject sandboxId
+      unlocked: playerAchievements
+        .find((p) =>
+          p.playerAchievements.some(
+            (pa) => pa.playerAchievement.achievementName === achievement.name,
+          ),
+        )
+        ?.playerAchievements.find(
+          (pa) => pa.playerAchievement.achievementName === achievement.name,
+        )?.playerAchievement.unlocked,
+      unlockDate: playerAchievements
+        .find((p) =>
+          p.playerAchievements.some(
+            (pa) => pa.playerAchievement.achievementName === achievement.name,
+          ),
+        )
+        ?.playerAchievements.find(
+          (pa) => pa.playerAchievement.achievementName === achievement.name,
+        )?.playerAchievement.unlockDate,
     })),
   );
 
   // Sort by rarity (completedPercent)
-  const sortedAchievements = allAchievements.sort(
-    (a, b) => a.completedPercent - b.completedPercent,
-  );
+  const sortedAchievements = allAchievements
+    .filter((a) => a.unlocked)
+    .sort((a, b) => a.completedPercent - b.completedPercent);
 
   const selectedAchievements = sortedAchievements.slice(0, 3);
 
