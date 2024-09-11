@@ -439,7 +439,10 @@ app.get('/refresh', async (c) => {
 
   const aud = decoded.aud;
 
-  if (aud !== process.env.EPIC_CLIENT_ID) {
+  const clientId = process.env.EPIC_CLIENT_ID;
+  const clientSecret = process.env.EPIC_CLIENT_SECRET;
+
+  if (aud !== clientId) {
     console.error('Client issuer invalid', aud);
     return c.json({ error: 'Invalid token' }, 401);
   }
@@ -467,16 +470,19 @@ app.get('/refresh', async (c) => {
   if (token.expiresAt < new Date()) {
     expired = true;
     const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
-    url.searchParams.append('grant_type', 'refresh_token');
-    url.searchParams.append('refresh_token', token.refreshToken);
 
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${Buffer.from(
+          `${clientId}:${clientSecret}`
+        ).toString('base64')}`,
       },
       body: new URLSearchParams({
-        token: token.refreshToken,
+        grant_type: 'refresh_token',
+        refresh_token: token.refreshToken,
+        scope: 'basic_profile',
       }),
     });
 
