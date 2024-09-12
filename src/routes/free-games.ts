@@ -1,28 +1,29 @@
-import { Hono } from "hono";
-import { FreeGames } from "../db/schemas/freegames";
-import { Offer } from "../db/schemas/offer";
-import { orderOffersObject } from "../utils/order-offers-object";
-import { PriceEngine } from "../db/schemas/price-engine";
-import { regions } from "../utils/countries";
-import { getCookie } from "hono/cookie";
+import { Hono } from 'hono';
+import { FreeGames } from '../db/schemas/freegames.js';
+import { Offer } from '../db/schemas/offer.js';
+import { orderOffersObject } from '../utils/order-offers-object.js';
+import { PriceEngine } from '../db/schemas/price-engine.js';
+import { regions } from '../utils/countries.js';
+import { getCookie } from 'hono/cookie';
+import client from '../clients/redis.js';
 
 const app = new Hono();
 
-app.get("/", async (c) => {
-  const country = c.req.query("country");
-  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
+app.get('/', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
-  const selectedCountry = country ?? cookieCountry ?? "US";
+  const selectedCountry = country ?? cookieCountry ?? 'US';
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry),
+    regions[r].countries.includes(selectedCountry)
   );
 
   if (!region) {
     c.status(404);
     return c.json({
-      message: "Country not found",
+      message: 'Country not found',
     });
   }
 
@@ -35,7 +36,7 @@ app.get("/", async (c) => {
       sort: {
         endDate: 1,
       },
-    },
+    }
   );
 
   const result = await Promise.all(
@@ -53,10 +54,10 @@ app.get("/", async (c) => {
         }),
       ]);
 
-      const offer = offerData.status === "fulfilled" ? offerData.value : null;
-      const price = priceData.status === "fulfilled" ? priceData.value : null;
+      const offer = offerData.status === 'fulfilled' ? offerData.value : null;
+      const price = priceData.status === 'fulfilled' ? priceData.value : null;
       const historical =
-        historicalData.status === "fulfilled" ? historicalData.value : [];
+        historicalData.status === 'fulfilled' ? historicalData.value : [];
 
       if (!offer) {
         return {
@@ -69,36 +70,91 @@ app.get("/", async (c) => {
         giveaway: { ...game.toObject(), historical },
         price: price ?? null,
       };
-    }),
+    })
   );
 
   return c.json(result, 200, {
-    "Cache-Control": "private, max-age=0",
+    'Cache-Control': 'private, max-age=0',
   });
 });
 
-app.get("/history", async (c) => {
+app.get('/history', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 25);
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `giveaways-history:${region}:${page}:${limit}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
   const freeGames = await FreeGames.find({}, null, {
     sort: {
       endDate: -1,
     },
+    limit,
+    skip,
   });
+
+  const [offersData, pricesData] = await Promise.allSettled([
+    Offer.find({
+      id: { $in: freeGames.map((g) => g.id) },
+    }),
+    PriceEngine.find({
+      offerId: { $in: freeGames.map((g) => g.id) },
+      region,
+    }),
+  ]);
+
+  const offers = offersData.status === 'fulfilled' ? offersData.value : [];
+  const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
 
   const result = await Promise.all(
     freeGames.map(async (game) => {
-      const offer = await Offer.findOne({
-        id: game.id,
-      });
+      const offer = offers.find((o) => o.id === game.id);
+      const price = prices.find((p) => p.offerId === game.id);
+
+      if (!offer) {
+        return {
+          giveaway: game,
+        };
+      }
 
       return {
-        title: offer?.title ?? "Unknown",
+        ...orderOffersObject(offer?.toObject()),
+        price: price ?? null,
         giveaway: game,
       };
-    }),
+    })
   );
 
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
   return c.json(result, 200, {
-    "Cache-Control": "private, max-age=0",
+    'Cache-Control': 'private, max-age=0',
   });
 });
 

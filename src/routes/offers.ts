@@ -1495,7 +1495,7 @@ app.get('/:id/suggestions', async (c) => {
     });
   }
 
-  const cacheKey = `suggestions:${id}`;
+  const cacheKey = `suggestions:${id}:${region}`;
 
   const cached = await client.get(cacheKey);
 
