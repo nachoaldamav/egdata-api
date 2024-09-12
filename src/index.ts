@@ -1378,6 +1378,16 @@ app.get('/offer-by-slug/:slug', async (c) => {
 });
 
 app.get('/active-sales', async (c) => {
+  const cacheKey = 'active-sales';
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
   const tags = await TagModel.find(
     {
       name: { $regex: 'Sale', $options: 'i' },
@@ -1391,7 +1401,38 @@ app.get('/active-sales', async (c) => {
     }
   );
 
-  const result = tags.map((t) => t.toObject());
+  const result: {
+    id: string;
+    name: string;
+    offers: OfferType[];
+  }[] = [];
+
+  await Promise.all(
+    tags.map(async (t) => {
+      const offers = await Offer.find(
+        {
+          tags: { $elemMatch: { id: t.id } },
+        },
+        undefined,
+        {
+          limit: 3,
+          sort: {
+            lastModifiedDate: -1,
+          },
+        }
+      );
+
+      result.push({
+        id: t.id,
+        name: t.name,
+        offers: offers.map((o) => orderOffersObject(o)),
+      });
+    })
+  );
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
 
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',
