@@ -1378,6 +1378,27 @@ app.get('/offer-by-slug/:slug', async (c) => {
   });
 });
 
+app.get('/active-sales', async (c) => {
+  const tags = await TagModel.find(
+    {
+      name: { $regex: 'Sale', $options: 'i' },
+      referenceCount: { $gt: 0 },
+    },
+    undefined,
+    {
+      sort: {
+        updated: -1,
+      },
+    }
+  );
+
+  const result = tags.map((t) => t.toObject());
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 app.route('/sandboxes', SandboxRoute);
 
 app.route('/search', SearchRoute);
