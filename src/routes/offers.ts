@@ -783,7 +783,7 @@ app.get('/:id', async (c) => {
 
   const start = new Date();
 
-  const cacheKey = `offer:${id}`;
+  const cacheKey = `offer:${id}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -813,7 +813,7 @@ app.get('/:id', async (c) => {
 
   await client.set(cacheKey, JSON.stringify(result), {
     // 1 day
-    EX: 86400,
+    EX: 60,
   });
 
   return c.json(result, 200, {

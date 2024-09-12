@@ -4,7 +4,6 @@ import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
-import { logger } from 'hono/logger';
 import { db } from './db/index.js';
 import { Offer, type OfferType } from './db/schemas/offer.js';
 import { Item } from './db/schemas/item.js';
