@@ -502,7 +502,7 @@ app.get("/:id/achievements", async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:achievements:${limit}:${page}`;
+  const cacheKey = `epic-profile:${id}:achievements:${limit}:${page}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -537,10 +537,10 @@ app.get("/:id/achievements", async (c) => {
           },
         },
         {
-          $limit: limit,
+          $skip: skip,
         },
         {
-          $skip: skip,
+          $limit: limit,
         },
         {
           $lookup: {
