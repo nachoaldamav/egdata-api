@@ -1390,7 +1390,8 @@ app.get('/active-sales', async (c) => {
 
   const tags = await TagModel.find(
     {
-      name: { $regex: 'Sale', $options: 'i' },
+      // To contain "Sale", "Savings" or "Promotion" case-insensitive
+      name: { $regex: '(Sale|Savings|Promotion)', $options: 'i' },
       referenceCount: { $gt: 0 },
     },
     undefined,
