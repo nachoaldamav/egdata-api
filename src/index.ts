@@ -1393,6 +1393,8 @@ app.get('/active-sales', async (c) => {
       // To contain "Sale", "Savings" or "Promotion" case-insensitive
       name: { $regex: '(Sale|Savings|Promotion)', $options: 'i' },
       referenceCount: { $gt: 0 },
+      // Ignore IDs 33639
+      id: { $nin: [33639] },
     },
     undefined,
     {
