@@ -769,6 +769,88 @@ app.get('/latest-achievements', async (c) => {
   });
 });
 
+// Latest games released
+app.get('/latest-released', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
+  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+  const skip = (page - 1) * limit;
+
+  const cacheKey = `latest-released:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offers = await Offer.find(
+    {
+      effectiveDate: {
+        $lte: new Date(),
+      },
+      offerType: {
+        $in: ['BASE_GAME', 'DLC'],
+      },
+    },
+    undefined,
+    {
+      sort: {
+        effectiveDate: -1,
+      },
+      limit,
+      skip,
+    }
+  );
+
+  const prices = await PriceEngine.find({
+    offerId: { $in: offers.map((o) => o.id) },
+    region,
+  });
+
+  const result = {
+    elements: offers.map((o) => {
+      const price = prices.find((p) => p.offerId === o.id);
+      return {
+        ...orderOffersObject(o),
+        price: price ?? null,
+      };
+    }),
+    limit,
+    start: skip,
+    page,
+    count: await Offer.countDocuments({
+      releaseDate: { $ne: null },
+      offerType: { $in: ['BASE_GAME'] },
+    }),
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 app.get('/:id', async (c) => {
   const { id } = c.req.param();
 
