@@ -1167,7 +1167,7 @@ app.get('/:id/regional-price', async (c) => {
       });
     }
 
-    const cacheKey = `regional-price:${id}:${region}:v0.1`;
+    const cacheKey = `regional-price:${id}:${region}:v0.2`;
     const cached = await client.get(cacheKey);
 
     if (cached) {
@@ -1181,7 +1181,7 @@ app.get('/:id/regional-price', async (c) => {
     const releaseDate = offer?.releaseDate ?? (offer?.effectiveDate as Date);
     const currentDate = new Date();
 
-    let priceQuery = { offerId: id, region } as any;
+    let priceQuery = { offerId: id, region } as Record<string, unknown>;
 
     if (releaseDate && releaseDate <= currentDate) {
       priceQuery.updatedAt = { $gte: releaseDate, $lte: currentDate };
@@ -1198,6 +1198,7 @@ app.get('/:id/regional-price', async (c) => {
       price = await PriceEngineHistorical.find(
         {
           offerId: id,
+          region,
         },
         undefined,
         {
