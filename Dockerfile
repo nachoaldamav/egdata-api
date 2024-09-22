@@ -16,7 +16,7 @@ RUN curl -fsSL https://get.pnpm.io/install.sh | bash -
 WORKDIR /app
 
 # Copy only package files for caching
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 
 # Install production dependencies
 FROM base AS prod-deps
