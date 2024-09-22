@@ -20,6 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.6",
     "meilisearch": "^0.41.0",
+    "mongodb": "^6.9.0",
     "mongoose": "8.5.2",
     "nanoid": "^5.0.7",
     "react": "^18.3.1",
