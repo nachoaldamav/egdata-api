@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y curl
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 # Set shell to bash
-SHELL ["/bin/bash", "-c"]
-RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
+ENV SHELL="/bin/bash"
+RUN curl -fsSL https://get.pnpm.io/install.sh | bash -
 
 # Set the working directory
 WORKDIR /app
