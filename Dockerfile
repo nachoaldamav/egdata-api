@@ -12,12 +12,13 @@ ENV PATH="$PNPM_HOME:$PATH"
 ENV SHELL="/bin/bash"
 RUN curl -fsSL https://get.pnpm.io/install.sh | bash -
 
+RUN pnpm env use --global lts
+
 COPY . /app
 WORKDIR /app
 
 # Install production dependencies
 FROM base AS prod-deps
-RUN pnpm env use --global lts
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
 FROM base AS build
