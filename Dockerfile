@@ -16,20 +16,16 @@ RUN curl -fsSL https://get.pnpm.io/install.sh | bash -
 WORKDIR /app
 
 # Copy only package files for caching
-COPY package.json pnpm-lock.yaml .npmrc ./
+COPY ./ ./
 
 # Install production dependencies
 FROM base AS prod-deps
 RUN pnpm env use --global lts
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
-# Create the final runtime image
-FROM base
+FROM base AS runtime
+COPY ./ ./
 COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=base /app/src ./src
 
-# Expose the application port
-EXPOSE 4000
-
-# Run the application using Bun
+# Start the server
 CMD ["bun", "run", "src/index.ts"]
