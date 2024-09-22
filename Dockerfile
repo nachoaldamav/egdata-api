@@ -1,35 +1,31 @@
+# Use Bun as the base image
 FROM oven/bun:1 AS base
-WORKDIR /usr/src/app
 
+# Install curl
+USER root
 RUN apt-get update && apt-get install -y curl
 
-# Set permissions for the bun user once, at the beginning
-RUN chown -R bun:bun /usr/src/app
+# Install pnpm
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
 
-# install dependencies into temp directory
-# this will cache them and speed up future builds
-FROM base AS install
-RUN mkdir -p /temp/dev
-COPY package.json bun.lockb /temp/dev/
-RUN cd /temp/dev && bun install --frozen-lockfile
+# Set the working directory
+WORKDIR /app
 
-# install with --production (exclude devDependencies)
-RUN mkdir -p /temp/prod
-COPY package.json bun.lockb /temp/prod/
-RUN cd /temp/prod && bun install --frozen-lockfile --production
+# Copy only package files for caching
+COPY package.json pnpm-lock.yaml ./
 
-# copy node_modules from temp directory
-# then copy all (non-ignored) project files into the image
-FROM base AS prerelease
-COPY --from=install --chown=bun:bun /temp/dev/node_modules node_modules
-COPY --chown=bun:bun . .
+# Install production dependencies
+FROM base AS prod-deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
-# copy production dependencies and source code into final image
-FROM base AS release
-COPY --from=install --chown=bun:bun /temp/prod/node_modules node_modules
-COPY --from=prerelease --chown=bun:bun /usr/src/app/ .
+# Create the final runtime image
+FROM base
+COPY --from=prod-deps /app/ ./
 
-# run the app
-USER bun
+# Expose the application port
 EXPOSE 4000
-ENTRYPOINT [ "bun", "run", "src/index.ts" ]
+
+# Run the application using Bun
+CMD ["bun", "run", "src/index.ts"]

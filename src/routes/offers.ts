@@ -1247,8 +1247,6 @@ app.get('/:id/regional-price', async (c) => {
 
   let priceQuery = { offerId: id } as any;
 
-  console.log('releaseDate', releaseDate);
-
   if (releaseDate && releaseDate <= currentDate) {
     priceQuery.updatedAt = { $gte: releaseDate };
   }
