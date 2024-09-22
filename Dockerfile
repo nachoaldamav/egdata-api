@@ -20,6 +20,7 @@ COPY package.json pnpm-lock.yaml ./
 
 # Install production dependencies
 FROM base AS prod-deps
+RUN pnpm env use --global lts
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
 # Create the final runtime image
