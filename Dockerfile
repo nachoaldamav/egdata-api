@@ -20,9 +20,12 @@ FROM base AS prod-deps
 RUN pnpm env use --global lts
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
-FROM base AS runtime
-COPY --from=base /app/ /app/
-COPY --from=prod-deps /app/node_modules ./app/node_modules
+FROM base AS build
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# RUN pnpm run build
 
+FROM base
+COPY --from=prod-deps /app/node_modules /app/node_modules
+COPY --from=build /app/src /app/src
 # Start the server
 CMD ["bun", "run", "src/index.ts"]
