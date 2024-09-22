@@ -25,7 +25,8 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-l
 
 # Create the final runtime image
 FROM base
-COPY --from=prod-deps /app/ ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=base /app/src ./src
 
 # Expose the application port
 EXPOSE 4000
