@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y curl
 # Install pnpm
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+# Set shell to bash
+SHELL ["/bin/bash", "-c"]
 RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
 
 # Set the working directory
