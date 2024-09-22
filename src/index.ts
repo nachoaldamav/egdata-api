@@ -1189,26 +1189,6 @@ app.options('/ping', async (c) => {
   return c.json({ message: 'pong' });
 });
 
-async function refreshChangelogIndex() {
-  console.log('Refreshing MeiliSearch index');
-  const changelogDocs = await Changelog.find({}, undefined, {
-    sort: {
-      timestamp: -1,
-    },
-  });
-
-  console.log(`Found ${changelogDocs.length} changelogs`);
-
-  const changelog = changelogDocs.map((c) => c.toObject());
-
-  console.log('Adding documents to MeiliSearch');
-  const index = meiliSearchClient.index('changelog');
-
-  await index.addDocuments(changelog, {
-    primaryKey: '_id',
-  });
-}
-
 const offerTypeRanks: {
   [key: string]: number;
 } = {
@@ -1233,8 +1213,43 @@ const offerTypeRanks: {
 
 const PAGE_SIZE = 500;
 
+async function refreshChangelogIndex() {
+  console.log('Refreshing MeiliSearch changelog index');
+  const index = meiliSearchClient.index('changelog');
+
+  let page = 0;
+  let totallogs = 0;
+  while (true) {
+    const logs = await Changelog.find({}, undefined, {
+      sort: {
+        timestamp: -1,
+      },
+      skip: page * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    });
+
+    if (logs.length === 0) break;
+
+    totallogs += logs.length;
+    console.log(
+      `Processing logs ${totallogs - logs.length + 1} to ${totallogs}`
+    );
+
+    await index.addDocuments(
+      logs.map((o) => o.toObject()),
+      {
+        primaryKey: '_id',
+      }
+    );
+
+    page++;
+  }
+
+  console.log(`Total logs processed: ${totallogs}`);
+}
+
 async function refreshOffersIndex() {
-  console.log('Refreshing MeiliSearch index');
+  console.log('Refreshing MeiliSearch offers index');
   const index = meiliSearchClient.index('offers');
 
   let page = 0;
@@ -1274,7 +1289,7 @@ async function refreshOffersIndex() {
 }
 
 async function refreshItemsIndex() {
-  console.log('Refreshing MeiliSearch index');
+  console.log('Refreshing MeiliSearch items index');
   const index = meiliSearchClient.index('items');
 
   let page = 0;
@@ -1309,7 +1324,7 @@ async function refreshItemsIndex() {
 }
 
 async function refreshSellersIndex() {
-  console.log('Refreshing MeiliSearch index');
+  console.log('Refreshing MeiliSearch sellers index');
   const index = meiliSearchClient.index('sellers');
 
   let page = 0;

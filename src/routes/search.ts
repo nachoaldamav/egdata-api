@@ -446,8 +446,8 @@ app.get('/changelog', async (c) => {
   } = c.req.query();
 
   // Parse the page and limit
-  const page = Math.max(parseInt(requestedPage, 10) || 1, 1);
-  const limit = Math.min(parseInt(requestedLimit, 10) || 10, 50);
+  const page = Math.max(Number.parseInt(requestedPage, 10) || 1, 1);
+  const limit = Math.min(Number.parseInt(requestedLimit, 10) || 10, 50);
 
   const changelogs = await meiliSearchClient.index('changelog').search<
     ChangelogType & {
