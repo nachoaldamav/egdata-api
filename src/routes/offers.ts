@@ -2729,9 +2729,17 @@ app.get('/:id/has-prepurchase', async (c) => {
     );
   }
 
+  const price = await PriceEngine.findOne({
+    offerId: prePurchaseOffer.id,
+    region,
+  });
+
   const result = {
     hasPrepurchase: true,
-    offer: orderOffersObject(prePurchaseOffer),
+    offer: {
+      ...orderOffersObject(prePurchaseOffer),
+      price: price ?? null,
+    },
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
