@@ -2595,9 +2595,6 @@ app.get('/:id/bundle', async (c) => {
   });
 });
 
-/**
- * Checks if the selected offer is part of 1 or multiple bundles
- */
 app.get('/:id/in-bundle', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
@@ -2751,9 +2748,6 @@ app.get('/:id/has-prepurchase', async (c) => {
   });
 });
 
-/**
- * Checks if the offer is a prepurchase offer of a regular one (opposite of has-prepurchase)
- */
 app.get('/:id/has-regular', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
