@@ -460,32 +460,34 @@ app.get('/changelog', async (c) => {
   });
 
   await Promise.all(
-    changelogs.hits.map(async (hit) => {
-      const type = hit.metadata.contextType;
-      const id = hit.metadata.contextId;
+    changelogs.hits
+      .filter((hit) => hit.metadata)
+      .map(async (hit) => {
+        const type = hit.metadata.contextType;
+        const id = hit.metadata.contextId;
 
-      if (type === 'offer') {
-        hit.document = await Offer.findOne({ id });
-      }
+        if (type === 'offer') {
+          hit.document = await Offer.findOne({ id });
+        }
 
-      if (type === 'item') {
-        hit.document = await Item.findOne({
-          id,
-        });
-      }
+        if (type === 'item') {
+          hit.document = await Item.findOne({
+            id,
+          });
+        }
 
-      if (type === 'asset') {
-        const asset = await Asset.findOne({
-          artifactId: id,
-        });
+        if (type === 'asset') {
+          const asset = await Asset.findOne({
+            artifactId: id,
+          });
 
-        hit.document = await Item.findOne({
-          id: asset?.itemId,
-        });
-      }
+          hit.document = await Item.findOne({
+            id: asset?.itemId,
+          });
+        }
 
-      return hit;
-    })
+        return hit;
+      })
   );
 
   // Return the changelogs
