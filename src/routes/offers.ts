@@ -2751,4 +2751,91 @@ app.get('/:id/has-prepurchase', async (c) => {
   });
 });
 
+/**
+ * Checks if the offer is a prepurchase offer of a regular one (opposite of has-prepurchase)
+ */
+app.get('/:id/has-regular', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `has-regular:${id}:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const { namespace } = offer;
+
+  const prePurchaseOffer = await Offer.findOne({
+    namespace,
+    offerType: 'BASE_GAME',
+    prePurchase: { $ne: true },
+    id: { $ne: id },
+  });
+
+  if (!prePurchaseOffer) {
+    await client.set(cacheKey, JSON.stringify(true), {
+      EX: 3600,
+    });
+    return c.json(
+      {
+        isPrepurchase: false,
+      },
+      200,
+      {
+        'Cache-Control': 'public, max-age=60',
+      }
+    );
+  }
+
+  const price = await PriceEngine.findOne({
+    offerId: prePurchaseOffer.id,
+    region,
+  });
+
+  const result = {
+    isPrepurchase: true,
+    offer: {
+      ...orderOffersObject(prePurchaseOffer),
+      price: price ?? null,
+    },
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 export default app;
