@@ -2667,4 +2667,80 @@ app.get('/:id/in-bundle', async (c) => {
   });
 });
 
+app.get('/:id/has-prepurchase', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `has-prepurchase:${id}:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const { namespace } = offer;
+
+  const prePurchaseOffer = await Offer.findOne({
+    namespace,
+    offerType: 'BASE_GAME',
+    prePurchase: true,
+    id: { $ne: id },
+  });
+
+  if (!prePurchaseOffer) {
+    await client.set(cacheKey, JSON.stringify(false), {
+      EX: 3600,
+    });
+    return c.json(
+      {
+        hasPrepurchase: false,
+      },
+      200,
+      {
+        'Cache-Control': 'public, max-age=60',
+      }
+    );
+  }
+
+  const result = {
+    hasPrepurchase: true,
+    offer: orderOffersObject(prePurchaseOffer),
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 export default app;
