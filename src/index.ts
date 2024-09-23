@@ -1373,6 +1373,30 @@ app.patch('/refresh-meilisearch', async (c) => {
   return c.json({ message: 'ok' });
 });
 
+app.patch('/refresh/changelog', async (c) => {
+  await refreshChangelogIndex();
+
+  return c.json({ message: 'ok' });
+});
+
+app.patch('/refresh/offers', async (c) => {
+  await refreshOffersIndex();
+
+  return c.json({ message: 'ok' });
+});
+
+app.patch('/refresh/items', async (c) => {
+  await refreshItemsIndex();
+
+  return c.json({ message: 'ok' });
+});
+
+app.patch('/refresh/sellers', async (c) => {
+  await refreshSellersIndex();
+
+  return c.json({ message: 'ok' });
+});
+
 app.get('/offer-by-slug/:slug', async (c) => {
   const { slug } = c.req.param();
 

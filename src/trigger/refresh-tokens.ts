@@ -6,24 +6,21 @@ export const refreshTokens = schedules.task({
   cron: '*/10 * * * *',
   run: async (payload, { ctx }) => {
     logger.log('Refreshing Epic Games tokens');
-    try {
-      const res = await axios.patch<{
-        ok: boolean;
-      }>('https://api.egdata.org/auth/refresh', {
-        headers: {
-          Authorization: `Bearer ${process.env.JWT_SECRET}`,
-        },
-      });
+    const res = await axios.patch<{
+      status: string;
+    }>('https://api.egdata.app/auth/refresh', {
+      headers: {
+        Authorization: `Bearer ${process.env.JWT_SECRET}`,
+      },
+    });
 
-      logger.debug(res);
+    logger.debug(JSON.stringify(res.data));
 
-      if (res.status === 200) {
-        logger.log('Epic Games tokens refreshed');
-      } else {
-        logger.error('Error refreshing Epic Games tokens', res.data);
-      }
-    } catch (err) {
-      logger.error('Error refreshing Epic Games tokens', err);
+    if (res.status === 200) {
+      logger.log('Epic Games tokens refreshed');
+    } else {
+      logger.error('Error refreshing Epic Games tokens', res.data);
+      throw new Error('Error refreshing Epic Games tokens');
     }
   },
 });
