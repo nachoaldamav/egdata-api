@@ -195,8 +195,24 @@ app.patch('/index', async (c) => {
 
     return {
       ...orderOffersObject(offer),
-      giveaway: g.toObject(),
+      giveaway: {
+        ...g.toObject(),
+        startTimestamp: new Date(g.startDate).getTime(),
+        endTimestamp: new Date(g.endDate).getTime(),
+      },
       price: price ?? null,
+      effectiveTimestamp: offer.effectiveDate
+        ? new Date(offer.effectiveDate).getTime()
+        : null,
+      creationTimestamp: offer.creationDate
+        ? new Date(offer.creationDate).getTime()
+        : null,
+      viewableTimestamp: offer.viewableDate
+        ? new Date(offer.viewableDate).getTime()
+        : null,
+      pcReleaseTimestamp: offer.pcReleaseDate
+        ? new Date(offer.pcReleaseDate).getTime()
+        : null,
     };
   });
 
