@@ -265,6 +265,7 @@ interface FreeGamesSearchQuery {
   limit?: string;
   page?: string;
   categories?: string[];
+  year?: string;
 }
 
 app.get('/search', async (c) => {
@@ -331,7 +332,17 @@ app.get('/search', async (c) => {
     } else if (query.sortBy === 'price') {
       sort = 'price.price.discountPrice';
     }
-    sort += `:${sortDir}`;
+  }
+
+  sort += `:${sortDir}`;
+
+  if (query.year) {
+    // Meilisearch does not support dates, so we need to convert to milliseconds
+    const startDate = new Date(`${query.year}-01-01`);
+    const endDate = new Date(`${query.year}-12-31`);
+
+    filters.push(`giveaway.startTimestamp >= ${startDate.getTime()}`);
+    filters.push(`giveaway.endTimestamp <= ${endDate.getTime()}`);
   }
 
   const result = await index.search(undefined, {
