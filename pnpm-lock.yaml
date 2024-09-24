@@ -30,11 +30,11 @@ importers:
         specifier: ^2.6.2
         version: 2.6.2
       '@trigger.dev/hono':
-        specifier: ^3.0.6
-        version: 3.0.6(@trigger.dev/sdk@3.0.6)(hono@4.5.0)
+        specifier: 3.0.7
+        version: 3.0.7(@trigger.dev/sdk@3.0.7)(hono@4.5.0)
       '@trigger.dev/sdk':
-        specifier: ^3.0.6
-        version: 3.0.6
+        specifier: 3.0.7
+        version: 3.0.7
       axios:
         specifier: 1.7.4
         version: 1.7.4
@@ -82,8 +82,8 @@ importers:
         specifier: 1.8.3
         version: 1.8.3
       '@trigger.dev/build':
-        specifier: ^3.0.6
-        version: 3.0.6(typescript@5.5.3)
+        specifier: 3.0.7
+        version: 3.0.7(typescript@5.5.3)
       '@types/bun':
         specifier: ^1.1.8
         version: 1.1.10
@@ -1361,23 +1361,23 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@trigger.dev/build@3.0.6':
-    resolution: {integrity: sha512-jSW6XDVoDdYdBoydG1XwPonh+PvJOwZp1im1zPLa5qqilRtGYNOh0bVtUilO+8hfojonsBNHyujz4kuvtseQcA==}
+  '@trigger.dev/build@3.0.7':
+    resolution: {integrity: sha512-I5HvZwx//Q12k/wb3LQDLbe5I7gd0qEUlqv2tKT/wCV7GaHN3wTu5JrTW70Q8Uu0M9TTxpGBuZbryLTkpofL8g==}
     engines: {node: '>=18.20.0'}
 
-  '@trigger.dev/core@3.0.6':
-    resolution: {integrity: sha512-NpRRF4WKuUpX40YHQyhlouAe4LYMU3Vm74SB3fnHU4tKoRGAgtAc8zLX1HwzaWxItK0l3DBlgXaxB14SJaB/gw==}
+  '@trigger.dev/core@3.0.7':
+    resolution: {integrity: sha512-3HfnAseLvGvCcK8zEdYiblESPiwfwfGdiWRXW84dtR2jCl5g8/e42STZ31qvg4J8+nHegCpTVfgIaV8iEpDZZA==}
     engines: {node: '>=18.20.0'}
 
-  '@trigger.dev/hono@3.0.6':
-    resolution: {integrity: sha512-rg8VExf9jV9aIUqgtuRIG7yrwGnZR1u1cfe2VK1N8HELm1zVPLu7HZ3GzgcjdosBzxDTCV/ihuMAtCPDMsVqlA==}
+  '@trigger.dev/hono@3.0.7':
+    resolution: {integrity: sha512-ZxOJaWuHGt4LwQ3Y7d+mOAITlw7SiOG/lTaHYvonWbv1ZYM5pT/qqNCvKIRRiMP4389RMRXHOZ6ZtKhSW2TEhA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       '@trigger.dev/sdk': ~2.3.0 || ^3.0.0
       hono: 3.x
 
-  '@trigger.dev/sdk@3.0.6':
-    resolution: {integrity: sha512-yqsRKWzSMaVJK1/LKVixyVQkkTbFBHL0Q3R+Be18qNGewoJFSf99dw04WlZfXi9FAEHBT1aErubMyCjrgUAoxA==}
+  '@trigger.dev/sdk@3.0.7':
+    resolution: {integrity: sha512-8ZQieOmibq4B6yl574G1zDJNfR34GcZXPG5hh0qpI9+CmTsGdnR8LMO68MJSiAooPWTcMqvZAL6ymIfUyP0+/g==}
     engines: {node: '>=18.20.0'}
 
   '@types/bun@1.1.10':
@@ -4082,9 +4082,9 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@trigger.dev/build@3.0.6(typescript@5.5.3)':
+  '@trigger.dev/build@3.0.7(typescript@5.5.3)':
     dependencies:
-      '@trigger.dev/core': 3.0.6
+      '@trigger.dev/core': 3.0.7
       pkg-types: 1.2.0
       tinyglobby: 0.2.6
       tsconfck: 3.1.3(typescript@5.5.3)
@@ -4094,7 +4094,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@trigger.dev/core@3.0.6':
+  '@trigger.dev/core@3.0.7':
     dependencies:
       '@google-cloud/precise-date': 4.0.0
       '@opentelemetry/api': 1.9.0
@@ -4120,17 +4120,17 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@trigger.dev/hono@3.0.6(@trigger.dev/sdk@3.0.6)(hono@4.5.0)':
+  '@trigger.dev/hono@3.0.7(@trigger.dev/sdk@3.0.7)(hono@4.5.0)':
     dependencies:
-      '@trigger.dev/sdk': 3.0.6
+      '@trigger.dev/sdk': 3.0.7
       hono: 4.5.0
 
-  '@trigger.dev/sdk@3.0.6':
+  '@trigger.dev/sdk@3.0.7':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.52.1
       '@opentelemetry/semantic-conventions': 1.25.1
-      '@trigger.dev/core': 3.0.6
+      '@trigger.dev/core': 3.0.7
       chalk: 5.3.0
       cronstrue: 2.50.0
       debug: 4.3.7

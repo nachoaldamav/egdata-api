@@ -5,6 +5,7 @@ const REFRESH_CHANGELOG_URL = 'https://api.egdata.app/refresh/changelog';
 const REFRESH_OFFERS_URL = 'https://api.egdata.app/refresh/offers';
 const REFRESH_ITEMS_URL = 'https://api.egdata.app/refresh/items';
 const REFRESH_SELLERS_URL = 'https://api.egdata.app/refresh/sellers';
+const REFRESH_FREE_GAMES_URL = 'https://api.egdata.app/free-games/index';
 
 export const refreshIndexes = schedules.task({
   id: 'refresh-indexes',

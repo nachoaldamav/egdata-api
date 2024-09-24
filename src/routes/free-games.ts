@@ -6,6 +6,7 @@ import { PriceEngine } from '../db/schemas/price-engine.js';
 import { regions } from '../utils/countries.js';
 import { getCookie } from 'hono/cookie';
 import client from '../clients/redis.js';
+import { meiliSearchClient } from '../clients/meilisearch.js';
 
 const app = new Hono();
 
@@ -156,6 +157,59 @@ app.get('/history', async (c) => {
   return c.json(result, 200, {
     'Cache-Control': 'private, max-age=0',
   });
+});
+
+app.patch('/index', async (c) => {
+  console.log('Refreshing MeiliSearch free games index');
+  const index = meiliSearchClient.index('free-games');
+  await index.deleteAllDocuments();
+
+  const giveaways = await FreeGames.find({}, undefined, {
+    sort: {
+      endDate: -1,
+    },
+  });
+
+  const [offersData, pricesData] = await Promise.allSettled([
+    Offer.find({
+      id: { $in: giveaways.map((g) => g.id) },
+    }),
+    PriceEngine.find({
+      offerId: { $in: giveaways.map((g) => g.id) },
+      region: 'US',
+    }),
+  ]);
+
+  const offers = offersData.status === 'fulfilled' ? offersData.value : [];
+  const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
+
+  const result = giveaways.map((g) => {
+    const offer = offers.find((o) => o.id === g.id);
+    const price = prices.find((p) => p.offerId === g.id);
+
+    if (!offer) {
+      return null;
+    }
+
+    return {
+      ...orderOffersObject(offer),
+      giveaway: g.toObject(),
+      price: price ?? null,
+    };
+  });
+
+  await index.addDocuments(
+    result
+      .filter((r) => r !== null)
+      .map((o) => {
+        return o;
+      }),
+    {
+      primaryKey: '_id',
+    }
+  );
+
+  return c.json({ message: 'ok' });
 });
 
 export default app;
