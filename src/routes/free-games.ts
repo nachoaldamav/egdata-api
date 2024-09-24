@@ -253,24 +253,32 @@ interface FreeGamesSearchQuery {
 app.get('/search', async (c) => {
   const query = c.req.query() as FreeGamesSearchQuery;
 
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
   const limit = Math.min(Number.parseInt(query.limit || '10'), 50);
   const page = Math.max(Number.parseInt(query.page || '1'), 1);
   const skip = (page - 1) * limit;
   let sort = query.sortBy || 'lastModifiedDate';
   const sortDir = query.sortDir || 'desc';
-  const dir = sortDir === 'asc' ? 1 : -1;
 
   const cacheKey = `free-games-search:${Buffer.from(
     JSON.stringify(query)
   ).toString('base64')}:${limit}:${page}`;
-
-  // const cached = await client.get(cacheKey);
-
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
 
   const start = new Date();
 
@@ -299,8 +307,6 @@ app.get('/search', async (c) => {
     sort += `:${sortDir}`;
   }
 
-  console.log(filters.join(' AND '));
-
   const result = await index.search(undefined, {
     limit,
     offset: skip,
@@ -309,8 +315,19 @@ app.get('/search', async (c) => {
     sort: [sort],
   });
 
+  const prices = await PriceEngine.find({
+    offerId: { $in: result.hits.map((h) => h.giveaway.id) },
+    region,
+  });
+
   const response = {
-    elements: result.hits,
+    elements: result.hits.map((h) => {
+      const price = prices.find((p) => p.offerId === h.giveaway.id);
+      return {
+        ...h,
+        price: price ?? null,
+      };
+    }),
     page,
     limit,
     total: result.estimatedTotalHits,
