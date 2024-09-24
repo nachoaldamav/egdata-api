@@ -280,6 +280,14 @@ app.get('/search', async (c) => {
     JSON.stringify(query)
   ).toString('base64')}:${limit}:${page}`;
 
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
   const start = new Date();
 
   const index = meiliSearchClient.index('free-games');
