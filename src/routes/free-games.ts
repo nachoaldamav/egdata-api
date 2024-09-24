@@ -170,6 +170,8 @@ app.patch('/index', async (c) => {
     },
   });
 
+  console.log(`Found ${giveaways.length} giveaways`);
+
   const [offersData, pricesData] = await Promise.allSettled([
     Offer.find({
       id: { $in: giveaways.map((g) => g.id) },
