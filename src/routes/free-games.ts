@@ -243,7 +243,8 @@ interface FreeGamesSearchQuery {
     | 'pcReleaseDate'
     | 'upcoming'
     | 'price'
-    | 'giveaway.endDate';
+    | 'giveaway.endDate'
+    | 'price.price.discountPrice';
   sortDir?: 'asc' | 'desc';
   limit?: string;
   page?: string;
@@ -311,6 +312,8 @@ app.get('/search', async (c) => {
   if (query.sortBy) {
     if (query.sortBy === 'giveawayDate') {
       sort = 'giveaway.endDate';
+    } else if (query.sortBy === 'price') {
+      sort = 'price.price.discountPrice';
     }
     sort += `:${sortDir}`;
   }
