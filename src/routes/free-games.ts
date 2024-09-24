@@ -214,4 +214,115 @@ app.patch('/index', async (c) => {
   return c.json({ message: 'ok' });
 });
 
+interface FreeGamesSearchQuery {
+  title?: string;
+  offerType?:
+    | 'IN_GAME_PURCHASE'
+    | 'BASE_GAME'
+    | 'EXPERIENCE'
+    | 'UNLOCKABLE'
+    | 'ADD_ON'
+    | 'Bundle'
+    | 'CONSUMABLE'
+    | 'WALLET'
+    | 'OTHERS'
+    | 'DEMO'
+    | 'DLC'
+    | 'VIRTUAL_CURRENCY'
+    | 'BUNDLE'
+    | 'DIGITAL_EXTRA'
+    | 'EDITION';
+  tags?: string[];
+  sortBy?:
+    | 'giveawayDate'
+    | 'releaseDate'
+    | 'lastModifiedDate'
+    | 'effectiveDate'
+    | 'creationDate'
+    | 'viewableDate'
+    | 'pcReleaseDate'
+    | 'upcoming'
+    | 'price'
+    | 'giveaway.endDate';
+  sortDir?: 'asc' | 'desc';
+  limit?: string;
+  page?: string;
+  categories?: string[];
+}
+
+app.get('/search', async (c) => {
+  const query = c.req.query() as FreeGamesSearchQuery;
+
+  const limit = Math.min(Number.parseInt(query.limit || '10'), 50);
+  const page = Math.max(Number.parseInt(query.page || '1'), 1);
+  const skip = (page - 1) * limit;
+  let sort = query.sortBy || 'lastModifiedDate';
+  const sortDir = query.sortDir || 'desc';
+  const dir = sortDir === 'asc' ? 1 : -1;
+
+  const cacheKey = `free-games-search:${Buffer.from(
+    JSON.stringify(query)
+  ).toString('base64')}:${limit}:${page}`;
+
+  // const cached = await client.get(cacheKey);
+
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
+
+  const start = new Date();
+
+  const index = meiliSearchClient.index('free-games');
+
+  const filters: Array<string> = [];
+
+  if (query.offerType) {
+    filters.push(`offerType = ${query.offerType}`);
+  }
+
+  if (query.tags) {
+    filters.push(`tags.id in [${query.tags.map((t) => `'${t}'`).join(',')}]`);
+  }
+
+  if (query.categories) {
+    filters.push(
+      `categories in [${query.categories.map((t) => `'${t}'`).join(',')}]`
+    );
+  }
+
+  if (query.sortBy) {
+    if (query.sortBy === 'giveawayDate') {
+      sort = 'giveaway.endDate';
+    }
+    sort += `:${sortDir}`;
+  }
+
+  console.log(filters.join(' AND '));
+
+  const result = await index.search(undefined, {
+    limit,
+    offset: skip,
+    filter: filters.join(' AND '),
+    q: query.title,
+    sort: [sort],
+  });
+
+  const response = {
+    elements: result.hits,
+    page,
+    limit,
+    total: result.estimatedTotalHits,
+  };
+
+  await client.set(cacheKey, JSON.stringify(response), {
+    EX: 60,
+  });
+
+  return c.json(response, 200, {
+    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+  });
+});
+
 export default app;
