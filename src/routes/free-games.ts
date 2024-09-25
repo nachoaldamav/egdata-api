@@ -400,13 +400,13 @@ app.get('/stats', async (c) => {
 
   const cacheKey = `giveaways-stats:${region}`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   const giveaways = await FreeGames.find({}, undefined, {
     sort: {
@@ -453,13 +453,13 @@ app.get('/stats', async (c) => {
         };
       },
       {
-        currencyCode: 'USD',
+        currencyCode: prices[0].price.currencyCode,
         originalPrice: 0,
         discountPrice: 0,
         discount: 0,
         basePayoutPrice: 0,
-        basePayoutCurrencyCode: 'USD',
-        payoutCurrencyExchangeRate: 1,
+        basePayoutCurrencyCode: prices[0].price.basePayoutCurrencyCode,
+        payoutCurrencyExchangeRate: prices[0].price.payoutCurrencyExchangeRate,
       }
     ),
     totalOffers: offers.length,
