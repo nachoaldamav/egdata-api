@@ -213,6 +213,7 @@ app.patch('/index', async (c) => {
       pcReleaseTimestamp: offer.pcReleaseDate
         ? new Date(offer.pcReleaseDate).getTime()
         : null,
+      _id: g._id,
     };
   });
 
