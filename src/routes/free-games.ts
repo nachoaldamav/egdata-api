@@ -380,4 +380,99 @@ app.get('/search', async (c) => {
   });
 });
 
+app.get('/stats', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `giveaways-stats:${region}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
+
+  const giveaways = await FreeGames.find({}, undefined, {
+    sort: {
+      endDate: -1,
+    },
+  });
+
+  const [offersData, pricesData] = await Promise.allSettled([
+    Offer.find({
+      id: { $in: giveaways.map((g) => g.id) },
+    }),
+    PriceEngine.find({
+      offerId: { $in: giveaways.map((g) => g.id) },
+      region,
+    }),
+  ]);
+
+  const offers = offersData.status === 'fulfilled' ? offersData.value : [];
+  const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
+
+  const result: {
+    totalValue: {
+      currencyCode: string;
+      originalPrice: number;
+      discountPrice: number;
+      discount: number;
+      basePayoutPrice: number;
+      basePayoutCurrencyCode: string;
+      payoutCurrencyExchangeRate: number;
+    };
+    totalGiveaways: number;
+    totalOffers: number;
+  } = {
+    totalValue: prices.reduce(
+      (acc, p) => {
+        return {
+          currencyCode: acc.currencyCode,
+          originalPrice: acc.originalPrice + p.price.originalPrice,
+          discountPrice: acc.discountPrice + p.price.discountPrice,
+          discount: acc.discount + p.price.discount,
+          basePayoutPrice: acc.basePayoutPrice + p.price.basePayoutPrice,
+          basePayoutCurrencyCode: acc.basePayoutCurrencyCode,
+          payoutCurrencyExchangeRate: acc.payoutCurrencyExchangeRate,
+        };
+      },
+      {
+        currencyCode: 'USD',
+        originalPrice: 0,
+        discountPrice: 0,
+        discount: 0,
+        basePayoutPrice: 0,
+        basePayoutCurrencyCode: 'USD',
+        payoutCurrencyExchangeRate: 1,
+      }
+    ),
+    totalOffers: offers.length,
+    totalGiveaways: giveaways.length,
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
+
+  return c.json(result, 200, {
+    'Cache-Control': 'private, max-age=0',
+  });
+});
+
 export default app;
