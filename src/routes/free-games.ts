@@ -400,13 +400,13 @@ app.get('/stats', async (c) => {
 
   const cacheKey = `giveaways-stats:${region}`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   const giveaways = await FreeGames.find({}, undefined, {
     sort: {
