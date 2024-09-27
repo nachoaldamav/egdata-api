@@ -1,12 +1,13 @@
-import mongoose from "mongoose";
-import { Image } from "./images.js";
+import mongoose from 'mongoose';
+import { Image } from './images.js';
 
 const CustomAttributeSchema = new mongoose.Schema(
   {
+    key: { type: String, required: true },
     type: { type: String, required: true },
     value: { type: String, required: true },
   },
-  { _id: false },
+  { _id: false }
 );
 
 const ItemSchema = new mongoose.Schema({
@@ -21,9 +22,8 @@ const ItemSchema = new mongoose.Schema({
   creationDate: { required: true, type: Date },
   lastModifiedDate: { required: true, type: Date },
   customAttributes: {
-    type: Map,
-    of: CustomAttributeSchema,
     required: false,
+    type: [CustomAttributeSchema],
   },
   entitlementName: { required: true, type: String },
   entitlementType: { required: true, type: String },
@@ -45,5 +45,5 @@ const ItemSchema = new mongoose.Schema({
   technicalDetails: { type: String },
 });
 
-export const Item = mongoose.model("Item", ItemSchema);
+export const Item = mongoose.model('Item', ItemSchema);
 export type ItemType = mongoose.InferSchemaType<typeof ItemSchema>;
