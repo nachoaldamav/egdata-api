@@ -17,6 +17,7 @@ export const refreshIndexes = schedules.task({
       axios.patch(REFRESH_OFFERS_URL),
       axios.patch(REFRESH_ITEMS_URL),
       axios.patch(REFRESH_SELLERS_URL),
+      axios.patch(REFRESH_FREE_GAMES_URL),
     ]);
 
     logger.log('Indexes refreshed');
