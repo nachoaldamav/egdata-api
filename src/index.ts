@@ -27,6 +27,7 @@ import AccountsRoute from './routes/accounts.js';
 import UsersRoute from './routes/users.js';
 import CollectionsRoute from './routes/collections.js';
 import ProfilesRoute from './routes/profiles.js';
+import ItemsRoute from './routes/items.js';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
@@ -240,51 +241,6 @@ Allow: /promotions-sitemap.xml
   return c.text(robots, 200, {
     'Content-Type': 'text/plain',
     'Cache-Control': 'public, max-age=60',
-  });
-});
-
-app.get('/items', async (c) => {
-  const MAX_LIMIT = 50;
-  const limit = Math.min(
-    Number.parseInt(c.req.query('limit') || '10'),
-    MAX_LIMIT
-  );
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-
-  const items = await Item.find({}, undefined, {
-    limit,
-    skip: (page - 1) * limit,
-    sort: {
-      lastModifiedDate: -1,
-    },
-  });
-
-  return c.json({
-    elements: items,
-    page,
-    limit,
-    total: await Item.countDocuments(),
-  });
-});
-
-app.get('/items/:id', async (c) => {
-  const { id } = c.req.param();
-  const item = await Item.findOne({
-    $or: [{ _id: id }, { id: id }],
-  });
-
-  if (!item) {
-    c.status(404);
-    return c.json({
-      message: 'Item not found',
-    });
-  }
-
-  return c.json({
-    ...item.toObject(),
-    customAttributes: item.customAttributes
-      ? attributesToObject(item.customAttributes as any)
-      : {},
   });
 });
 
@@ -1502,6 +1458,8 @@ app.route('/users', UsersRoute);
 app.route('/collections', CollectionsRoute);
 
 app.route('/profiles', ProfilesRoute);
+
+app.route('/items', ItemsRoute);
 
 export default {
   port: 4000,
