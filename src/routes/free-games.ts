@@ -399,7 +399,7 @@ app.get('/stats', async (c) => {
     });
   }
 
-  const cacheKey = `giveaways-stats:${region}`;
+  const cacheKey = `giveaways-stats:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -428,6 +428,21 @@ app.get('/stats', async (c) => {
   const offers = offersData.status === 'fulfilled' ? offersData.value : [];
   const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
 
+  const offerRepetitions: Record<string, number> = {};
+
+  for (const offer of giveaways) {
+    offerRepetitions[offer.id] = (offerRepetitions[offer.id] || 0) + 1;
+  }
+
+  const singleSellers: Record<string, number> = {};
+
+  for (const offer of offers) {
+    if (offer.seller) {
+      singleSellers[offer.seller.id as string] =
+        (singleSellers[offer.seller.id as string] || 0) + 1;
+    }
+  }
+
   const result: {
     totalValue: {
       currencyCode: string;
@@ -440,6 +455,8 @@ app.get('/stats', async (c) => {
     };
     totalGiveaways: number;
     totalOffers: number;
+    repeated: number;
+    sellers: number;
   } = {
     totalValue: prices.reduce(
       (acc, p) => {
@@ -465,6 +482,12 @@ app.get('/stats', async (c) => {
     ),
     totalOffers: offers.length,
     totalGiveaways: giveaways.length,
+    // Sum all the repeated offers (1 is not repeated)
+    repeated: Object.values(offerRepetitions).reduce(
+      (acc, cur) => acc + cur - 1,
+      0
+    ),
+    sellers: Object.keys(singleSellers).length,
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
