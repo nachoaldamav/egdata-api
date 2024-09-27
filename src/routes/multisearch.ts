@@ -1,18 +1,19 @@
-import { Hono } from "hono";
-import { meiliSearchClient } from "../clients/meilisearch";
-import { orderOffersObject } from "../utils/order-offers-object";
+import { Hono } from 'hono';
+import { meiliSearchClient } from '../clients/meilisearch.js';
+import { orderOffersObject } from '../utils/order-offers-object.js';
+import { attributesToObject } from '../utils/attributes-to-object.js';
 
 const app = new Hono();
 
-app.get("/", (c) => {
-  return c.json({ message: "Hello, World!" });
+app.get('/', (c) => {
+  return c.json({ message: 'Hello, World!' });
 });
 
-app.get("/offers", async (c) => {
+app.get('/offers', async (c) => {
   const { query } = c.req.query();
 
-  const search = await meiliSearchClient.index("offers").search(query, {
-    sort: ["offerType:asc", "lastModifiedDate:desc"],
+  const search = await meiliSearchClient.index('offers').search(query, {
+    sort: ['offerType:asc', 'lastModifiedDate:desc'],
   });
 
   return c.json({
@@ -26,20 +27,31 @@ app.get("/offers", async (c) => {
   });
 });
 
-app.get("/items", async (c) => {
-  const { query } = c.req.query();
+app.get('/items', async (c) => {
+  const { query, type: entitlementType } = c.req.query();
 
-  const search = await meiliSearchClient.index("items").search(query, {
-    sort: ["lastModifiedDate:desc"],
+  const search = await meiliSearchClient.index('items').search(query, {
+    sort: ['lastModifiedDate:desc'],
+    filter: entitlementType ? [`entitlementType = ${entitlementType}`] : [],
   });
 
-  return c.json(search);
+  return c.json({
+    ...search,
+    hits: search.hits.map((hit) => {
+      return {
+        ...hit,
+        customAttributes: hit.customAttributes
+          ? attributesToObject(hit.customAttributes as any)
+          : {},
+      };
+    }),
+  });
 });
 
-app.get("/sellers", async (c) => {
+app.get('/sellers', async (c) => {
   const { query } = c.req.query();
 
-  const search = await meiliSearchClient.index("sellers").search(query);
+  const search = await meiliSearchClient.index('sellers').search(query);
 
   return c.json(search);
 });
