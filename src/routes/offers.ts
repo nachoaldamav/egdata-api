@@ -30,6 +30,7 @@ import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
 import { Hltb } from '@egdata/core.schemas.hltb';
 import { Bundles } from '@egdata/core.schemas.bundles';
 import { epic, epicInfo } from './auth.js';
+import { $ } from 'bun';
 
 const app = new Hono();
 
@@ -769,7 +770,6 @@ app.get('/latest-achievements', async (c) => {
   });
 });
 
-// Latest games released
 app.get('/latest-released', async (c) => {
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
@@ -809,11 +809,15 @@ app.get('/latest-released', async (c) => {
       offerType: {
         $in: ['BASE_GAME', 'DLC'],
       },
+      releaseDate: {
+        $ne: null,
+        $lte: new Date(),
+      },
     },
     undefined,
     {
       sort: {
-        effectiveDate: -1,
+        releaseDate: -1,
       },
       limit,
       skip,
