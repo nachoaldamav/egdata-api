@@ -76,6 +76,28 @@ type SingleAchievement = {
 
 const app = new Hono();
 
+app.get('/sitemap.xml', async (c) => {
+  const profiles = await db.db.collection('epic').find({}).toArray();
+
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${profiles
+    .map(
+      (profile) =>
+        `<url>
+          <loc>https://egdata.app/profile/${profile.accountId}</loc>
+        </url>`
+    )
+    .join('\n')}
+</urlset>`;
+
+  return c.text(sitemap, {
+    headers: {
+      'Content-Type': 'application/xml',
+    },
+  });
+});
+
 app.get('/:id', async (c) => {
   const { id } = c.req.param();
 
