@@ -699,7 +699,7 @@ app.get('/:id/information', async (c) => {
       );
     }
 
-    // Fetch total stats
+    // Fetch total stats including totalXP
     const statsArray = await db.db
       .collection('player-achievements')
       .aggregate([
@@ -710,6 +710,7 @@ app.get('/:id/information', async (c) => {
               $size: { $ifNull: ['$playerAwards', []] },
             },
             totalUnlocked: 1,
+            totalXP: 1,
           },
         },
         {
@@ -718,6 +719,7 @@ app.get('/:id/information', async (c) => {
             totalGames: { $sum: 1 },
             totalPlayerAwards: { $sum: '$totalPlayerAwardsCount' },
             totalAchievements: { $sum: '$totalUnlocked' },
+            totalXP: { $sum: '$totalXP' },
           },
         },
       ])
@@ -727,6 +729,7 @@ app.get('/:id/information', async (c) => {
       totalGames: 0,
       totalPlayerAwards: 0,
       totalAchievements: 0,
+      totalXP: 0,
     };
 
     // Fetch reviews count
@@ -741,6 +744,7 @@ app.get('/:id/information', async (c) => {
         totalGames: stats.totalGames,
         totalAchievements: stats.totalAchievements,
         totalPlayerAwards: stats.totalPlayerAwards,
+        totalXP: stats.totalXP,
         reviewsCount: reviewsCount,
       },
       avatar: {
