@@ -54,6 +54,26 @@ interface PlayerAchievement2 {
   isBase: boolean;
 }
 
+type SingleAchievement = {
+  playerAwards: PlayerAward[];
+  totalXP: number;
+  totalUnlocked: number;
+  sandboxId: string;
+  baseOfferForSandbox: {
+    id: string;
+    namespace: string;
+    keyImages: unknown[];
+  };
+  product: {
+    name: string;
+    slug: string;
+  };
+  productAchievements: {
+    totalAchievements: number;
+    totalProductXP: number;
+  };
+};
+
 const app = new Hono();
 
 app.get('/:id', async (c) => {
@@ -774,26 +794,6 @@ app.get('/:id/information', async (c) => {
   }
 });
 
-type SingleAchievement = {
-  playerAwards: PlayerAward[];
-  totalXP: number;
-  totalUnlocked: number;
-  sandboxId: string;
-  baseOfferForSandbox: {
-    id: string;
-    namespace: string;
-    keyImages: unknown[];
-  };
-  product: {
-    name: string;
-    slug: string;
-  };
-  productAchievements: {
-    totalAchievements: number;
-    totalProductXP: number;
-  };
-};
-
 app.get('/:id/games', async (c) => {
   const { id } = c.req.param();
   const { page = '1', limit = '10' } = c.req.query();
@@ -920,6 +920,133 @@ app.get('/:id/games', async (c) => {
 
     await client.set(cacheKey, JSON.stringify(result), {
       EX: 60,
+    });
+
+    return c.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=60',
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching achievements', err);
+    c.status(400);
+    return c.json({
+      message: 'Failed to fetch achievements',
+    });
+  }
+});
+
+app.get('/:id/random-game', async (c) => {
+  const { id } = c.req.param();
+
+  if (!id) {
+    c.status(400);
+    return c.json({
+      message: 'Missing id parameter',
+    });
+  }
+
+  const cacheKey = `epic-profile:${id}:random-game`;
+
+  const cached = await client.get(cacheKey);
+  if (cached) {
+    return c.json(JSON.parse(cached), {
+      headers: {
+        'Cache-Control': 'public, max-age=60',
+      },
+    });
+  }
+
+  try {
+    // Check if user exists
+    const profile = await epicStoreClient.getUser(id);
+
+    if (!profile) {
+      c.status(404);
+      return c.json({
+        message: 'Profile not found',
+      });
+    }
+
+    // Fetch paginated achievements
+    const savedPlayerAchievementsCursor = db.db
+      .collection('player-achievements')
+      .find({ epicAccountId: id })
+      // Sort by the totalXP field in descending order
+      .sort({ totalXP: -1 })
+      .skip(Math.floor(Math.random() * 100))
+      .limit(1);
+
+    const savedPlayerAchievements =
+      await savedPlayerAchievementsCursor.toArray();
+
+    const achievements: SingleAchievement[] = [];
+
+    if (savedPlayerAchievements && savedPlayerAchievements.length > 0) {
+      await Promise.all(
+        savedPlayerAchievements.map(async (entry) => {
+          const sandbox = await Sandbox.findOne({ _id: entry.sandboxId });
+
+          if (!sandbox) {
+            console.error('Sandbox not found', entry.sandboxId);
+            return;
+          }
+
+          const [product, offer, achievementsSets] = await Promise.all([
+            db.db
+              .collection('products')
+              .findOne({ _id: sandbox?.parent as unknown as Id }),
+            Offer.findOne({
+              namespace: entry.sandboxId,
+              offerType: 'BASE_GAME',
+            }),
+            AchievementSet.find({
+              sandboxId: entry.sandboxId,
+            }),
+          ]);
+
+          if (!product || !offer) {
+            return;
+          }
+
+          achievements.push({
+            playerAwards: entry.playerAwards,
+            totalXP: entry.totalXP,
+            totalUnlocked: entry.totalUnlocked,
+            sandboxId: entry.sandboxId,
+            baseOfferForSandbox: {
+              id: offer.id,
+              namespace: offer.namespace,
+              keyImages: offer.keyImages,
+            },
+            product: {
+              name: offer.title,
+              slug: offer.productSlug as string,
+            },
+            productAchievements: {
+              totalAchievements: achievementsSets.reduce(
+                (acc, curr) => acc + curr.achievements.length,
+                0
+              ),
+              totalProductXP: achievementsSets.reduce(
+                (acc, curr) =>
+                  acc +
+                  curr.achievements.reduce((acc, curr) => acc + curr.xp, 0),
+                0
+              ),
+            },
+          });
+        })
+      );
+    }
+
+    // Construct the result object
+    const result = {
+      achievements,
+    };
+
+    await client.set(cacheKey, JSON.stringify(result), {
+      EX: 360,
     });
 
     return c.json(result, {
