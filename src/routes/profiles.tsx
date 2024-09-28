@@ -938,6 +938,7 @@ app.get('/:id/games', async (c) => {
 
 app.get('/:id/random-game', async (c) => {
   const { id } = c.req.param();
+  const { sandbox } = c.req.query();
 
   if (!id) {
     c.status(400);
@@ -946,7 +947,8 @@ app.get('/:id/random-game', async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:random-game`;
+  // Update the cache key to include the sandbox if provided
+  const cacheKey = `epic-profile:${id}:random-game:${sandbox || 'random'}`;
 
   const cached = await client.get(cacheKey);
   if (cached) {
@@ -968,82 +970,73 @@ app.get('/:id/random-game', async (c) => {
       });
     }
 
-    // Fetch paginated achievements
-    const savedPlayerAchievementsCursor = db.db
-      .collection('player-achievements')
-      .find({ epicAccountId: id })
-      // Sort by the totalXP field in descending order
-      .sort({ totalXP: -1 })
-      .skip(Math.floor(Math.random() * 100))
-      .limit(1);
+    let savedPlayerAchievement;
 
-    const savedPlayerAchievements =
-      await savedPlayerAchievementsCursor.toArray();
+    if (sandbox) {
+      // Override random logic: fetch the achievement for the provided sandbox
+      savedPlayerAchievement = await db.db
+        .collection('player-achievements')
+        .findOne({ epicAccountId: id, sandboxId: sandbox });
+    } else {
+      // Fetch a random achievement
+      const totalAchievements = await db.db
+        .collection('player-achievements')
+        .countDocuments({ epicAccountId: id });
 
-    const achievements: SingleAchievement[] = [];
+      if (totalAchievements === 0) {
+        c.status(404);
+        return c.json({
+          message: 'No achievements found for this user',
+        });
+      }
 
-    if (savedPlayerAchievements && savedPlayerAchievements.length > 0) {
-      await Promise.all(
-        savedPlayerAchievements.map(async (entry) => {
-          const sandbox = await Sandbox.findOne({ _id: entry.sandboxId });
+      const randomSkip = Math.floor(Math.random() * totalAchievements);
 
-          if (!sandbox) {
-            console.error('Sandbox not found', entry.sandboxId);
-            return;
-          }
+      const savedPlayerAchievements = await db.db
+        .collection('player-achievements')
+        .find({ epicAccountId: id })
+        .skip(randomSkip)
+        .limit(1)
+        .toArray();
 
-          const [product, offer, achievementsSets] = await Promise.all([
-            db.db
-              .collection('products')
-              .findOne({ _id: sandbox?.parent as unknown as Id }),
-            Offer.findOne({
-              namespace: entry.sandboxId,
-              offerType: 'BASE_GAME',
-            }),
-            AchievementSet.find({
-              sandboxId: entry.sandboxId,
-            }),
-          ]);
+      savedPlayerAchievement = savedPlayerAchievements[0];
+    }
 
-          if (!product || !offer) {
-            return;
-          }
+    if (!savedPlayerAchievement) {
+      c.status(404);
+      return c.json({
+        message: 'No achievements found for this user in the specified sandbox',
+      });
+    }
 
-          achievements.push({
-            playerAwards: entry.playerAwards,
-            totalXP: entry.totalXP,
-            totalUnlocked: entry.totalUnlocked,
-            sandboxId: entry.sandboxId,
-            baseOfferForSandbox: {
-              id: offer.id,
-              namespace: offer.namespace,
-              keyImages: offer.keyImages,
-            },
-            product: {
-              name: offer.title,
-              slug: offer.productSlug as string,
-            },
-            productAchievements: {
-              totalAchievements: achievementsSets.reduce(
-                (acc, curr) => acc + curr.achievements.length,
-                0
-              ),
-              totalProductXP: achievementsSets.reduce(
-                (acc, curr) =>
-                  acc +
-                  curr.achievements.reduce((acc, curr) => acc + curr.xp, 0),
-                0
-              ),
-            },
-          });
-        })
-      );
+    // Fetch the sandbox data
+    const sandboxData = await Sandbox.findOne({
+      _id: savedPlayerAchievement.sandboxId,
+    });
+
+    if (!sandboxData) {
+      console.error('Sandbox not found', savedPlayerAchievement.sandboxId);
+      c.status(404);
+      return c.json({
+        message: 'Sandbox not found',
+      });
+    }
+
+    // Fetch the offer
+    const offer = await Offer.findOne({
+      namespace: savedPlayerAchievement.sandboxId,
+      offerType: 'BASE_GAME',
+    });
+
+    if (!offer) {
+      c.status(404);
+      return c.json({
+        message: 'Offer not found',
+      });
     }
 
     // Construct the result object
-    const result = {
-      achievements,
-    };
+    const result = offer;
 
     await client.set(cacheKey, JSON.stringify(result), {
       EX: 360,
@@ -1055,10 +1048,10 @@ app.get('/:id/random-game', async (c) => {
       },
     });
   } catch (err) {
-    console.error('Error fetching achievements', err);
+    console.error('Error fetching offer', err);
     c.status(400);
     return c.json({
-      message: 'Failed to fetch achievements',
+      message: 'Failed to fetch offer',
     });
   }
 });
