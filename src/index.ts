@@ -99,6 +99,21 @@ app.get('/', (c) => {
   });
 });
 
+app.get('/robots.txt', async (c) => {
+  // Disallow all robots as this is an API (Besides the sitemap)
+  const robots = `User-agent: *
+Disallow: /
+Allow: /sitemap.xml
+Allow: /promotions-sitemap.xml
+Allow: /profiles/sitemap.xml
+`;
+
+  return c.text(robots, 200, {
+    'Content-Type': 'text/plain',
+    'Cache-Control': 'public, max-age=60',
+  });
+});
+
 app.get('/sitemap.xml', async (c) => {
   const cacheKey = 'sitemap';
   const cacheTimeInSec = 3600 * 24; // 1 day
@@ -227,20 +242,6 @@ app.get('/promotions-sitemap.xml', async (c) => {
   return c.text(siteMap, 200, {
     'Content-Type': 'application/xml',
     'Cache-Control': `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
-  });
-});
-
-app.get('/robots.txt', async (c) => {
-  // Disallow all robots as this is an API (Besides the sitemap)
-  const robots = `User-agent: *
-Disallow: /
-Allow: /sitemap.xml
-Allow: /promotions-sitemap.xml
-`;
-
-  return c.text(robots, 200, {
-    'Content-Type': 'text/plain',
-    'Cache-Control': 'public, max-age=60',
   });
 });
 
