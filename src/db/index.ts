@@ -44,14 +44,19 @@ export class DB {
     checkFile(process.env.MONGO_CA);
     checkFile(process.env.MONGO_CERT);
 
-    await mongoose.connect(`mongodb://${process.env.MONGO_URL}:27017/egdata`, {
-      authMechanism: 'MONGODB-X509',
-      authSource: '$external',
-      tlsCAFile: process.env.MONGO_CA,
-      tlsCertificateKeyFile: process.env.MONGO_CERT,
-      tls: true,
-      tlsAllowInvalidCertificates: true,
-    });
+    await mongoose
+      .connect(`mongodb://${process.env.MONGO_URL}:27017/egdata`, {
+        authMechanism: 'MONGODB-X509',
+        authSource: '$external',
+        tlsCAFile: process.env.MONGO_CA,
+        tlsCertificateKeyFile: process.env.MONGO_CERT,
+        tls: true,
+        tlsAllowInvalidCertificates: true,
+      })
+      .catch((err) => {
+        console.error('Error connecting to MongoDB', err);
+        process.exit(1);
+      });
     console.log('Connected to MongoDB');
   }
 
