@@ -491,7 +491,7 @@ app.get('/stats', async (c) => {
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
+    EX: 30,
   });
 
   return c.json(result, 200, {
