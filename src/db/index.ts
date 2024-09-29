@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { existsSync, readdirSync, lstatSync } from 'node:fs';
-import { dirname } from 'node:path';
 
 /**
  * This function first check if the file is a directory, then if it is a file, and then if it exists.
@@ -42,19 +41,28 @@ export class DB {
     }
 
     const caExists = checkFile(process.env.MONGO_CA);
-    const certExists = checkFile(process.env.MONGO_CERT);
 
     if (!caExists) {
       const filesInDir = readdirSync(process.env.MONGO_CA);
-      console.log('Files in dir:', filesInDir);
+      console.log({
+        exists: existsSync(process.env.MONGO_CA),
+        files: filesInDir,
+        isDir: lstatSync(process.env.MONGO_CA).isDirectory(),
+      });
       throw new Error(
         `MONGO_CA file does not exist or is not a file ${process.env.MONGO_CA}`
       );
     }
 
+    const certExists = checkFile(process.env.MONGO_CERT);
+
     if (!certExists) {
       const filesInDir = readdirSync(process.env.MONGO_CERT);
-      console.log('Files in dir:', filesInDir);
+      console.log({
+        exists: existsSync(process.env.MONGO_CERT),
+        files: filesInDir,
+        isDir: lstatSync(process.env.MONGO_CERT).isDirectory(),
+      });
       throw new Error(
         `MONGO_CERT file does not exist or is not a file ${process.env.MONGO_CERT}`
       );
