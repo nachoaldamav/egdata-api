@@ -41,8 +41,20 @@ export class DB {
       throw new Error('MONGO_CERT is required');
     }
 
-    checkFile(process.env.MONGO_CA);
-    checkFile(process.env.MONGO_CERT);
+    const caExists = checkFile(process.env.MONGO_CA);
+    const certExists = checkFile(process.env.MONGO_CERT);
+
+    if (!caExists) {
+      throw new Error(
+        `MONGO_CA file does not exist or is not a file ${process.env.MONGO_CA}`
+      );
+    }
+
+    if (!certExists) {
+      throw new Error(
+        `MONGO_CERT file does not exist or is not a file ${process.env.MONGO_CERT}`
+      );
+    }
 
     await mongoose
       .connect(`mongodb://${process.env.MONGO_URL}:27017/egdata`, {
