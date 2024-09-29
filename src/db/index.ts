@@ -45,12 +45,16 @@ export class DB {
     const certExists = checkFile(process.env.MONGO_CERT);
 
     if (!caExists) {
+      const filesInDir = readdirSync(process.env.MONGO_CA);
+      console.log('Files in dir:', filesInDir);
       throw new Error(
         `MONGO_CA file does not exist or is not a file ${process.env.MONGO_CA}`
       );
     }
 
     if (!certExists) {
+      const filesInDir = readdirSync(process.env.MONGO_CERT);
+      console.log('Files in dir:', filesInDir);
       throw new Error(
         `MONGO_CERT file does not exist or is not a file ${process.env.MONGO_CERT}`
       );
