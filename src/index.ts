@@ -28,11 +28,11 @@ import UsersRoute from './routes/users.js';
 import CollectionsRoute from './routes/collections.js';
 import ProfilesRoute from './routes/profiles.js';
 import ItemsRoute from './routes/items.js';
+import SellersRoute from './routes/sellers.js';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
 import { meiliSearchClient } from './clients/meilisearch.js';
-import { CollectionOffer } from './db/schemas/collections.js';
 import { Seller } from './db/schemas/sellers.js';
 
 config();
@@ -740,161 +740,6 @@ app.get('/changelog', async (c) => {
   });
 });
 
-app.get('/sellers', async (c) => {
-  const sellers = await Offer.distinct('seller');
-
-  return c.json(sellers);
-});
-
-app.get('/sellers/:id', async (c) => {
-  const { id } = c.req.param();
-  const country = c.req.query('country');
-  const limit = Number.parseInt(c.req.query('limit') || '0');
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-  const offerType = c.req.query('offerType');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
-
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
-
-  if (!region) {
-    c.status(404);
-    return c.json({
-      message: 'Country not found',
-    });
-  }
-
-  const cacheKey = `sellers:${id}:${region}:${page}:${limit}:${offerType}`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
-  const offers = await Offer.find(
-    {
-      'seller.id': id,
-      ...(offerType ? { offerType } : {}),
-    },
-    undefined,
-    {
-      limit: limit === 0 ? undefined : limit,
-      skip: (page - 1) * (limit === 0 ? 1 : limit),
-      sort: {
-        lastModifiedDate: -1,
-      },
-    }
-  );
-
-  const prices = await PriceEngine.find({
-    offerId: { $in: offers.map((o) => o.id) },
-    region,
-  });
-
-  const result = offers.map((o) => {
-    const price = prices.find((p) => p.offerId === o.id);
-    return {
-      ...orderOffersObject(o),
-      price,
-    };
-  });
-
-  return c.json(result);
-});
-
-app.get('/sellers/:id/cover', async (c) => {
-  const { id } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
-
-  if (!region) {
-    c.status(404);
-    return c.json({
-      message: 'Country not found',
-    });
-  }
-
-  const cacheKey = `sellers:${id}:cover:${region}`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
-  const topSellers = await CollectionOffer.findById('top-sellers');
-
-  if (!topSellers) {
-    c.status(404);
-    return c.json({
-      message: 'Top sellers collection not found',
-    });
-  }
-
-  const offersInTopSellers = await Offer.find(
-    {
-      id: { $in: topSellers.offers.map((o) => o._id) },
-      'seller.id': id,
-    },
-    undefined,
-    {
-      sort: {
-        lastModifiedDate: -1,
-      },
-    }
-  );
-
-  let offers = offersInTopSellers.slice(0, 5);
-
-  if (offers.length === 0) {
-    // Just get the 1st offer from the seller
-    offers = await Offer.find(
-      {
-        'seller.id': id,
-      },
-      undefined,
-      {
-        limit: 5,
-        sort: {
-          lastModifiedDate: -1,
-        },
-      }
-    );
-  }
-
-  const prices = await PriceEngine.find({
-    offerId: { $in: offers.map((o) => o.id) },
-    region,
-  });
-
-  const result = offers.map((o) => {
-    const price = prices.find((p) => p.offerId === o.id);
-    return {
-      ...orderOffersObject(o),
-      price,
-    };
-  });
-
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
-
-  return c.json(result);
-});
-
 app.get('/region', async (c) => {
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
@@ -1461,6 +1306,8 @@ app.route('/collections', CollectionsRoute);
 app.route('/profiles', ProfilesRoute);
 
 app.route('/items', ItemsRoute);
+
+app.route('/sellers', SellersRoute);
 
 export default {
   port: 4000,
