@@ -8,6 +8,7 @@ import { orderOffersObject } from '../utils/order-offers-object.js';
 import { CollectionOffer } from '../db/schemas/collections.js';
 import { Item } from '../db/schemas/item.js';
 import { FreeGames } from '../db/schemas/freegames.js';
+import { Seller } from '../db/schemas/sellers.js';
 
 const app = new Hono();
 
@@ -179,6 +180,15 @@ app.get('/:id/stats', async (c) => {
     });
   }
 
+  const seller = await Seller.findOne({ _id: id });
+
+  if (!seller) {
+    c.status(404);
+    return c.json({
+      message: 'Seller not found',
+    });
+  }
+
   const [offers, items, games, offersList] = await Promise.all([
     Offer.countDocuments({
       'seller.id': id,
@@ -206,6 +216,7 @@ app.get('/:id/stats', async (c) => {
     items,
     games,
     freegames,
+    seller,
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
