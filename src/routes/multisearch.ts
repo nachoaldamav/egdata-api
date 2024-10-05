@@ -13,7 +13,7 @@ app.get('/offers', async (c) => {
   const { query } = c.req.query();
 
   const search = await meiliSearchClient.index('offers').search(query, {
-    sort: ['offerType:asc', 'lastModifiedDate:desc'],
+    sort: ['offerTypeRank:asc', 'lastModifiedDate:desc'],
   });
 
   return c.json({
