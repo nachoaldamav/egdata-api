@@ -786,7 +786,8 @@ app.get('/:id/information', async (c) => {
         totalGames: stats.totalGames,
         totalAchievements: stats.totalAchievements,
         totalPlayerAwards: stats.totalPlayerAwards,
-        totalXP: stats.totalXP,
+        // Each platinum award is worth 250 XP
+        totalXP: stats.totalXP + stats.totalPlayerAwards * 250,
         reviewsCount: reviewsCount,
       },
       avatar: {
