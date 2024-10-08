@@ -1093,12 +1093,19 @@ app.get('/:id/items', async (c) => {
     });
   }
 
-  const items = await Item.find({
-    linkedOffers: id,
+  const offer = await Offer.findOne({
+    id: id,
   });
 
-  await client.set(cacheKey, JSON.stringify(items), {
-    EX: 3600,
+  if (!offer) {
+    return c.json({ error: 'Offer not found' }, 404);
+  }
+
+  const itemsSpecified = offer.items.map((item) => item.id);
+
+  // Or it's an item specified by the offer, or it's linked by the item
+  const items = await Item.find({
+    $or: [{ id: { $in: itemsSpecified } }, { linkedOffers: id }],
   });
 
   return c.json(items, 200, {
