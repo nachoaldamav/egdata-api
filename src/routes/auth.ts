@@ -35,7 +35,7 @@ const app = new Hono();
 
 app.use(cors());
 
-interface EpicTokenInfo {
+export interface EpicTokenInfo {
   active: boolean;
   scope: string;
   token_type: string;
