@@ -29,6 +29,30 @@ app.get('/', async (c) => {
   });
 });
 
+type BulkBody = string[];
+
+app.get('/bulk', async (c) => {
+  const batch = (await c.req.json()) as BulkBody;
+
+  // Select only the items in the array that are a string, no objects, nulls, booleans, etc...
+  const ids = batch.filter((id) => typeof id === 'string').slice(0, 100);
+
+  const items = await Item.find({
+    id: { $in: ids },
+  });
+
+  return c.json(
+    items.map((item) => {
+      return {
+        ...item.toObject(),
+        customAttributes: item.customAttributes
+          ? attributesToObject(item.customAttributes as any)
+          : {},
+      };
+    })
+  );
+});
+
 app.get('/:id', async (c) => {
   const { id } = c.req.param();
   const item = await Item.findOne({
