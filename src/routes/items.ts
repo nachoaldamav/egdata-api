@@ -29,13 +29,18 @@ app.get('/', async (c) => {
   });
 });
 
-type BulkBody = string[];
+type BulkBody = { items: string[] };
 
-app.get('/bulk', async (c) => {
-  const batch = (await c.req.json()) as BulkBody;
+app.post('/bulk', async (c) => {
+  const batch = (await c.req.json().catch((e) => {
+    console.error(e);
+    return {
+      items: [],
+    };
+  })) as BulkBody;
 
   // Select only the items in the array that are a string, no objects, nulls, booleans, etc...
-  const ids = batch.filter((id) => typeof id === 'string').slice(0, 100);
+  const ids = batch.items.filter((id) => typeof id === 'string').slice(0, 100);
 
   const items = await Item.find({
     id: { $in: ids },
