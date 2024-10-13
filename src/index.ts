@@ -30,6 +30,7 @@ import ProfilesRoute from './routes/profiles.js';
 import ItemsRoute from './routes/items.js';
 import SellersRoute from './routes/sellers.js';
 import AdminRoute from './routes/admin.js';
+import AssetsRoute from './routes/assets.js';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
@@ -1312,6 +1313,8 @@ app.route('/items', ItemsRoute);
 app.route('/sellers', SellersRoute);
 
 app.route('/admin', AdminRoute);
+
+app.route('/assets', AssetsRoute);
 
 export default {
   port: 4000,
