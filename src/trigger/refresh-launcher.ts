@@ -1,7 +1,7 @@
 import { envvars, logger, schedules } from '@trigger.dev/sdk/v3';
 
 export const refreshLauncherTokens = schedules.task({
-  id: 'refresh-tokens',
+  id: 'refresh-launcher-tokens',
   cron: '*/10 * * * *',
   run: async () => {
     const token = await envvars.retrieve('JWT_SECRET');
