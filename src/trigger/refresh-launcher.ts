@@ -1,6 +1,6 @@
 import { envvars, logger, schedules } from '@trigger.dev/sdk/v3';
 
-export const refreshTokens = schedules.task({
+export const refreshLauncherTokens = schedules.task({
   id: 'refresh-tokens',
   cron: '*/10 * * * *',
   run: async () => {
@@ -15,7 +15,7 @@ export const refreshTokens = schedules.task({
       token: `${token.value.substring(0, 5)}...`,
     });
 
-    const res = await fetch('https://api.egdata.app/auth/refresh', {
+    const res = await fetch('https://api.egdata.app/auth/refresh-admin', {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token.value}`,
@@ -23,10 +23,13 @@ export const refreshTokens = schedules.task({
     });
 
     if (!res.ok) {
-      logger.error('Error refreshing Epic Games tokens', await res.json());
-      throw new Error('Error refreshing Epic Games tokens');
+      logger.error(
+        'Error refreshing Epic Games Launcher tokens',
+        await res.json()
+      );
+      throw new Error('Error refreshing Epic Games Launcher tokens');
     }
 
-    logger.log('Epic Games tokens refreshed');
+    logger.log('Epic Games Launcher tokens refreshed');
   },
 });

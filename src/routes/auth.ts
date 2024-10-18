@@ -120,9 +120,6 @@ export const epic = createMiddleware<EpicAuthMiddleware>(async (c, next) => {
   }
 });
 
-/**
- * Same middleware, but it's used to get the account ID
- */
 export const epicInfo = createMiddleware<EpicAuthMiddleware>(
   async (c, next) => {
     // Get the authorization header or cookie "EPIC_AUTH"
@@ -655,6 +652,118 @@ app.patch('/refresh', async (c) => {
       });
     }
   }
+
+  return c.json(
+    {
+      status: 'ok',
+    },
+    200
+  );
+});
+
+const launcherClient = '34a02cf8f4414e29b15921876da36f9a';
+const launcherSecret = 'daafbccc737745039dffe53d94fc76cf';
+
+type LauncherAuthTokens = {
+  access_token: string;
+  expires_in: number;
+  expires_at: string;
+  token_type: string;
+  refresh_token: string;
+  refresh_expires: number;
+  refresh_expires_at: string;
+  account_id: string;
+  client_id: string;
+  internal_client: boolean;
+  client_service: string;
+  scope: string[];
+  displayName: string;
+  app: string;
+  in_app_id: string;
+  device_id: string;
+  product_id: string;
+  application_id: string;
+};
+
+// Refresh the admin user
+app.patch('/refresh-admin', async (c) => {
+  // Get the authorization header and compare it to 'JWT_SECRET' env variable
+  const authorization = c.req.header('Authorization');
+
+  if (!authorization) {
+    console.error('Missing authorization header');
+    return c.json({ error: 'Missing authorization header' }, 401);
+  }
+
+  if (authorization.startsWith('Bearer ')) {
+    const token = authorization.replace('Bearer ', '');
+
+    if (token !== process.env.JWT_SECRET) {
+      console.error('Invalid JWT_SECRET token');
+      return c.json({ error: 'Invalid JWT_SECRET token' }, 401);
+    }
+  } else {
+    console.error('Invalid authorization header');
+    return c.json({ error: 'Invalid authorization header' }, 401);
+  }
+
+  const user = await db.db.collection('launcher').findOne<LauncherAuthTokens>({
+    account_id: process.env.ADMIN_ACCOUNT_ID,
+  });
+
+  if (!user) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  // Refresh the user tokens
+  const { refresh_token, refresh_expires_at } = user;
+
+  // If the token is not expired (within 10 minutes), just continue
+  if (
+    new Date(refresh_expires_at) >
+    new Date(new Date().getTime() + 10 * 60 * 1000)
+  ) {
+    return c.json({ message: 'Token is not expired' }, 200);
+  }
+
+  const url = new URL(
+    'https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token'
+  );
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${Buffer.from(
+        `${launcherClient}:${launcherSecret}`
+      ).toString('base64')}`,
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('Failed to refresh admin user tokens', await response.json());
+    return c.json({ error: 'Failed to refresh admin user tokens' }, 401);
+  }
+
+  const responseData = (await response.json()) as LauncherAuthTokens;
+
+  await db.db.collection('launcher').updateOne(
+    {
+      account_id: process.env.ADMIN_ACCOUNT_ID,
+    },
+    {
+      $set: {
+        access_token: responseData.access_token,
+        refresh_token: responseData.refresh_token,
+        expires_at: new Date(responseData.expires_at),
+        refresh_expires_at: new Date(responseData.refresh_expires_at),
+      },
+    }
+  );
 
   return c.json(
     {
