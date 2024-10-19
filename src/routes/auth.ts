@@ -716,13 +716,10 @@ app.patch('/refresh-admin', async (c) => {
   }
 
   // Refresh the user tokens
-  const { refresh_token, refresh_expires_at } = user;
+  const { refresh_token, expires_at } = user;
 
   // If the token is not expired (within 10 minutes), just continue
-  if (
-    new Date(refresh_expires_at) >
-    new Date(new Date().getTime() + 10 * 60 * 1000)
-  ) {
+  if (new Date(expires_at) > new Date(new Date().getTime() + 10 * 60 * 1000)) {
     return c.json({ message: 'Token is not expired' }, 200);
   }
 
