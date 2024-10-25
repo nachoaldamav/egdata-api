@@ -36,7 +36,7 @@ app.get('/:hash/files', async (c) => {
     .find({
       manifestHash: hash,
     })
-    .sort({ depth: 1 })
+    .sort({ depth: 1, filename: 1 })
     .skip((page - 1) * limit)
     .limit(limit)
     .toArray();
