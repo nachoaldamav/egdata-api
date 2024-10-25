@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
+import { swaggerUI } from '@hono/swagger-ui';
 import { db } from './db/index.js';
 import { Offer, type OfferType } from './db/schemas/offer.js';
 import { Item } from './db/schemas/item.js';
@@ -31,6 +32,7 @@ import ItemsRoute from './routes/items.js';
 import SellersRoute from './routes/sellers.js';
 import AdminRoute from './routes/admin.js';
 import AssetsRoute from './routes/assets.js';
+import BuildsRoute from './routes/builds.js';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
@@ -38,6 +40,7 @@ import { meiliSearchClient } from './clients/meilisearch.js';
 import { Seller } from './db/schemas/sellers.js';
 
 config();
+db.connect();
 
 const internalNamespaces = [
   'epic',
@@ -71,9 +74,14 @@ app.use(
   })
 );
 
-db.connect();
-
 app.use('/*', etag());
+
+app.get(
+  '/ui',
+  swaggerUI({
+    url: '/doc',
+  })
+);
 
 // app.use(logger());
 
@@ -99,6 +107,53 @@ app.get('/', (c) => {
         return a.method.localeCompare(b.method);
       })
       .map((x) => `${x.method} ${x.path}`),
+  });
+});
+
+app.get('/doc', async (c) => {
+  const endpoints = inspectRoutes(app);
+
+  // Format endpoints to match OpenAPI paths structure
+  const paths = endpoints.reduce((acc, endpoint) => {
+    if (endpoint.name === '[handler]' && !endpoint.isMiddleware) {
+      // Initialize the path object if it doesn't exist
+      if (!acc[endpoint.path]) {
+        acc[endpoint.path] = {};
+      }
+
+      // Add the method to the path
+      acc[endpoint.path][endpoint.method.toLowerCase()] = {
+        summary: `Endpoint for ${endpoint.method} ${endpoint.path}`,
+        responses: {
+          '200': {
+            description: 'Successful response',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: {
+                      type: 'string',
+                      example: `Response for ${endpoint.method} ${endpoint.path}`,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+    return acc;
+  }, {});
+
+  return c.json({
+    openapi: '3.0.0',
+    info: {
+      title: 'Egdata API',
+      version: '1.0.0',
+    },
+    paths: paths,
   });
 });
 
@@ -1315,6 +1370,8 @@ app.route('/sellers', SellersRoute);
 app.route('/admin', AdminRoute);
 
 app.route('/assets', AssetsRoute);
+
+app.route('/builds', BuildsRoute);
 
 export default {
   port: 4000,

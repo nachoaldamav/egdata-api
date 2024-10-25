@@ -381,4 +381,36 @@ app.get('/:sandboxId/changelog', async (c) => {
   return c.json(changelist);
 });
 
+app.get('/:sandboxId/builds', async (c) => {
+  const { sandboxId } = c.req.param();
+
+  const sandbox = await db.db.collection('sandboxes').findOne({
+    // @ts-ignore
+    _id: sandboxId,
+  });
+
+  if (!sandbox) {
+    c.status(404);
+
+    return c.json({
+      message: 'Sandbox not found',
+    });
+  }
+
+  const items = await Item.find({
+    namespace: sandboxId,
+  });
+
+  const builds = await db.db
+    .collection('builds')
+    .find({
+      appName: {
+        $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+      },
+    })
+    .toArray();
+
+  return c.json(builds);
+});
+
 export default app;

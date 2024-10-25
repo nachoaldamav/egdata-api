@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Item } from '../db/schemas/item.js';
 import { attributesToObject } from '../utils/attributes-to-object.js';
 import { Asset } from '../db/schemas/assets.js';
+import { db } from '../db/index.js';
 
 const app = new Hono();
 
@@ -87,6 +88,29 @@ app.get('/:id/assets', async (c) => {
   });
 
   return c.json(item);
+});
+
+app.get('/:id/builds', async (c) => {
+  const { id } = c.req.param();
+
+  const item = await Item.findOne({
+    id,
+  });
+
+  if (!item) {
+    return c.json({ error: 'Item not found' }, 404);
+  }
+
+  const builds = await db.db
+    .collection('builds')
+    .find({
+      appName: {
+        $in: item.releaseInfo.map((r) => r.appId),
+      },
+    })
+    .toArray();
+
+  return c.json(builds);
 });
 
 export default app;
