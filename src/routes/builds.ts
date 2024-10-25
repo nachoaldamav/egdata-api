@@ -41,7 +41,14 @@ app.get('/:hash/files', async (c) => {
     .limit(limit)
     .toArray();
 
-  return c.json(files);
+  return c.json({
+    files,
+    page,
+    limit,
+    total: await db.db.collection('files').countDocuments({
+      manifestHash: hash,
+    }),
+  });
 });
 
 app.get('/:hash/items', async (c) => {
