@@ -62,11 +62,11 @@ app.get('/:id/files', async (c) => {
   });
 });
 
-app.get('/:hash/items', async (c) => {
-  const { hash } = c.req.param();
+app.get('/:id/items', async (c) => {
+  const { id } = c.req.param();
 
   const build = await db.db.collection('builds').findOne({
-    hash,
+    _id: new ObjectId(id),
   });
 
   if (!build) {
