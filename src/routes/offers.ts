@@ -1453,7 +1453,23 @@ app.get('/:id/achievements', async (c) => {
 app.get('/:id/related', async (c) => {
   const { id } = c.req.param();
 
-  const cacheKey = `related-offers:${id}:v0.1`;
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `related-offers:${id}:${region}`;
 
   const cached = await client.get(cacheKey);
 
@@ -1477,11 +1493,24 @@ app.get('/:id/related', async (c) => {
     id: { $ne: offer.id },
   });
 
-  await client.set(cacheKey, JSON.stringify(related), {
-    EX: 3600,
+  const prices = await PriceEngine.find({
+    offerId: { $in: related.map((o) => o.id) },
+    region,
   });
 
-  return c.json(related, 200, {
+  const result = related.map((o) => {
+    const price = prices.find((p) => p.offerId === o.id);
+    return {
+      ...orderOffersObject(o),
+      price: price ?? null,
+    };
+  });
+
+  await client.set(cacheKey, JSON.stringify(related), {
+    EX: 60,
+  });
+
+  return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',
   });
 });
