@@ -1453,7 +1453,7 @@ app.get('/:id/achievements', async (c) => {
 app.get('/:id/related', async (c) => {
   const { id } = c.req.param();
 
-  const cacheKey = `related-offers:${id}`;
+  const cacheKey = `related-offers:${id}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
