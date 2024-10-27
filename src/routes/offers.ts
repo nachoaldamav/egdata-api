@@ -1472,24 +1472,10 @@ app.get('/:id/related', async (c) => {
     });
   }
 
-  const related = await Offer.find(
-    {
-      namespace: offer.namespace,
-      id: { $ne: offer.id },
-    },
-    {
-      _id: 0,
-      id: 1,
-      namespace: 1,
-      title: 1,
-      keyImages: 1,
-      lastModifiedDate: 1,
-      creationDate: 1,
-      viewableDate: 1,
-      effectiveDate: 1,
-      offerType: 1,
-    }
-  );
+  const related = await Offer.find({
+    namespace: offer.namespace,
+    id: { $ne: offer.id },
+  });
 
   await client.set(cacheKey, JSON.stringify(related), {
     EX: 3600,
