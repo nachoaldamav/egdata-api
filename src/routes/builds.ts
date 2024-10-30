@@ -80,4 +80,58 @@ app.get('/:id/items', async (c) => {
   return c.json(items);
 });
 
+app.get('/:id/install-options', async (c) => {
+  const { id } = c.req.param();
+
+  const build = await db.db.collection('builds').findOne({
+    _id: new ObjectId(id),
+  });
+
+  if (!build) {
+    return c.json({ error: 'Build not found' }, 404);
+  }
+
+  const filesWithInstallOptions = await db.db
+    .collection<{
+      manifestHash: string;
+      installTags: string[];
+      fileHash: string;
+      fileSize: number;
+    }>('files')
+    .find({
+      manifestHash: build.hash,
+      installTags: {
+        $exists: true,
+        $not: { $size: 0 },
+      },
+    })
+    .toArray();
+
+  const result: Record<
+    string,
+    {
+      files: number;
+      size: number;
+    }
+  > = {};
+
+  for (const file of filesWithInstallOptions) {
+    const installOptions = file.installTags.map((t) => t);
+
+    for (const installOption of installOptions) {
+      if (!result[installOption]) {
+        result[installOption] = {
+          files: 0,
+          size: 0,
+        };
+      }
+
+      result[installOption].files++;
+      result[installOption].size += file.fileSize;
+    }
+  }
+
+  return c.json(result);
+});
+
 export default app;
