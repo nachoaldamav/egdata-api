@@ -452,10 +452,18 @@ app.get('/refresh', async (c) => {
     return c.json({ error: 'Missing id parameter' }, 400);
   }
 
-  let token = await db.db.collection('tokens').findOne({
-    _id: new ObjectId(id),
-    accountId: decoded.sub,
-  });
+  let token = await db.db
+    .collection<{
+      accessToken: string;
+      refreshToken: string;
+      expiresAt: Date;
+      refreshExpiresAt: Date;
+      accountId: string;
+    }>('tokens')
+    .findOne({
+      _id: new ObjectId(id),
+      accountId: decoded.sub,
+    });
 
   if (!token) {
     console.error('Token not found');
@@ -465,7 +473,7 @@ app.get('/refresh', async (c) => {
   let expired = false;
 
   // Check if the token is expired, if so, refresh it
-  if (token.expiresAt < new Date()) {
+  if (token.expiresAt.getTime() < new Date().getTime()) {
     expired = true;
     const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
 
@@ -515,9 +523,17 @@ app.get('/refresh', async (c) => {
   }
 
   if (expired) {
-    token = await db.db.collection('tokens').findOne({
-      _id: new ObjectId(id),
-    });
+    token = await db.db
+      .collection<{
+        accessToken: string;
+        refreshToken: string;
+        expiresAt: Date;
+        refreshExpiresAt: Date;
+        accountId: string;
+      }>('tokens')
+      .findOne({
+        _id: new ObjectId(id),
+      });
   }
 
   console.log(`Refreshed token for ${decoded.sub}`);
@@ -854,6 +870,160 @@ app.post('/v2/persist', async (c) => {
       {
         id: entry.upsertedId,
         status: 'ok',
+      },
+      200
+    );
+  } catch (err) {
+    console.error('Error verifying JWT', err);
+    return c.json({ error: 'Invalid JWT' }, 401);
+  }
+});
+
+app.get('/v2/refresh', async (c) => {
+  // Get the jwt token from the authorization header
+  const authorization = c.req.header('Authorization');
+
+  if (!authorization) {
+    console.error('Missing authorization header');
+    return c.json({ error: 'Missing authorization header' }, 401);
+  }
+
+  const token = authorization.replace('Bearer ', '');
+
+  if (!token) {
+    console.error('Missing token');
+    return c.json({ error: 'Missing token' }, 401);
+  }
+
+  const certificate = process.env.JWT_PUBLIC_KEY;
+
+  if (!certificate) {
+    console.error('Missing JWT_PUBLIC_KEY env variable');
+    return c.json({ error: 'Missing JWT_PUBLIC_KEY env variable' }, 401);
+  }
+
+  try {
+    const egdataJWT = jwt.verify(token, readFileSync(certificate, 'utf-8'), {
+      algorithms: ['RS256'],
+    }) as {
+      access_token: string;
+      refresh_token: string;
+      expires_at: string;
+      refresh_expires_at: string;
+    };
+
+    if (!egdataJWT || !egdataJWT.access_token) {
+      console.error('Invalid JWT');
+      return c.json({ error: 'Invalid JWT' }, 401);
+    }
+
+    // Inspect the token from "decoded.access_token"
+    const decoded = jwt.decode(egdataJWT.access_token as string) as {
+      sub: string;
+      iss: string;
+      dn: string;
+      nonce: string;
+      pfpid: string;
+      sec: number;
+      aud: string;
+      t: string;
+      scope: string;
+      appid: string;
+      exp: number;
+      iat: number;
+      jti: string;
+    };
+
+    if (!decoded || !decoded.sub || !decoded.iss) {
+      console.error('Invalid JWT');
+      return c.json({ error: 'Invalid JWT' }, 401);
+    }
+
+    // Get the token from the database
+    let dbtoken = await db.db
+      .collection<{
+        accessToken: string;
+        refreshToken: string;
+        expiresAt: Date;
+        refreshExpiresAt: Date;
+        accountId: string;
+      }>('tokens')
+      .findOne({
+        tokenId: decoded.jti,
+      });
+
+    if (!dbtoken) {
+      console.error('Token not found');
+      return c.json({ error: 'Token not found' }, 404);
+    }
+
+    // Check if the token is expired, if so, refresh it and return the new token
+    if (dbtoken.expiresAt.getTime() < new Date().getTime()) {
+      const url = new URL('https://api.epicgames.dev/epic/oauth/v2/token');
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Basic ${Buffer.from(
+            `${process.env.EPIC_CLIENT_ID}:${process.env.EPIC_CLIENT_SECRET}`
+          ).toString('base64')}`,
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: dbtoken.refreshToken,
+          scope: 'basic_profile',
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to refresh token', await response.json());
+        return c.json({ error: 'Failed to refresh token' }, 401);
+      }
+
+      const responseData = (await response.json()) as {
+        access_token: string;
+        refresh_token: string;
+        refresh_expires_at: string;
+        expires_at: string;
+      };
+
+      await db.db.collection('tokens').updateOne(
+        {
+          tokenId: decoded.jti,
+        },
+        {
+          $set: {
+            accessToken: responseData.access_token,
+            refreshToken: responseData.refresh_token,
+            expiresAt: new Date(responseData.expires_at),
+            refreshExpiresAt: new Date(responseData.refresh_expires_at),
+          },
+        },
+        {
+          upsert: false,
+        }
+      );
+
+      dbtoken = await db.db
+        .collection<{
+          accessToken: string;
+          refreshToken: string;
+          expiresAt: Date;
+          refreshExpiresAt: Date;
+          accountId: string;
+        }>('tokens')
+        .findOne({
+          tokenId: decoded.jti,
+        });
+    }
+
+    return c.json(
+      {
+        accessToken: dbtoken?.accessToken,
+        refreshToken: dbtoken?.refreshToken,
+        expiresAt: dbtoken?.expiresAt,
+        refreshExpiresAt: dbtoken?.refreshExpiresAt,
       },
       200
     );
