@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 import * as jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import { db } from '../db/index.js';
+import { readFileSync } from 'node:fs';
 
 interface EpicProfileResponse {
   accountId: string;
@@ -768,6 +769,98 @@ app.patch('/refresh-admin', async (c) => {
     },
     200
   );
+});
+
+app.post('/v2/persist', async (c) => {
+  // Get the jwt token from the authorization header
+  const authorization = c.req.header('Authorization');
+
+  if (!authorization) {
+    console.error('Missing authorization header');
+    return c.json({ error: 'Missing authorization header' }, 401);
+  }
+
+  const token = authorization.replace('Bearer ', '');
+
+  if (!token) {
+    console.error('Missing token');
+    return c.json({ error: 'Missing token' }, 401);
+  }
+
+  const certificate = process.env.JWT_PUBLIC_KEY;
+
+  if (!certificate) {
+    console.error('Missing JWT_PUBLIC_KEY env variable');
+    return c.json({ error: 'Missing JWT_PUBLIC_KEY env variable' }, 401);
+  }
+
+  try {
+    const egdataJWT = jwt.verify(token, readFileSync(certificate, 'utf-8'), {
+      algorithms: ['RS256'],
+    }) as {
+      access_token: string;
+      refresh_token: string;
+      expires_at: string;
+      refresh_expires_at: string;
+    };
+
+    if (!egdataJWT || !egdataJWT.access_token) {
+      console.error('Invalid JWT');
+      return c.json({ error: 'Invalid JWT' }, 401);
+    }
+
+    // Inspect the token from "decoded.access_token" and save it to the database
+    const decoded = jwt.decode(egdataJWT.access_token as string) as {
+      sub: string;
+      iss: string;
+      dn: string;
+      nonce: string;
+      pfpid: string;
+      sec: number;
+      aud: string;
+      t: string;
+      scope: string;
+      appid: string;
+      exp: number;
+      iat: number;
+      jti: string;
+    };
+
+    if (!decoded || !decoded.sub || !decoded.iss) {
+      console.error('Invalid JWT');
+      return c.json({ error: 'Invalid JWT' }, 401);
+    }
+
+    // Save the JWT to the database (same logic as "persist" endpoint)
+    const entry = await db.db.collection('tokens').updateOne(
+      {
+        tokenId: decoded.jti,
+      },
+      {
+        $set: {
+          accessToken: egdataJWT.access_token,
+          refreshToken: egdataJWT.refresh_token,
+          expiresAt: new Date(egdataJWT.expires_at),
+          refreshExpiresAt: new Date(egdataJWT.refresh_expires_at),
+          accountId: decoded.sub,
+        },
+      },
+      {
+        upsert: true,
+      }
+    );
+
+    return c.json(
+      {
+        id: entry.upsertedId,
+        status: 'ok',
+      },
+      200
+    );
+  } catch (err) {
+    console.error('Error verifying JWT', err);
+    return c.json({ error: 'Invalid JWT' }, 401);
+  }
 });
 
 export default app;
