@@ -63,7 +63,7 @@ importers:
         specifier: latest
         version: 1.1.5(mongoose@8.5.2)
       '@egdata/core.schemas.tags':
-        specifier: ^1.1.5
+        specifier: latest
         version: 1.1.5(mongoose@8.5.2)
       '@hono/node-server':
         specifier: 1.12.0
