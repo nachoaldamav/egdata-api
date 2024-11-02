@@ -31,7 +31,7 @@ app.get('/:slug', async (c) => {
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `collections:${slug}:${region}:${page}:${limit}:v0.1`;
+  const cacheKey = `collections:${slug}:${region}:${page}:${limit}`;
 
   const cached = await client.get(cacheKey);
 
@@ -87,6 +87,7 @@ app.get('/:slug', async (c) => {
           price: price ?? null,
           position: collectionOffer?.position ?? totalOffersCount,
           previousPosition: collectionOffer?.previous,
+          metadata: collectionOffer,
         };
       })
       .sort(
