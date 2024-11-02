@@ -71,57 +71,6 @@ app.get('/:sandboxId', async (c) => {
   return c.json(sandbox);
 });
 
-app.get('/:sandboxId/achievements', async (ctx) => {
-  const start = Date.now();
-  const { sandboxId } = ctx.req.param();
-
-  const cacheKey = `sandbox:${sandboxId}:achivement-sets`;
-  const cached = await client.get(cacheKey);
-
-  let achievementSets: mongoose.InferRawDocType<typeof AchievementSet>[] = [];
-
-  if (cached) {
-    achievementSets = JSON.parse(cached);
-  } else {
-    const sandbox = await Namespace.findOne({
-      namespace: sandboxId,
-    });
-
-    if (!sandbox) {
-      ctx.status(404);
-
-      return ctx.json({
-        message: 'Sandbox not found',
-      });
-    }
-
-    achievementSets = await AchievementSet.find(
-      {
-        sandboxId,
-      },
-      {
-        _id: false,
-        __v: false,
-      }
-    );
-
-    await client.set(cacheKey, JSON.stringify(achievementSets), {
-      EX: 1800, // 30min
-    });
-  }
-
-  return ctx.json(
-    {
-      sandboxId,
-      achievementSets,
-    },
-    200,
-    {
-      'Server-Timing': `db;dur=${Date.now() - start}`,
-    }
-  );
-});
-
 app.get('/:sandboxId/items', async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
