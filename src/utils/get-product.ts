@@ -1,6 +1,6 @@
-import { db as dbInstance } from "../db/index.js";
-import { Offer } from "../db/schemas/offer.js";
-import { Sandbox } from "../db/schemas/sandboxes.js";
+import { db as dbInstance } from '../db/index.js';
+import { Offer } from '@egdata/core.schemas.offers';
+import { Sandbox } from '@egdata/core.schemas.sandboxes';
 
 const { db } = dbInstance;
 
@@ -18,7 +18,7 @@ export const getProduct = async (offerId: string) => {
   }
 
   // @ts-expect-error - _id is a string
-  const product = db.collection("products").findOne({ _id: sandbox.parent });
+  const product = db.collection('products').findOne({ _id: sandbox.parent });
 
   return product;
 };

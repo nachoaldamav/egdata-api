@@ -1,16 +1,16 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import client from '../clients/redis.js';
-import { Offer } from '../db/schemas/offer.js';
-import { Tags } from '../db/schemas/tags.js';
-import { PipelineStage } from 'mongoose';
+import { Offer } from '@egdata/core.schemas.offers';
+import { Tags } from '@egdata/core.schemas.tags';
+import type { PipelineStage } from 'mongoose';
 import { regions } from '../utils/countries.js';
 import { getCookie } from 'hono/cookie';
 import { db } from '../db/index.js';
-import { ChangelogType } from '../db/schemas/changelog.js';
+import type { ChangelogType } from '@egdata/core.schemas.changelog';
 import { meiliSearchClient } from '../clients/meilisearch.js';
-import { Item } from '../db/schemas/item.js';
-import { Asset } from '../db/schemas/assets.js';
+import { Item } from '@egdata/core.schemas.items';
+import { Asset } from '@egdata/core.schemas.assets';
 
 interface SearchBody {
   title?: string;

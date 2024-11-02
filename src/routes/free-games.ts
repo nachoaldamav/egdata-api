@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { FreeGames } from '../db/schemas/freegames.js';
-import { Offer } from '../db/schemas/offer.js';
+import { FreeGames } from '@egdata/core.schemas.free-games';
+import { Offer } from '@egdata/core.schemas.offers';
 import { orderOffersObject } from '../utils/order-offers-object.js';
-import { PriceEngine } from '../db/schemas/price-engine.js';
+import { PriceEngine } from '@egdata/core.schemas.price';
 import { regions } from '../utils/countries.js';
 import { getCookie } from 'hono/cookie';
 import client from '../clients/redis.js';

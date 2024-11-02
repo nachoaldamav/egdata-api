@@ -4,24 +4,24 @@ import client from '../clients/redis.js';
 import {
   PriceEngine,
   PriceEngineHistorical,
-  type PriceType,
-} from '../db/schemas/price-engine.js';
+  type PriceEngineType as PriceType,
+} from '@egdata/core.schemas.price';
 import { getCookie } from 'hono/cookie';
-import { AchievementSet } from '../db/schemas/achievements.js';
-import { Asset, type AssetType } from '../db/schemas/assets.js';
-import { Changelog } from '../db/schemas/changelog.js';
-import { Item } from '../db/schemas/item.js';
-import { Mappings } from '../db/schemas/mappings.js';
-import { Offer, type OfferType } from '../db/schemas/offer.js';
+import { AchievementSet } from '@egdata/core.schemas.achievements';
+import { Asset, type AssetType } from '@egdata/core.schemas.assets';
+import { Changelog } from '@egdata/core.schemas.changelog';
+import { Item } from '@egdata/core.schemas.items';
+import { Mappings } from '@egdata/core.schemas.mappings';
+import { Offer, type OfferType } from '@egdata/core.schemas.offers';
 import { attributesToObject } from '../utils/attributes-to-object.js';
 import { getGameFeatures } from '../utils/game-features.js';
-import { TagModel, Tags } from '../db/schemas/tags.js';
+import { TagModel, Tags } from '@egdata/core.schemas.tags';
 import { orderOffersObject } from '../utils/order-offers-object.js';
 import { getImage } from '../utils/get-image.js';
-import { Media } from '../db/schemas/media.js';
-import { CollectionOffer } from '../db/schemas/collections.js';
-import { Sandbox } from '../db/schemas/sandboxes.js';
-import { FreeGames } from '../db/schemas/freegames.js';
+import { Media } from '@egdata/core.schemas.media';
+import { CollectionOffer } from '@egdata/core.schemas.collections';
+import { Sandbox } from '@egdata/core.schemas.sandboxes';
+import { FreeGames } from '@egdata/core.schemas.free-games';
 import { db } from '../db/index.js';
 import { Ratings } from '@egdata/core.schemas.ratings';
 import { type IReview, Review } from '../db/schemas/reviews.js';
@@ -30,7 +30,6 @@ import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
 import { Hltb } from '@egdata/core.schemas.hltb';
 import { Bundles } from '@egdata/core.schemas.bundles';
 import { epic, epicInfo } from './auth.js';
-import { $ } from 'bun';
 
 const app = new Hono();
 

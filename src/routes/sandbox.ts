@@ -1,17 +1,17 @@
 import { Hono } from 'hono';
 import type mongoose from 'mongoose';
 import client from '../clients/redis.js';
-import { AchievementSet } from '../db/schemas/achievements.js';
-import { Namespace } from '../db/schemas/namespace.js';
-import { Item } from '../db/schemas/item.js';
-import { Offer } from '../db/schemas/offer.js';
-import { Asset } from '../db/schemas/assets.js';
+import { AchievementSet } from '@egdata/core.schemas.achievements';
+import { Namespace } from '@egdata/core.schemas.namespace';
+import { Item } from '@egdata/core.schemas.items';
+import { Offer } from '@egdata/core.schemas.offers';
+import { Asset } from '@egdata/core.schemas.assets';
 import { db } from '../db/index.js';
-import { PriceEngine } from '../db/schemas/price-engine.js';
+import { PriceEngine } from '@egdata/core.schemas.price';
 import { regions } from '../utils/countries.js';
 import { getCookie } from 'hono/cookie';
 import { orderOffersObject } from '../utils/order-offers-object.js';
-import { Changelog } from '../db/schemas/changelog.js';
+import { Changelog } from '@egdata/core.schemas.changelog';
 
 const app = new Hono();
 

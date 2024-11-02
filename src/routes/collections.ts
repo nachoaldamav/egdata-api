@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { Offer } from '../db/schemas/offer.js';
-import { PriceEngine } from '../db/schemas/price-engine.js';
-import { CollectionOffer } from '../db/schemas/collections.js';
+import { Offer } from '@egdata/core.schemas.offers';
+import { PriceEngine } from '@egdata/core.schemas.price';
+import { CollectionOffer } from '@egdata/core.schemas.collections';
 import { getCookie } from 'hono/cookie';
 import { regions } from '../utils/countries.js';
 import client from '../clients/redis.js';
@@ -86,6 +86,7 @@ app.get('/:slug', async (c) => {
           ...o.toObject(),
           price: price ?? null,
           position: collectionOffer?.position ?? totalOffersCount,
+          previousPosition: collectionOffer?.previous,
         };
       })
       .sort(

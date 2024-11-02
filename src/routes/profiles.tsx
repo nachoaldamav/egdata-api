@@ -3,12 +3,12 @@ import { epicStoreClient } from '../clients/epic.js';
 import client from '../clients/redis.js';
 import type { AchievementsSummary } from '../types/get-user-achievements.js';
 import { db } from '../db/index.js';
-import { Sandbox } from '../db/schemas/sandboxes.js';
-import { Offer } from '../db/schemas/offer.js';
+import { Sandbox } from '@egdata/core.schemas.sandboxes';
+import { Offer } from '@egdata/core.schemas.offers';
 import {
   AchievementSet,
   type AchievementType,
-} from '../db/schemas/achievements.js';
+} from '@egdata/core.schemas.achievements';
 
 export interface PlayerProductAchievements {
   _id: Id;

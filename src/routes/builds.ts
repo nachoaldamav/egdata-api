@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db/index.js';
-import { Item } from '../db/schemas/item.js';
-import { Asset } from '../db/schemas/assets.js';
+import { Item } from '@egdata/core.schemas.items';
+import { Asset } from '@egdata/core.schemas.assets';
 import { ObjectId } from 'mongodb';
 
 const app = new Hono();

@@ -1,14 +1,14 @@
 import { Hono } from 'hono';
-import { Offer } from '../db/schemas/offer.js';
+import { Offer } from '@egdata/core.schemas.offers';
 import { getCookie } from 'hono/cookie';
 import { regions } from '../utils/countries.js';
 import client from '../clients/redis.js';
-import { PriceEngine } from '../db/schemas/price-engine.js';
+import { PriceEngine } from '@egdata/core.schemas.price';
 import { orderOffersObject } from '../utils/order-offers-object.js';
-import { CollectionOffer } from '../db/schemas/collections.js';
-import { Item } from '../db/schemas/item.js';
-import { FreeGames } from '../db/schemas/freegames.js';
-import { Seller } from '../db/schemas/sellers.js';
+import { CollectionOffer } from '@egdata/core.schemas.collections';
+import { Item } from '@egdata/core.schemas.items';
+import { FreeGames } from '@egdata/core.schemas.free-games';
+import { Seller } from '@egdata/core.schemas.sellers';
 
 const app = new Hono();
 

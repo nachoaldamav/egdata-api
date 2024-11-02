@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Asset } from '../db/schemas/assets.js';
+import { Asset } from '@egdata/core.schemas.assets';
 
 const app = new Hono();
 

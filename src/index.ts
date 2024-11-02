@@ -6,16 +6,19 @@ import { getCookie } from 'hono/cookie';
 import { etag } from 'hono/etag';
 import { swaggerUI } from '@hono/swagger-ui';
 import { db } from './db/index.js';
-import { Offer, type OfferType } from './db/schemas/offer.js';
-import { Item } from './db/schemas/item.js';
+import { Offer, type OfferType } from '@egdata/core.schemas.offers';
+import { Item } from '@egdata/core.schemas.items';
 import { orderOffersObject } from './utils/order-offers-object.js';
 import { getFeaturedGames } from './utils/get-featured-games.js';
 import { countries, regions } from './utils/countries.js';
-import { TagModel, Tags } from './db/schemas/tags.js';
+import { TagModel, Tags } from '@egdata/core.schemas.tags';
 import { attributesToObject } from './utils/attributes-to-object.js';
-import { Asset } from './db/schemas/assets.js';
-import { PriceEngine, type PriceType } from './db/schemas/price-engine.js';
-import { Changelog } from './db/schemas/changelog.js';
+import { Asset } from '@egdata/core.schemas.assets';
+import {
+  PriceEngine,
+  type PriceEngineType as PriceType,
+} from '@egdata/core.schemas.price';
+import { Changelog } from '@egdata/core.schemas.changelog';
 import client from './clients/redis.js';
 import SandboxRoute from './routes/sandbox.js';
 import SearchRoute from './routes/search.js';
@@ -37,7 +40,7 @@ import { config } from 'dotenv';
 import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
 import { meiliSearchClient } from './clients/meilisearch.js';
-import { Seller } from './db/schemas/sellers.js';
+import { Seller } from '@egdata/core.schemas.sellers';
 
 config();
 db.connect();
