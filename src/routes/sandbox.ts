@@ -429,12 +429,15 @@ app.get('/:sandboxId/stats', async (c) => {
     });
   }
 
-  const [offers, items] = await Promise.all([
+  const [offers, items, achievements] = await Promise.all([
     Offer.countDocuments({
       namespace: sandboxId,
     }),
     Item.find({
       namespace: sandboxId,
+    }),
+    AchievementSet.find({
+      sandboxId,
     }),
   ]);
 
@@ -457,6 +460,7 @@ app.get('/:sandboxId/stats', async (c) => {
     items: items.length,
     assets,
     builds: builds.length,
+    achievements: achievements.flatMap((a) => a.achievements).length,
   });
 });
 
