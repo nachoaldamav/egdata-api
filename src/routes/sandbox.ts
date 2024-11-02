@@ -124,20 +124,7 @@ app.get('/:sandboxId/offers', async (ctx) => {
     {
       namespace: sandboxId,
     },
-    {
-      _id: 0,
-      id: 1,
-      title: 1,
-      description: 1,
-      namespace: 1,
-      offerType: 1,
-      effectiveDate: 1,
-      creationDate: 1,
-      lastModifiedDate: 1,
-      keyImages: 1,
-      productSlug: 1,
-      releaseDate: 1,
-    },
+    undefined,
     {
       sort: {
         lastModified: -1,
