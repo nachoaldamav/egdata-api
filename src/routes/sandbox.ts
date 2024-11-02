@@ -413,4 +413,51 @@ app.get('/:sandboxId/builds', async (c) => {
   return c.json(builds);
 });
 
+app.get('/:sandboxId/stats', async (c) => {
+  const { sandboxId } = c.req.param();
+
+  const sandbox = await db.db.collection('sandboxes').findOne({
+    // @ts-ignore
+    _id: sandboxId,
+  });
+
+  if (!sandbox) {
+    c.status(404);
+
+    return c.json({
+      message: 'Sandbox not found',
+    });
+  }
+
+  const [offers, items] = await Promise.all([
+    Offer.countDocuments({
+      namespace: sandboxId,
+    }),
+    Item.find({
+      namespace: sandboxId,
+    }),
+  ]);
+
+  const [assets, builds] = await Promise.all([
+    Asset.countDocuments({
+      namespace: sandboxId,
+    }),
+    db.db
+      .collection('builds')
+      .find({
+        appName: {
+          $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+        },
+      })
+      .toArray(),
+  ]);
+
+  return c.json({
+    offers,
+    items: items.length,
+    assets,
+    builds: builds.length,
+  });
+});
+
 export default app;
