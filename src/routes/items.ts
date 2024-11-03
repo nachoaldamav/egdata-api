@@ -119,8 +119,9 @@ app.get('/:id/builds', async (c) => {
 
       return {
         ...build,
-        downloadSizeBytes: asset?.downloadSizeBytes,
-        installedSizeBytes: asset?.installedSizeBytes,
+        downloadSizeBytes: build?.downloadSizeBytes ?? asset?.downloadSizeBytes,
+        installedSizeBytes:
+          build?.installedSizeBytes ?? asset?.installedSizeBytes,
       };
     })
   );
