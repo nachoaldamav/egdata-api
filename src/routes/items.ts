@@ -110,7 +110,22 @@ app.get('/:id/builds', async (c) => {
     })
     .toArray();
 
-  return c.json(builds);
+  const assets = await Promise.all(
+    builds.map(async (build) => {
+      const asset = await Asset.findOne({
+        artifactId: build.appName,
+        platform: build.labelName.split('-')[1],
+      });
+
+      return {
+        ...build,
+        downloadSizeBytes: asset?.downloadSizeBytes,
+        installedSizeBytes: asset?.installedSizeBytes,
+      };
+    })
+  );
+
+  return c.json(assets);
 });
 
 export default app;
