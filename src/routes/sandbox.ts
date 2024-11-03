@@ -242,7 +242,7 @@ app.get('/:sandboxId/base-game', async (c) => {
     });
   }
 
-  const cacheKey = `base-game:${sandboxId}:${region}`;
+  const cacheKey = `base-game:${sandboxId}:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -256,6 +256,7 @@ app.get('/:sandboxId/base-game', async (c) => {
     namespace: sandboxId,
     offerType: 'BASE_GAME',
     prePurchase: { $ne: true },
+    isCodeRedemptionOnly: false,
   });
 
   if (!baseGame) {
