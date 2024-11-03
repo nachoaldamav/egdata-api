@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import type mongoose from 'mongoose';
 import client from '../clients/redis.js';
 import { AchievementSet } from '@egdata/core.schemas.achievements';
 import { Namespace } from '@egdata/core.schemas.namespace';
@@ -12,6 +11,7 @@ import { regions } from '../utils/countries.js';
 import { getCookie } from 'hono/cookie';
 import { orderOffersObject } from '../utils/order-offers-object.js';
 import { Changelog } from '@egdata/core.schemas.changelog';
+import { ObjectId } from 'mongodb';
 
 const app = new Hono();
 
@@ -151,19 +151,63 @@ app.get('/:sandboxId/assets', async (ctx) => {
     });
   }
 
-  const assets = await Asset.find(
-    {
-      namespace: sandboxId,
-    },
-    undefined,
-    {
-      sort: {
-        lastModified: -1,
+  // const assets = await Asset.find(
+  //   {
+  //     namespace: sandboxId,
+  //   },
+  //   undefined,
+  //   {
+  //     sort: {
+  //       lastModified: -1,
+  //     },
+  //   }
+  // );
+  const [assets, items] = await Promise.all([
+    Asset.find(
+      {
+        namespace: sandboxId,
       },
-    }
-  );
+      undefined,
+      {
+        sort: {
+          lastModified: -1,
+        },
+      }
+    ),
+    Item.find(
+      {
+        namespace: sandboxId,
+      },
+      {
+        id: 1,
+        namespace: 1,
+        releaseInfo: 1,
+      }
+    ),
+  ]);
 
-  return ctx.json(assets);
+  const result = assets.map((a) => a.toObject());
+
+  // Some assets are not found because they are protected or hidden, but we know they exist, so we add them to the result with 0 sizes
+  for (const item of items) {
+    for (const releaseInfo of item.releaseInfo) {
+      if (!assets.find((a) => a.artifactId === releaseInfo.appId)) {
+        for (const platform of releaseInfo.platform) {
+          result.push({
+            artifactId: releaseInfo.appId as string,
+            downloadSizeBytes: 0,
+            installedSizeBytes: 0,
+            itemId: item.id,
+            namespace: item.namespace,
+            platform,
+            _id: new ObjectId(),
+          });
+        }
+      }
+    }
+  }
+
+  return ctx.json(result);
 });
 
 app.get('/:sandboxId/base-game', async (c) => {
