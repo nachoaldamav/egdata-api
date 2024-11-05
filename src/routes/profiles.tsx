@@ -700,15 +700,65 @@ app.get('/:id/information', async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:v0.3`;
+  const cacheKey = `epic-profile:${id}:stats:v0.3`;
 
-  const cached = await client.get(cacheKey);
-  if (cached) {
-    return c.json(JSON.parse(cached), {
-      headers: {
-        'Cache-Control': 'public, max-age=60',
-      },
-    });
+  // Check if stats are cached
+  const cachedStats = await client.get(cacheKey);
+  let stats: {
+    totalGames: number;
+    totalPlayerAwards: number;
+    totalAchievements: number;
+    totalXP: number;
+  };
+
+  if (cachedStats) {
+    stats = JSON.parse(cachedStats);
+  } else {
+    try {
+      // Fetch total stats including totalXP
+      const statsArray = await db.db
+        .collection('player-achievements')
+        .aggregate([
+          { $match: { epicAccountId: id } },
+          {
+            $project: {
+              totalPlayerAwardsCount: {
+                $size: { $ifNull: ['$playerAwards', []] },
+              },
+              totalUnlocked: 1,
+              totalXP: 1,
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalGames: { $sum: 1 },
+              totalPlayerAwards: { $sum: '$totalPlayerAwardsCount' },
+              totalAchievements: { $sum: '$totalUnlocked' },
+              totalXP: { $sum: '$totalXP' },
+            },
+          },
+        ])
+        .toArray();
+
+      stats = statsArray[0] || {
+        totalGames: 0,
+        totalPlayerAwards: 0,
+        totalAchievements: 0,
+        totalXP: 0,
+      };
+
+      // Cache the stats data for future requests
+      await client.set(cacheKey, JSON.stringify(stats), {
+        EX: 60,
+      });
+    } catch (err) {
+      console.error('Error fetching stats', err);
+      c.status(400);
+      return c.json({
+        message: 'Failed to fetch stats',
+      });
+    }
   }
 
   try {
@@ -741,39 +791,6 @@ app.get('/:id/information', async (c) => {
       );
     }
 
-    // Fetch total stats including totalXP
-    const statsArray = await db.db
-      .collection('player-achievements')
-      .aggregate([
-        { $match: { epicAccountId: id } },
-        {
-          $project: {
-            totalPlayerAwardsCount: {
-              $size: { $ifNull: ['$playerAwards', []] },
-            },
-            totalUnlocked: 1,
-            totalXP: 1,
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalGames: { $sum: 1 },
-            totalPlayerAwards: { $sum: '$totalPlayerAwardsCount' },
-            totalAchievements: { $sum: '$totalUnlocked' },
-            totalXP: { $sum: '$totalXP' },
-          },
-        },
-      ])
-      .toArray();
-
-    const stats = statsArray[0] || {
-      totalGames: 0,
-      totalPlayerAwards: 0,
-      totalAchievements: 0,
-      totalXP: 0,
-    };
-
     // Fetch reviews count
     const reviewsCount = await db.db
       .collection('reviews')
@@ -783,25 +800,18 @@ app.get('/:id/information', async (c) => {
     const result = {
       ...profile,
       stats: {
-        totalGames: stats.totalGames,
-        totalAchievements: stats.totalAchievements,
-        totalPlayerAwards: stats.totalPlayerAwards,
-        // Each platinum award is worth 250 XP
+        ...stats,
         totalXP: stats.totalXP + stats.totalPlayerAwards * 250,
         reviewsCount: reviewsCount,
       },
       avatar: {
         small: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.small,
-        medium: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.medium,
-        large: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.large,
+        medium: dbProfile?.avatarUrl?.variants[1] ?? profile?.avatar?.medium,
+        large: dbProfile?.avatarUrl?.variants[2] ?? profile?.avatar?.large,
       },
       linkedAccounts: dbProfile?.linkedAccounts,
       creationDate: dbProfile?.creationDate,
     };
-
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 60,
-    });
 
     return c.json(result, {
       headers: {
