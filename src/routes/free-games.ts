@@ -346,11 +346,11 @@ app.get('/search', async (c) => {
     filters.push(`giveaway.endTimestamp <= ${endDate.getTime()}`);
   }
 
-  const result = await index.search(undefined, {
+  const result = await index.search(query.title || '', {
+    // Use empty string if title is undefined
     limit,
     offset: skip,
-    filter: filters.join(' AND '),
-    q: query.title,
+    filter: filters.length > 0 ? filters.join(' AND ') : undefined, // Apply filter only if not empty
     sort: [sort],
   });
 
