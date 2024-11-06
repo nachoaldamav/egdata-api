@@ -483,10 +483,8 @@ app.get('/stats', async (c) => {
     totalOffers: offers.length,
     totalGiveaways: giveaways.length,
     // Sum all the repeated offers (1 is not repeated)
-    repeated: Object.values(offerRepetitions).reduce(
-      (acc, cur) => acc + cur - 1,
-      0
-    ),
+    repeated: Object.values(offerRepetitions).filter((count) => count > 1)
+      .length,
     sellers: Object.keys(singleSellers).length,
   };
 
