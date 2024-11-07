@@ -30,6 +30,7 @@ import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
 import { Hltb } from '@egdata/core.schemas.hltb';
 import { Bundles } from '@egdata/core.schemas.bundles';
 import { epic, epicInfo } from './auth.js';
+import { ageRatingsCountries } from '../utils/age-ratings.js';
 
 const app = new Hono();
 
@@ -1667,8 +1668,13 @@ app.get('/:id/suggestions', async (c) => {
 
 app.get('/:id/age-rating', async (c) => {
   const { id } = c.req.param();
+  const single = c.req.query('single');
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
-  const cacheKey = `age-rating:${id}`;
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const cacheKey = `age-rating:${id}:${single ? 'single' : 'all'}`;
 
   const cached = await client.get(cacheKey);
 
@@ -1700,6 +1706,44 @@ app.get('/:id/age-rating', async (c) => {
 
   const ageRatings = sandbox.ageGatings;
 
+  if (!ageRatings) {
+    c.status(404);
+    return c.json({
+      message: 'Sandbox not found',
+    });
+  }
+
+  if (single) {
+    const selectedRating = Object.entries(ageRatingsCountries).find(
+      ([, rating]) => rating.includes(selectedCountry)
+    )?.[0];
+
+    if (!selectedRating) {
+      c.status(404);
+      return c.json({
+        message: 'Country not found',
+      });
+    }
+
+    const rating = ageRatings[selectedRating];
+
+    if (!rating) {
+      c.status(404);
+      return c.json({
+        message: 'Age rating not found',
+      });
+    }
+
+    return c.json(
+      {
+        [selectedRating]: rating,
+      },
+      200,
+      {
+        'Cache-Control': 'public, max-age=60',
+      }
+    );
+  }
   await client.set(cacheKey, JSON.stringify(ageRatings), {
     EX: 3600,
   });
