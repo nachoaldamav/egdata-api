@@ -1714,16 +1714,10 @@ app.get('/:id/age-rating', async (c) => {
   }
 
   if (single) {
-    const selectedRating = Object.entries(ageRatingsCountries).find(
-      ([, rating]) => rating.includes(selectedCountry)
-    )?.[0];
-
-    if (!selectedRating) {
-      c.status(404);
-      return c.json({
-        message: 'Country not found',
-      });
-    }
+    const selectedRating =
+      Object.entries(ageRatingsCountries).find(([, rating]) =>
+        rating.includes(selectedCountry)
+      )?.[0] ?? 'IARC';
 
     const rating = ageRatings[selectedRating];
 
@@ -1744,6 +1738,7 @@ app.get('/:id/age-rating', async (c) => {
       }
     );
   }
+
   await client.set(cacheKey, JSON.stringify(ageRatings), {
     EX: 3600,
   });
