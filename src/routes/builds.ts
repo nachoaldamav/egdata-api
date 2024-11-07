@@ -36,6 +36,7 @@ app.get('/:id/files', async (c) => {
   const page = Number.parseInt(c.req.query('page') || '1', 10);
   const sort = c.req.query('sort') || 'depth';
   const direction = c.req.query('dir') || 'asc';
+  const filename = c.req.query('q');
 
   // Get the extension(s) query parameter, expecting a comma-separated list if there are multiple
   const extensions = c.req.query('extension')?.split(',');
@@ -59,6 +60,12 @@ app.get('/:id/files', async (c) => {
   if (extensions) {
     query.fileName = {
       $regex: new RegExp(`\\.(${extensions.join('|')})$`, 'i'),
+    };
+  }
+
+  if (filename) {
+    query.fileName = {
+      $regex: new RegExp(`^${filename}$`, 'i'),
     };
   }
 
