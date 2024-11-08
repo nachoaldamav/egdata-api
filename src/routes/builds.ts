@@ -65,7 +65,7 @@ app.get('/:id/files', async (c) => {
 
   if (filename) {
     query.fileName = {
-      $regex: new RegExp(`^${filename}$`, 'i'),
+      $regex: new RegExp(filename, 'i'),
     };
   }
 
