@@ -43,7 +43,8 @@ interface SearchBody {
     | 'upcoming'
     | 'priceAsc'
     | 'priceDesc'
-    | 'price';
+    | 'price'
+    | 'discount';
   sortDir?: 'asc' | 'desc';
   limit?: number;
   page?: number;
@@ -242,7 +243,9 @@ app.post('/', async (c) => {
       };
     }
 
-    if (!['upcoming', 'priceAsc', 'priceDesc', 'price'].includes(sort)) {
+    if (
+      !['upcoming', 'priceAsc', 'priceDesc', 'price', 'discount'].includes(sort)
+    ) {
       // @ts-expect-error
       sortParams[sort] = sortQuery[sort];
     } else if (sort === 'upcoming') {
@@ -261,7 +264,7 @@ app.post('/', async (c) => {
   let offersPipeline: PipelineStage[] = [];
   let collection = 'offers';
 
-  if (['priceAsc', 'priceDesc', 'price'].includes(sort)) {
+  if (['priceAsc', 'priceDesc', 'price', 'discount'].includes(sort)) {
     // If sorting by price, start with the pricing collection
     // const priceSortOrder = sort === 'priceAsc' ? 1 : -1;
     const priceSortOrder =
@@ -270,6 +273,9 @@ app.post('/', async (c) => {
           ? 1
           : -1
         : dir;
+
+    const sortKey =
+      sort === 'discount' ? 'price.discount' : 'price.discountPrice';
 
     collection = 'pricev2';
     offersPipeline = [
@@ -281,7 +287,7 @@ app.post('/', async (c) => {
       },
       {
         $sort: {
-          'price.discountPrice': priceSortOrder,
+          [sortKey]: priceSortOrder,
         },
       },
       // Move the root content (all of it) to the price field
