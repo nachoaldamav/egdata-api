@@ -56,16 +56,21 @@ app.get('/:id/files', async (c) => {
 
   const sortQuery: Sort = {};
 
-  // If extensions are provided, use `$in` with a regex to match any of the extensions
-  if (extensions) {
+  if (filename && extensions) {
+    // Both filename and extensions are provided
+    query.$and = [
+      { fileName: { $regex: new RegExp(filename, 'i') } },
+      {
+        fileName: { $regex: new RegExp(`\\.(${extensions.join('|')})$`, 'i') },
+      },
+    ];
+  } else if (filename) {
+    // Only filename is provided
+    query.fileName = { $regex: new RegExp(filename, 'i') };
+  } else if (extensions) {
+    // Only extensions are provided
     query.fileName = {
       $regex: new RegExp(`\\.(${extensions.join('|')})$`, 'i'),
-    };
-  }
-
-  if (filename) {
-    query.fileName = {
-      $regex: new RegExp(filename, 'i'),
     };
   }
 
