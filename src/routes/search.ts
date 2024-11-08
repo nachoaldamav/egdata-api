@@ -278,7 +278,7 @@ app.post('/', async (c) => {
     )
   ) {
     // If sorting by price, start with the pricing collection
-    const priceSortOrder: 1 | -1 =
+    let priceSortOrder: 1 | -1 =
       sort === 'priceAsc' || sort === 'priceDesc'
         ? sort === 'priceAsc'
           ? 1
@@ -296,6 +296,11 @@ app.post('/', async (c) => {
 
       return 'price.discountPrice';
     };
+
+    if (sort === 'discountPercent') {
+      // Revert the order if sorting by discount percentage
+      priceSortOrder = priceSortOrder * -1;
+    }
 
     collection = 'pricev2';
     offersPipeline = [
