@@ -44,7 +44,8 @@ interface SearchBody {
     | 'priceAsc'
     | 'priceDesc'
     | 'price'
-    | 'discount';
+    | 'discount'
+    | 'discountPercent';
   sortDir?: 'asc' | 'desc';
   limit?: number;
   page?: number;
@@ -230,7 +231,7 @@ app.post('/', async (c) => {
     }
   }
 
-  if (query.onSale) {
+  if (query.onSale || ['discount', 'discountPercent'].includes(sort)) {
     priceQuery['price.discount'] = { $gt: 0 };
   }
 
@@ -244,7 +245,14 @@ app.post('/', async (c) => {
     }
 
     if (
-      !['upcoming', 'priceAsc', 'priceDesc', 'price', 'discount'].includes(sort)
+      ![
+        'upcoming',
+        'priceAsc',
+        'priceDesc',
+        'price',
+        'discount',
+        'discountPercent',
+      ].includes(sort)
     ) {
       // @ts-expect-error
       sortParams[sort] = sortQuery[sort];
@@ -264,18 +272,30 @@ app.post('/', async (c) => {
   let offersPipeline: PipelineStage[] = [];
   let collection = 'offers';
 
-  if (['priceAsc', 'priceDesc', 'price', 'discount'].includes(sort)) {
+  if (
+    ['priceAsc', 'priceDesc', 'price', 'discount', 'discountPercent'].includes(
+      sort
+    )
+  ) {
     // If sorting by price, start with the pricing collection
-    // const priceSortOrder = sort === 'priceAsc' ? 1 : -1;
-    const priceSortOrder =
+    const priceSortOrder: 1 | -1 =
       sort === 'priceAsc' || sort === 'priceDesc'
         ? sort === 'priceAsc'
           ? 1
           : -1
         : dir;
 
-    const sortKey =
-      sort === 'discount' ? 'price.discount' : 'price.discountPrice';
+    const sortKey = () => {
+      if (sort === 'discountPercent') {
+        return 'appliedRules.discountSetting.discountPercentage';
+      }
+
+      if (sort === 'discount') {
+        return 'price.discount';
+      }
+
+      return 'price.discountPrice';
+    };
 
     collection = 'pricev2';
     offersPipeline = [
@@ -287,7 +307,7 @@ app.post('/', async (c) => {
       },
       {
         $sort: {
-          [sortKey]: priceSortOrder,
+          [sortKey()]: priceSortOrder,
         },
       },
       // Move the root content (all of it) to the price field
