@@ -1133,6 +1133,9 @@ app.get('/:id/price', async (c) => {
   }
 
   const cacheKey = `price:${id}:${region}:v0.1`;
+
+  console.log(`Requesting ${cacheKey}`);
+
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -2935,7 +2938,9 @@ app.get('/:id/price/stats', async (c) => {
     });
   }
 
-  const cacheKey = `price:stats:${id}:${region}:v0.1`;
+  const cacheKey = `price-stats:${id}:${region}:v0.1`;
+
+  console.log(`Requesting ${cacheKey}`);
 
   const cached = await client.get(cacheKey);
 
