@@ -1720,7 +1720,7 @@ app.get('/:id/age-rating', async (c) => {
     const selectedRating =
       Object.entries(ageRatingsCountries).find(([, rating]) =>
         rating.includes(selectedCountry)
-      )?.[0] ?? 'IARC';
+      )?.[0] ?? 'Generic';
 
     const rating = ageRatings[selectedRating];
 
