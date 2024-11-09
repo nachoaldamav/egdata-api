@@ -2917,10 +2917,6 @@ app.get('/:id/genres', async (c) => {
   return c.json(result);
 });
 
-/**
- * Returns the current price, lowest price, last discount price
- * All prices should return the price object, not the number
- */
 app.get('/:id/price/stats', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
@@ -2939,7 +2935,7 @@ app.get('/:id/price/stats', async (c) => {
     });
   }
 
-  const cacheKey = `price:stats:${id}:${region}`;
+  const cacheKey = `price:stats:${id}:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
