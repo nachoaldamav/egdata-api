@@ -2917,4 +2917,97 @@ app.get('/:id/genres', async (c) => {
   return c.json(result);
 });
 
+/**
+ * Returns the current price, lowest price, last discount price
+ * All prices should return the price object, not the number
+ */
+app.get('/:id/price/stats', async (c) => {
+  const { id } = c.req.param();
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+
+  const cacheKey = `price-stats:${id}:${region}`;
+
+  // const cached = await client.get(cacheKey);
+
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const [currentPrice, lowestPrice, lastDiscountPrice] = await Promise.all([
+    PriceEngine.findOne(
+      {
+        offerId: id,
+        region,
+      },
+      undefined,
+      {
+        sort: {
+          updatedAt: -1,
+        },
+      }
+    ),
+    PriceEngineHistorical.findOne(
+      {
+        offerId: id,
+        region,
+        'price.discount': { $gt: 0 },
+      },
+      undefined,
+      {
+        sort: {
+          'price.discountPrice': 1,
+        },
+      }
+    ),
+    PriceEngineHistorical.findOne(
+      {
+        offerId: id,
+        region,
+        'price.discount': { $gt: 0 },
+      },
+      undefined,
+      {
+        sort: {
+          updatedAt: -1,
+        },
+      }
+    ),
+  ]);
+
+  await client.set(cacheKey, JSON.stringify(currentPrice), {
+    EX: 3600,
+  });
+
+  return c.json({
+    current: currentPrice,
+    lowest: lowestPrice,
+    lastDiscount: lastDiscountPrice,
+  });
+});
+
 export default app;
