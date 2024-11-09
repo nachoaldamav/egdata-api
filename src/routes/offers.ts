@@ -2896,4 +2896,25 @@ app.get('/:id/has-regular', async (c) => {
   });
 });
 
+app.get('/:id/genres', async (c) => {
+  const { id } = c.req.param();
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    return c.json({ error: 'Offer not found' }, 404);
+  }
+
+  const genres = await Tags.find({
+    groupName: 'genre',
+    status: 'ACTIVE',
+  });
+
+  const result = offer.tags.filter((tag) =>
+    genres?.map((genre) => genre?.id).includes(tag?.id)
+  );
+
+  return c.json(result);
+});
+
 export default app;
