@@ -2939,7 +2939,7 @@ app.get('/:id/price/stats', async (c) => {
     });
   }
 
-  const cacheKey = `price-stats:${id}:${region}`;
+  const cacheKey = `price:stats:${id}:${region}`;
 
   const cached = await client.get(cacheKey);
 
