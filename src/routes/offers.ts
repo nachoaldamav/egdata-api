@@ -2941,13 +2941,13 @@ app.get('/:id/price/stats', async (c) => {
 
   const cacheKey = `price-stats:${id}:${region}`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   const offer = await Offer.findOne({ id });
 
