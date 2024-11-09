@@ -2938,18 +2938,6 @@ app.get('/:id/price-stats', async (c) => {
     });
   }
 
-  const cacheKey = `price-stats:${id}:${region}:v0.1`;
-
-  console.log(`Requesting ${cacheKey}`);
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
   const offer = await Offer.findOne({ id });
 
   if (!offer) {
@@ -2999,10 +2987,6 @@ app.get('/:id/price-stats', async (c) => {
       }
     ),
   ]);
-
-  await client.set(cacheKey, JSON.stringify(currentPrice), {
-    EX: 3600,
-  });
 
   return c.json({
     current: currentPrice,
