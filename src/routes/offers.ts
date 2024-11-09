@@ -2920,7 +2920,7 @@ app.get('/:id/genres', async (c) => {
   return c.json(result);
 });
 
-app.get('/:id/price/stats', async (c) => {
+app.get('/:id/price-stats', async (c) => {
   const { id } = c.req.param();
   const country = c.req.query('country');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
