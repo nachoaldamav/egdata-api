@@ -1,11 +1,12 @@
-import mongoose from "mongoose";
+import mongoose, { Schema, type Document } from 'mongoose';
+import type { JSONContent } from '@tiptap/core';
 
-export interface IReview {
+export interface IReview extends Document {
   id: string;
   userId: string;
   rating: number;
   recommended: boolean;
-  content: string;
+  content: string | JSONContent;
   title: string;
   tags: string[];
   createdAt: Date;
@@ -13,7 +14,7 @@ export interface IReview {
   updatedAt: Date;
   editions?: {
     title: string;
-    content: string;
+    content: string | JSONContent;
     createdAt: Date;
     rating: number;
     tags: string[];
@@ -21,7 +22,7 @@ export interface IReview {
   }[];
 }
 
-const reviewSchema = new mongoose.Schema<IReview>({
+const reviewSchema = new Schema<IReview>({
   id: {
     type: String,
     required: true,
@@ -42,9 +43,8 @@ const reviewSchema = new mongoose.Schema<IReview>({
     required: true,
   },
   content: {
-    type: String,
+    type: Schema.Types.Mixed, // Allows string or JSON
     required: true,
-    maxlength: 50_000,
   },
   title: {
     type: String,
@@ -54,7 +54,10 @@ const reviewSchema = new mongoose.Schema<IReview>({
   tags: {
     type: [String],
     required: true,
-    length: 5,
+    validate: {
+      validator: (v: string[]) => v.length <= 5,
+      message: 'Tags array should contain at most 5 elements.',
+    },
   },
   createdAt: {
     type: Date,
@@ -79,10 +82,11 @@ const reviewSchema = new mongoose.Schema<IReview>({
         createdAt: Date,
         rating: Number,
         tags: [String],
+        recommended: Boolean,
       },
     ],
     required: false,
   },
 });
 
-export const Review = mongoose.model("Review", reviewSchema);
+export const Review = mongoose.model<IReview>('Review', reviewSchema);
