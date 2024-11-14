@@ -866,6 +866,30 @@ app.post('/v2/persist', async (c) => {
       }
     );
 
+    const existingEntry = await db.db.collection('epic').findOne({
+      accountId: decoded.sub,
+    });
+
+    if (!existingEntry) {
+      // Get user information from Epic Games and save the user to the `epic` collection
+      const user = await getEpicAccount(egdataJWT.access_token, decoded.sub);
+
+      await db.db.collection('epic').updateOne(
+        {
+          accountId: decoded.sub,
+        },
+        {
+          $set: {
+            ...user,
+            creationDate: new Date(),
+          },
+        },
+        {
+          upsert: true,
+        }
+      );
+    }
+
     return c.json(
       {
         id: entry.upsertedId,
