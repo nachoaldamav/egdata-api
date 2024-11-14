@@ -1057,9 +1057,22 @@ app.get('/v2/refresh', async (c) => {
   }
 });
 
+// _setCookie(name, token, {
+//   httpOnly: true,
+//   secure: import.meta.env.PROD,
+//   sameSite: 'lax',
+//   path: '/',
+//   domain: import.meta.env.PROD ? 'egdata.app' : 'localhost',
+//   expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+// });
+
 app.get('/logout', async (c) => {
   // Remove the cookie "EGDATA_AUTH" and redirect to "HTTPS://EGDATA.APP/"
-  deleteCookie(c, 'EGDATA_AUTH');
+  deleteCookie(c, 'EGDATA_AUTH', {
+    secure: true,
+    path: '/',
+    domain: 'egdata.app',
+  });
   return c.redirect('https://egdata.app/');
 });
 
