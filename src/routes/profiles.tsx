@@ -5,10 +5,9 @@ import type { AchievementsSummary } from '../types/get-user-achievements.js';
 import { db } from '../db/index.js';
 import { Sandbox } from '@egdata/core.schemas.sandboxes';
 import { Offer } from '@egdata/core.schemas.offers';
-import {
-  AchievementSet,
-  type AchievementType,
-} from '@egdata/core.schemas.achievements';
+import { AchievementSet } from '@egdata/core.schemas.achievements';
+import type { WithId } from 'mongodb';
+import type { AnyObject } from 'mongoose';
 
 export interface PlayerProductAchievements {
   _id: Id;
@@ -741,38 +740,40 @@ app.get('/:id/information', async (c) => {
       );
     }
 
-    // Fetch total stats including totalXP
-    const statsArray = await db.db
+    // Manually calculate stats by iterating through achievements
+    const playerAchievements = await db.db
       .collection('player-achievements')
-      .aggregate([
-        { $match: { epicAccountId: id } },
-        {
-          $project: {
-            totalPlayerAwardsCount: {
-              $size: { $ifNull: ['$playerAwards', []] },
-            },
-            totalUnlocked: 1,
-            totalXP: 1,
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalGames: { $sum: 1 },
-            totalPlayerAwards: { $sum: '$totalPlayerAwardsCount' },
-            totalAchievements: { $sum: '$totalUnlocked' },
-            totalXP: { $sum: '$totalXP' },
-          },
-        },
-      ])
+      .find({ epicAccountId: id })
       .toArray();
 
-    const stats = statsArray[0] || {
-      totalGames: 0,
-      totalPlayerAwards: 0,
-      totalAchievements: 0,
-      totalXP: 0,
-    };
+    let totalGames = 0;
+    let totalPlayerAwards = 0;
+    let totalAchievements = 0;
+    let totalXP = 0;
+
+    const singleAchievementsLists: WithId<AnyObject>[] = [];
+
+    for (const achievement of playerAchievements) {
+      if (
+        !singleAchievementsLists.find(
+          (a) => a.sandboxId === achievement.sandboxId
+        )
+      ) {
+        singleAchievementsLists.push(achievement);
+      }
+    }
+
+    for (const achievement of singleAchievementsLists) {
+      totalGames += 1;
+      totalPlayerAwards += achievement.playerAwards
+        ? achievement.playerAwards.length
+        : 0;
+      totalAchievements += achievement.totalUnlocked || 0;
+      totalXP += achievement.totalXP || 0;
+    }
+
+    // Calculate the total XP with additional points for each platinum award
+    const calculatedXP = totalXP + totalPlayerAwards * 250;
 
     // Fetch reviews count
     const reviewsCount = await db.db
@@ -783,12 +784,11 @@ app.get('/:id/information', async (c) => {
     const result = {
       ...profile,
       stats: {
-        totalGames: stats.totalGames,
-        totalAchievements: stats.totalAchievements,
-        totalPlayerAwards: stats.totalPlayerAwards,
-        // Each platinum award is worth 250 XP
-        totalXP: stats.totalXP + stats.totalPlayerAwards * 250,
-        reviewsCount: reviewsCount,
+        totalGames,
+        totalAchievements,
+        totalPlayerAwards,
+        totalXP: calculatedXP,
+        reviewsCount,
       },
       avatar: {
         small: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.small,
