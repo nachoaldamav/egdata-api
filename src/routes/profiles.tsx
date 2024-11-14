@@ -857,7 +857,6 @@ app.get('/:id/games', async (c) => {
     const savedPlayerAchievementsCursor = db.db
       .collection('player-achievements')
       .find({ epicAccountId: id })
-      // Sort by the totalXP field in descending order
       .sort({ totalXP: -1 })
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum);
@@ -930,9 +929,15 @@ app.get('/:id/games', async (c) => {
       );
     }
 
+    // Deduplicate based on sandboxId after assembling achievements
+    const deduplicatedAchievements = achievements.filter(
+      (achievement, index, self) =>
+        index === self.findIndex((t) => t.sandboxId === achievement.sandboxId)
+    );
+
     // Construct the result object
     const result = {
-      achievements,
+      achievements: deduplicatedAchievements,
       pagination: {
         total: totalGames,
         page: pageNum,
