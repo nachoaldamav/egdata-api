@@ -1957,16 +1957,6 @@ app.get('/:id/reviews', epicInfo, async (c) => {
 
   const verifiedFilter = c.req.query('verified');
 
-  const cacheKey = `reviews:${id}:${page}:${limit}:${verifiedFilter}`;
-
-  // const cached = await client.get(cacheKey);
-
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
-
   const currentUser = epic?.account_id;
 
   const query: any = {
@@ -2028,12 +2018,6 @@ app.get('/:id/reviews', epicInfo, async (c) => {
     total: await Review.countDocuments(query),
     limit,
   };
-
-  if (reviews.length > 0) {
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 3600,
-    });
-  }
 
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',

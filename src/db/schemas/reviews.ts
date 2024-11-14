@@ -78,7 +78,7 @@ const reviewSchema = new Schema<IReview>({
     type: [
       {
         title: String,
-        content: String,
+        content: Schema.Types.Mixed, // Allows string or JSON
         createdAt: Date,
         rating: Number,
         tags: [String],
