@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getCookie } from 'hono/cookie';
+import { deleteCookie, getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { cors } from 'hono/cors';
 import * as jwt from 'jsonwebtoken';
@@ -1055,6 +1055,12 @@ app.get('/v2/refresh', async (c) => {
     console.error('Error verifying JWT', err);
     return c.json({ error: 'Invalid JWT' }, 401);
   }
+});
+
+app.get('/logout', async (c) => {
+  // Remove the cookie "EGDATA_AUTH" and redirect to "HTTPS://EGDATA.APP/"
+  deleteCookie(c, 'EGDATA_AUTH');
+  return c.redirect('https://egdata.app/');
 });
 
 export default app;
