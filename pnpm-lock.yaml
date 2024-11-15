@@ -78,11 +78,11 @@ importers:
         specifier: ^2.9.1
         version: 2.9.1(@tiptap/pm@2.9.1)
       '@trigger.dev/hono':
-        specifier: 3.0.13
-        version: 3.0.13(@trigger.dev/sdk@3.0.13)(hono@4.5.0)
+        specifier: 3.2.0
+        version: 3.2.0(@trigger.dev/sdk@3.2.0)(hono@4.5.0)
       '@trigger.dev/sdk':
-        specifier: 3.0.13
-        version: 3.0.13
+        specifier: 3.2.0
+        version: 3.2.0
       axios:
         specifier: 1.7.4
         version: 1.7.4
@@ -130,8 +130,8 @@ importers:
         specifier: 1.8.3
         version: 1.8.3
       '@trigger.dev/build':
-        specifier: 3.0.13
-        version: 3.0.13(typescript@5.5.3)
+        specifier: 3.2.0
+        version: 3.2.0(typescript@5.5.3)
       '@types/bun':
         specifier: ^1.1.8
         version: 1.1.12
@@ -464,6 +464,9 @@ packages:
     resolution: {integrity: sha512-Ddw8Vyp1CZ3dlh7InvZ1amKpPnlY5D9t15VlxSKogldCwLQP1vhDWs2DLA6X4H27/xRQBuBctUmw1D6Z3abb9g==}
     peerDependencies:
       mongoose: ^8.5.2
+
+  '@electric-sql/client@0.6.3':
+    resolution: {integrity: sha512-/AYkRrEASKIGcjtNp8IVJ3sAUm+IQ2l0NrGgDvvAG/n1+ifOl7kD1E4dRyg1qdY/b+HdKhGNYlNgsPuwMKO2Mg==}
 
   '@emnapi/runtime@1.3.1':
     resolution: {integrity: sha512-kEBmG8KyqtxJZv+ygbEim+KCGtIq1fC22Ms3S4ziXmYKm8uyoLX0MHONVKwp+9opg390VaKRNt4a7A9NwmpNhw==}
@@ -906,6 +909,9 @@ packages:
 
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
+
+  '@jsonhero/path@1.0.21':
+    resolution: {integrity: sha512-gVUDj/92acpVoJwsVJ/RuWOaHyG4oFzn898WNGQItLCTQ+hOaVlEaImhwE1WqOTf+l3dGOUkbSiVKlb3q1hd1Q==}
 
   '@mongodb-js/saslprep@1.1.9':
     resolution: {integrity: sha512-tVkljjeEaAhCqTzajSdgbQ6gE6f3oneVwa3iXR6csiEwXXOFsiC6Uh9iAjAhXPtqa/XMDHWjjeNH/77m/Yq2dw==}
@@ -1502,23 +1508,23 @@ packages:
   '@tiptap/pm@2.9.1':
     resolution: {integrity: sha512-mvV86fr7kEuDYEApQ2uMPCKL2uagUE0BsXiyyz3KOkY1zifyVm1fzdkscb24Qy1GmLzWAIIihA+3UHNRgYdOlQ==}
 
-  '@trigger.dev/build@3.0.13':
-    resolution: {integrity: sha512-4pN3KDl4Cn3qqTo5ZsV14NESjBzCV6h0Q9ZFBurq6BeposFflVyBtRQMCh5oUD+3YyGfq4RRlTP5Qz7iu00YXQ==}
+  '@trigger.dev/build@3.2.0':
+    resolution: {integrity: sha512-+SS7hEvjMeqYNp3zBx0dluFkDh6CcOnj2NhJpOxOFTKDi7Jcm8EefNDxD29ttCEIPRS8SFupob2MI5tnt7AqrA==}
     engines: {node: '>=18.20.0'}
 
-  '@trigger.dev/core@3.0.13':
-    resolution: {integrity: sha512-BK4Yd+LrxA5cxAsO66yOm8UvBGdSplzfSqFGo6OpxhWZqZBsUMADAYBXhjb7ujl/F/BrN47qhLSuyaaybBiHcw==}
+  '@trigger.dev/core@3.2.0':
+    resolution: {integrity: sha512-V0YpClYeYP1zgEiH6Mhz9IRN+nwhTsXqWt3b6DBsJq9OWT4zFHuOW14lmGD0jq7tdDfqWffjnE119i4NLTXZCg==}
     engines: {node: '>=18.20.0'}
 
-  '@trigger.dev/hono@3.0.13':
-    resolution: {integrity: sha512-WXQ+xgK7S0xpQVMI/fK00kvFzoN4KzG7Mddnk6upi9Oi/noCIpm7dx4uCDDkxaEzxRjltfPU22qYrdTkP561Jw==}
+  '@trigger.dev/hono@3.2.0':
+    resolution: {integrity: sha512-Nwwr3k5usk/qhPCm5pe+HnvbS1PugCDN5vLaAtdvDSDsaY6WcxJ51LqLvJxlrChuvS7R20tJ2tyUTfvTF0UqEQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       '@trigger.dev/sdk': ~2.3.0 || ^3.0.0
       hono: 3.x
 
-  '@trigger.dev/sdk@3.0.13':
-    resolution: {integrity: sha512-Ju+NDhwGJgnYuiotEWwcsG4dmN69XYjpkLLCPTMhMeGZgECUvXoduNC5avEIt6FyUqii3M67k/4jDgUIfa7UJg==}
+  '@trigger.dev/sdk@3.2.0':
+    resolution: {integrity: sha512-gZqR88+vA04VHYruFqdRhttL7g3WKqeQk3EcAx2Q0mubDyoWCcMklBja+q1bLNi2P4/tKK4Z7WK90Y33RVVWcQ==}
     engines: {node: '>=18.20.0'}
 
   '@types/bun@1.1.12':
@@ -1763,6 +1769,10 @@ packages:
   delayed-stream@1.0.0:
     resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
     engines: {node: '>=0.4.0'}
+
+  dequal@2.0.3:
+    resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
+    engines: {node: '>=6'}
 
   detect-libc@2.0.3:
     resolution: {integrity: sha512-bwy0MGW55bG41VqxxypOsdSdGqLwXPI/focwgTYCFMbdUiBAxLg9CFzG08sz2aqzknwiX7Hkl0bQENjg8iLByw==}
@@ -2015,6 +2025,9 @@ packages:
 
   jackspeak@3.4.3:
     resolution: {integrity: sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw==}
+
+  jose@5.9.6:
+    resolution: {integrity: sha512-AMlnetc9+CV9asI19zHmrgS/WYsWUwCn2R7RzlbJWD7F9eWYUTGyBmU9o6PxngtLGOiDGPRu+Uc4fhKzbpteZQ==}
 
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
@@ -3407,6 +3420,10 @@ snapshots:
     dependencies:
       mongoose: 8.5.2
 
+  '@electric-sql/client@0.6.3':
+    optionalDependencies:
+      '@rollup/rollup-darwin-arm64': 4.24.3
+
   '@emnapi/runtime@1.3.1':
     dependencies:
       tslib: 2.8.1
@@ -3679,6 +3696,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.0
 
   '@js-sdsl/ordered-map@4.4.2': {}
+
+  '@jsonhero/path@1.0.21': {}
 
   '@mongodb-js/saslprep@1.1.9':
     dependencies:
@@ -4391,9 +4410,9 @@ snapshots:
       prosemirror-transform: 1.10.2
       prosemirror-view: 1.36.0
 
-  '@trigger.dev/build@3.0.13(typescript@5.5.3)':
+  '@trigger.dev/build@3.2.0(typescript@5.5.3)':
     dependencies:
-      '@trigger.dev/core': 3.0.13
+      '@trigger.dev/core': 3.2.0
       pkg-types: 1.2.1
       tinyglobby: 0.2.10
       tsconfck: 3.1.3(typescript@5.5.3)
@@ -4403,9 +4422,11 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@trigger.dev/core@3.0.13':
+  '@trigger.dev/core@3.2.0':
     dependencies:
+      '@electric-sql/client': 0.6.3
       '@google-cloud/precise-date': 4.0.0
+      '@jsonhero/path': 1.0.21
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.52.1
       '@opentelemetry/exporter-logs-otlp-http': 0.52.1(@opentelemetry/api@1.9.0)
@@ -4417,8 +4438,10 @@ snapshots:
       '@opentelemetry/sdk-trace-base': 1.25.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-node': 1.25.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.25.1
+      dequal: 2.0.3
       execa: 8.0.1
       humanize-duration: 3.32.1
+      jose: 5.9.6
       nanoid: 3.3.7
       socket.io-client: 4.7.5
       superjson: 2.2.1
@@ -4430,17 +4453,17 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@trigger.dev/hono@3.0.13(@trigger.dev/sdk@3.0.13)(hono@4.5.0)':
+  '@trigger.dev/hono@3.2.0(@trigger.dev/sdk@3.2.0)(hono@4.5.0)':
     dependencies:
-      '@trigger.dev/sdk': 3.0.13
+      '@trigger.dev/sdk': 3.2.0
       hono: 4.5.0
 
-  '@trigger.dev/sdk@3.0.13':
+  '@trigger.dev/sdk@3.2.0':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.52.1
       '@opentelemetry/semantic-conventions': 1.25.1
-      '@trigger.dev/core': 3.0.13
+      '@trigger.dev/core': 3.2.0
       chalk: 5.3.0
       cronstrue: 2.51.0
       debug: 4.3.7
@@ -4679,6 +4702,8 @@ snapshots:
       ms: 2.1.3
 
   delayed-stream@1.0.0: {}
+
+  dequal@2.0.3: {}
 
   detect-libc@2.0.3: {}
 
@@ -4971,6 +4996,8 @@ snapshots:
       '@isaacs/cliui': 8.0.2
     optionalDependencies:
       '@pkgjs/parseargs': 0.11.0
+
+  jose@5.9.6: {}
 
   joycon@3.1.1: {}
 

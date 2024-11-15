@@ -27,6 +27,6 @@ export const refreshTokens = schedules.task({
       throw new Error('Error refreshing Epic Games tokens');
     }
 
-    logger.log('Epic Games tokens refreshed');
+    logger.log('Epic Games tokens refreshed', await res.json());
   },
 });

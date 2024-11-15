@@ -574,8 +574,7 @@ app.patch('/refresh', async (c) => {
   const tokens = await db.db
     .collection('tokens')
     .find({
-      expiresAt: { $lt: new Date() },
-      refreshExpiresAt: { $lt: new Date(Date.now() + 10 * 60 * 1000) },
+      expiresAt: { $lt: new Date(Date.now() + 10 * 60 * 1000) },
     })
     .toArray();
 
@@ -648,7 +647,9 @@ app.patch('/refresh', async (c) => {
           upsert: false,
         }
       );
-    } catch (err) {
+
+      console.log(`Refreshed token ${token.tokenId}`);
+    } catch {
       // Revoke the token and delete it from the database
       const url = new URL('https://api.epicgames.dev/epic/oauth/v2/revoke');
       url.searchParams.append('token', token.refreshToken);
@@ -1056,15 +1057,6 @@ app.get('/v2/refresh', async (c) => {
     return c.json({ error: 'Invalid JWT' }, 401);
   }
 });
-
-// _setCookie(name, token, {
-//   httpOnly: true,
-//   secure: import.meta.env.PROD,
-//   sameSite: 'lax',
-//   path: '/',
-//   domain: import.meta.env.PROD ? 'egdata.app' : 'localhost',
-//   expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-// });
 
 app.get('/logout', async (c) => {
   // Remove the cookie "EGDATA_AUTH" and redirect to "HTTPS://EGDATA.APP/"
