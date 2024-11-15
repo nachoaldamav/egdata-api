@@ -1280,15 +1280,31 @@ app.get('/offer-by-slug/:slug', async (c) => {
 });
 
 app.get('/active-sales', async (c) => {
-  const cacheKey = 'active-sales';
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
-  const cached = await client.get(cacheKey);
+  const selectedCountry = country ?? cookieCountry ?? 'US';
 
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
     });
   }
+
+  const cacheKey = 'active-sales';
+
+  // const cached = await client.get(cacheKey);
+
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   const tags = await TagModel.find(
     {
@@ -1320,17 +1336,26 @@ app.get('/active-sales', async (c) => {
         },
         undefined,
         {
-          limit: 3,
           sort: {
             lastModifiedDate: -1,
           },
         }
       );
 
+      const prices = await PriceEngine.find({
+        region,
+        offerId: { $in: offers.map((o) => o.id) },
+      });
+
+      const everyPriceIsOnSale =
+        prices.length > 0 && prices.every((p) => p.price.discount > 0);
+
       result.push({
         id: t.id,
         name: t.name,
-        offers: offers.map((o) => orderOffersObject(o)),
+        active: everyPriceIsOnSale,
+        // @ts-expect-error
+        offers: offers.slice(0, 3).map((o) => orderOffersObject(o)),
       });
     })
   );
