@@ -819,9 +819,10 @@ app.post('/v2/persist', async (c) => {
       refresh_token: string;
       expires_at: string;
       refresh_expires_at: string;
+      id: string | undefined;
     };
 
-    if (!egdataJWT || !egdataJWT.access_token) {
+    if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.id) {
       console.error('Invalid JWT');
       return c.json({ error: 'Invalid JWT' }, 401);
     }
@@ -851,7 +852,7 @@ app.post('/v2/persist', async (c) => {
     // Save the JWT to the database (same logic as "persist" endpoint)
     const entry = await db.db.collection('tokens').updateOne(
       {
-        tokenId: decoded.jti,
+        tokenId: egdataJWT.id,
       },
       {
         $set: {
@@ -893,7 +894,7 @@ app.post('/v2/persist', async (c) => {
 
     return c.json(
       {
-        id: entry.upsertedId,
+        id: egdataJWT.id,
         status: 'ok',
       },
       200
@@ -935,9 +936,10 @@ app.get('/v2/refresh', async (c) => {
       refresh_token: string;
       expires_at: string;
       refresh_expires_at: string;
+      id: string | undefined;
     };
 
-    if (!egdataJWT || !egdataJWT.access_token) {
+    if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.id) {
       console.error('Invalid JWT');
       return c.json({ error: 'Invalid JWT' }, 401);
     }
@@ -974,7 +976,7 @@ app.get('/v2/refresh', async (c) => {
         accountId: string;
       }>('tokens')
       .findOne({
-        tokenId: decoded.jti,
+        tokenId: egdataJWT.id,
       });
 
     if (!dbtoken) {
@@ -1015,7 +1017,7 @@ app.get('/v2/refresh', async (c) => {
 
       await db.db.collection('tokens').updateOne(
         {
-          tokenId: decoded.jti,
+          tokenId: egdataJWT.id,
         },
         {
           $set: {
@@ -1039,7 +1041,7 @@ app.get('/v2/refresh', async (c) => {
           accountId: string;
         }>('tokens')
         .findOne({
-          tokenId: decoded.jti,
+          tokenId: egdataJWT.id,
         });
     }
 
