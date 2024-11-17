@@ -819,10 +819,10 @@ app.post('/v2/persist', async (c) => {
       refresh_token: string;
       expires_at: string;
       refresh_expires_at: string;
-      id: string | undefined;
+      jti: string | undefined;
     };
 
-    if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.id) {
+    if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.jti) {
       console.error('Invalid JWT');
       return c.json({ error: 'Invalid JWT' }, 401);
     }
@@ -850,9 +850,9 @@ app.post('/v2/persist', async (c) => {
     }
 
     // Save the JWT to the database (same logic as "persist" endpoint)
-    const entry = await db.db.collection('tokens').updateOne(
+    await db.db.collection('tokens').updateOne(
       {
-        tokenId: egdataJWT.id,
+        tokenId: egdataJWT.jti,
       },
       {
         $set: {
@@ -894,7 +894,7 @@ app.post('/v2/persist', async (c) => {
 
     return c.json(
       {
-        id: egdataJWT.id,
+        id: egdataJWT.jti,
         status: 'ok',
       },
       200
@@ -936,10 +936,10 @@ app.get('/v2/refresh', async (c) => {
       refresh_token: string;
       expires_at: string;
       refresh_expires_at: string;
-      id: string | undefined;
+      jti: string | undefined;
     };
 
-    if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.id) {
+    if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.jti) {
       console.error('Invalid JWT');
       return c.json({ error: 'Invalid JWT' }, 401);
     }
@@ -976,7 +976,7 @@ app.get('/v2/refresh', async (c) => {
         accountId: string;
       }>('tokens')
       .findOne({
-        tokenId: egdataJWT.id,
+        tokenId: egdataJWT.jti,
       });
 
     if (!dbtoken) {
@@ -1017,7 +1017,7 @@ app.get('/v2/refresh', async (c) => {
 
       await db.db.collection('tokens').updateOne(
         {
-          tokenId: egdataJWT.id,
+          tokenId: egdataJWT.jti,
         },
         {
           $set: {
@@ -1041,7 +1041,7 @@ app.get('/v2/refresh', async (c) => {
           accountId: string;
         }>('tokens')
         .findOne({
-          tokenId: egdataJWT.id,
+          tokenId: egdataJWT.jti,
         });
     }
 
