@@ -1007,26 +1007,37 @@ app.get('/:id/features', async (c) => {
     });
   }
 
+  const subItems = await OfferSubItems.find({
+    _id: id,
+  });
+
   const items = await Item.find({
-    linkedOffers: { $in: [id] },
+    $or: [
+      {
+        id: {
+          $in: [
+            ...offer.items.map((i) => i.id),
+            ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+          ],
+        },
+      },
+      { linkedOffers: id },
+    ],
   });
 
   const customAttributes = items.reduce((acc, item) => {
-    return {
-      ...acc,
-      ...attributesToObject(item.customAttributes as any),
-    };
+    return Object.assign(acc, attributesToObject(item.customAttributes as any));
   }, attributesToObject([]));
 
   // Get the game features
+  const tagsObject = offer.tags.reduce((acc, tag) => {
+    acc[tag.id] = tag;
+    return acc;
+  }, {});
+
   const gameFeatures = getGameFeatures({
     attributes: customAttributes,
-    tags: offer.tags.reduce((acc, tag) => {
-      return {
-        ...acc,
-        [tag.id]: tag,
-      };
-    }, {}),
+    tags: tagsObject,
   });
 
   return c.json(gameFeatures);
@@ -1045,32 +1056,42 @@ app.get('/:id/assets', async (c) => {
     });
   }
 
-  const assets = await Item.aggregate<{ assets: AssetType[] }>([
-    {
-      $match: {
-        linkedOffers: id,
-      },
-    },
-    {
-      $lookup: {
-        from: 'assets',
-        localField: 'id',
-        foreignField: 'itemId',
-        as: 'assets',
-      },
-    },
-    {
-      $unwind: '$assets',
-    },
-    {
-      $project: {
-        _id: 0,
-        assets: 1,
-      },
-    },
-  ]);
+  const offer = await Offer.findOne({
+    id: id,
+  });
 
-  const result = assets.flatMap((a) => a.assets);
+  if (!offer) {
+    return c.json({ error: 'Offer not found' }, 404);
+  }
+
+  const subItems = await OfferSubItems.find({
+    _id: id,
+  });
+
+  const items = await Item.find(
+    {
+      $or: [
+        {
+          id: {
+            $in: [
+              ...offer.items.map((i) => i.id),
+              ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+            ],
+          },
+        },
+        { linkedOffers: id },
+      ],
+    },
+    {
+      id: 1,
+    }
+  );
+
+  const assets = await Asset.find({
+    itemId: { $in: items.map((i) => i.id) },
+  });
+
+  const result = assets.map((a) => a.toObject());
 
   await client.set(cacheKey, JSON.stringify(assets), {
     EX: 3600,
@@ -1363,15 +1384,9 @@ app.get('/:id/changelog', async (c) => {
     });
   }
 
-  const [offerData, itemsData] = await Promise.allSettled([
-    Offer.findOne({ id }),
-    Item.find({
-      linkedOffers: id,
-    }),
-  ]);
-
-  const offer = offerData.status === 'fulfilled' ? offerData.value : null;
-  const items = itemsData.status === 'fulfilled' ? itemsData.value : [];
+  const offer = await Offer.findOne({
+    id,
+  });
 
   if (!offer) {
     c.status(404);
@@ -1380,12 +1395,39 @@ app.get('/:id/changelog', async (c) => {
     });
   }
 
-  const itemsIds = items.map((i) => i.id);
-  const assets = await Asset.find({
-    itemId: { $in: itemsIds },
+  const subItems = await OfferSubItems.find({
+    _id: id,
   });
 
-  const allIds = [id, ...itemsIds.concat(assets.map((a) => a.artifactId))];
+  const items = await Item.find({
+    $or: [
+      {
+        id: {
+          $in: [
+            ...offer.items.map((i) => i.id),
+            ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+          ],
+        },
+      },
+      { linkedOffers: id },
+    ],
+  });
+
+  if (!offer) {
+    c.status(404);
+    return c.json({
+      message: 'Offer not found',
+    });
+  }
+
+  const assets = await Asset.find({
+    itemId: { $in: items.map((i) => i.id) },
+  });
+
+  const allIds = [
+    id,
+    ...items.map((i) => i.id).concat(assets.map((a) => a.artifactId)),
+  ];
 
   const changelist = await Changelog.find(
     {
