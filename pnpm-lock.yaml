@@ -62,6 +62,9 @@ importers:
       '@egdata/core.schemas.sellers':
         specifier: latest
         version: 1.1.5(mongoose@8.5.2)
+      '@egdata/core.schemas.subitems':
+        specifier: ^0.0.1
+        version: 0.0.1(mongoose@8.5.2)
       '@egdata/core.schemas.tags':
         specifier: latest
         version: 1.1.5(mongoose@8.5.2)
@@ -457,6 +460,11 @@ packages:
 
   '@egdata/core.schemas.sellers@1.1.5':
     resolution: {integrity: sha512-VVXBSljZ3fZKdFBTbgZyGXLvuedFTW2NVg38Tm06y9ksjKhIPa4HEMQ8q7gv9fQ2bVeAw9VPTHXceJtzhLFSZQ==}
+    peerDependencies:
+      mongoose: ^8.5.2
+
+  '@egdata/core.schemas.subitems@0.0.1':
+    resolution: {integrity: sha512-WyaA0cW8OcNUYaplH7p6T/RLrNnJXQft7rT6PoMGheWH1lYre+mSIKjFlMMQ4NaqfNxxteBORfNFSepfXLX5vA==}
     peerDependencies:
       mongoose: ^8.5.2
 
@@ -3413,6 +3421,10 @@ snapshots:
       mongoose: 8.5.2
 
   '@egdata/core.schemas.sellers@1.1.5(mongoose@8.5.2)':
+    dependencies:
+      mongoose: 8.5.2
+
+  '@egdata/core.schemas.subitems@0.0.1(mongoose@8.5.2)':
     dependencies:
       mongoose: 8.5.2
 

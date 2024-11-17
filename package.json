@@ -24,6 +24,7 @@
     "@egdata/core.schemas.ratings": "latest",
     "@egdata/core.schemas.sandboxes": "latest",
     "@egdata/core.schemas.sellers": "latest",
+    "@egdata/core.schemas.subitems": "^0.0.1",
     "@egdata/core.schemas.tags": "latest",
     "@hono/node-server": "1.12.0",
     "@hono/swagger-ui": "0.4.0",

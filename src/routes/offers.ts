@@ -29,6 +29,7 @@ import { getProduct } from '../utils/get-product.js';
 import { verifyGameOwnership } from '../utils/verify-game-ownership.js';
 import { Hltb } from '@egdata/core.schemas.hltb';
 import { Bundles } from '@egdata/core.schemas.bundles';
+import { OfferSubItems } from '@egdata/core.schemas.subitems';
 import { epic, epicInfo } from './auth.js';
 import { ageRatingsCountries } from '../utils/age-ratings.js';
 
@@ -1083,7 +1084,7 @@ app.get('/:id/assets', async (c) => {
 app.get('/:id/items', async (c) => {
   const { id } = c.req.param();
 
-  const cacheKey = `items:offer:${id}:v0.1`;
+  const cacheKey = `items:offer:${id}`;
 
   const cached = await client.get(cacheKey);
 
@@ -1103,9 +1104,23 @@ app.get('/:id/items', async (c) => {
 
   const itemsSpecified = offer.items.map((item) => item.id);
 
+  const subItems = await OfferSubItems.find({
+    _id: id,
+  });
+
   // Or it's an item specified by the offer, or it's linked by the item
   const items = await Item.find({
-    $or: [{ id: { $in: itemsSpecified } }, { linkedOffers: id }],
+    $or: [
+      {
+        id: {
+          $in: [
+            ...itemsSpecified,
+            ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+          ],
+        },
+      },
+      { linkedOffers: id },
+    ],
   });
 
   return c.json(items, 200, {
