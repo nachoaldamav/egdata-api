@@ -2894,6 +2894,12 @@ app.get('/:id/has-regular', async (c) => {
     });
   }
 
+  if (offer.offerType !== 'BASE_GAME') {
+    return c.json({
+      isPrepurchase: false,
+    });
+  }
+
   const { namespace } = offer;
 
   const prePurchaseOffer = await Offer.findOne({

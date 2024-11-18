@@ -962,8 +962,8 @@ app.get('/v2/refresh', async (c) => {
     };
 
     if (!decoded || !decoded.sub || !decoded.iss) {
-      console.error('Invalid JWT');
-      return c.json({ error: 'Invalid JWT' }, 401);
+      console.error('Invalid Epic JWT');
+      return c.json({ error: 'Invalid Epic JWT' }, 401);
     }
 
     // Get the token from the database
