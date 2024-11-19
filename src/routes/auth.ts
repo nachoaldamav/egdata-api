@@ -6,6 +6,7 @@ import * as jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import { db } from '../db/index.js';
 import { readFileSync } from 'node:fs';
+import { telegramBotService } from '../clients/telegram.js';
 
 interface EpicProfileResponse {
   accountId: string;
@@ -613,6 +614,12 @@ app.patch('/refresh', async (c) => {
       if (!response.ok) {
         console.error('Failed to refresh token', await response.json());
 
+        await telegramBotService.sendMessage(
+          `Failed to refresh token for ${token.tokenId}
+          \`\`\`${JSON.stringify(await response.json())}\`\`\`
+          `
+        );
+
         // Remove the token from the DB
         await db.db.collection('tokens').deleteOne({
           tokenId: token.tokenId,
@@ -649,7 +656,12 @@ app.patch('/refresh', async (c) => {
       );
 
       console.log(`Refreshed token ${token.tokenId}`);
-    } catch {
+    } catch (e) {
+      await telegramBotService.sendMessage(
+        `Failed to refresh token for ${token.tokenId}
+        \`\`\`${JSON.stringify(e)}\`\`\`
+        `
+      );
       // Revoke the token and delete it from the database
       const url = new URL('https://api.epicgames.dev/epic/oauth/v2/revoke');
       url.searchParams.append('token', token.refreshToken);
