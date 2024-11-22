@@ -1,4 +1,4 @@
-import type { Serve } from 'bun';
+import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
@@ -1401,8 +1401,10 @@ app.route('/assets', AssetsRoute);
 
 app.route('/builds', BuildsRoute);
 
-export default {
+serve({
+  fetch: app.fetch,
   port: 4000,
   hostname: '0.0.0.0',
-  fetch: app.fetch,
-} satisfies Serve;
+});
+
+console.log('Listening on http://localhost:4000');
