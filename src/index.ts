@@ -26,7 +26,7 @@ import OffersRoute from './routes/offers.js';
 import PromotionsRoute from './routes/promotions.js';
 import FreeGamesRoute from './routes/free-games.js';
 import MultisearchRoute from './routes/multisearch.js';
-import AuthRoute from './routes/auth.js';
+import AuthRoute, { LauncherAuthTokens } from './routes/auth.js';
 import AccountsRoute from './routes/accounts.js';
 import UsersRoute from './routes/users.js';
 import CollectionsRoute from './routes/collections.js';
@@ -41,6 +41,8 @@ import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
 import { meiliSearchClient } from './clients/meilisearch.js';
 import { Seller } from '@egdata/core.schemas.sellers';
+import { decode, verify } from 'jsonwebtoken';
+import { readFileSync } from 'fs';
 
 config();
 db.connect();
@@ -1367,6 +1369,138 @@ app.get('/active-sales', async (c) => {
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',
   });
+});
+
+app.post('/donate/key/:code', async (c) => {
+  const { code } = c.req.param();
+
+  console.log('Received donation code', code);
+
+  if (!code || code.length !== 20) {
+    return c.json({ error: 'Invalid code' }, 400);
+  }
+
+  console.log('Verifying code');
+
+  const authorization = getCookie(c, 'EGDATA_AUTH');
+
+  if (!authorization) {
+    console.error('Missing authorization header');
+    return c.json({ error: 'Missing authorization header' }, 401);
+  }
+
+  const token = authorization.replace('Bearer ', '');
+
+  if (!token) {
+    console.error('Missing token');
+    return c.json({ error: 'Missing token' }, 401);
+  }
+
+  const certificate = process.env.JWT_PUBLIC_KEY;
+
+  if (!certificate) {
+    console.error('Missing JWT_PUBLIC_KEY env variable');
+    return c.json({ error: 'Missing JWT_PUBLIC_KEY env variable' }, 401);
+  }
+
+  const egdataJWT = verify(token, readFileSync(certificate, 'utf-8'), {
+    algorithms: ['RS256'],
+  }) as {
+    access_token: string;
+    refresh_token: string;
+    expires_at: string;
+    refresh_expires_at: string;
+    jti: string | undefined;
+  };
+
+  if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.jti) {
+    console.error('Invalid JWT');
+    return c.json({ error: 'Invalid JWT' }, 401);
+  }
+
+  // Inspect the token from "decoded.access_token" and save it to the database
+  const decoded = decode(egdataJWT.access_token as string) as {
+    sub: string;
+    iss: string;
+    dn: string;
+    nonce: string;
+    pfpid: string;
+    sec: number;
+    aud: string;
+    t: string;
+    scope: string;
+    appid: string;
+    exp: number;
+    iat: number;
+    jti: string;
+  };
+
+  if (!decoded || !decoded.sub || !decoded.iss) {
+    console.error('Invalid JWT');
+    return c.json({ error: 'Invalid JWT' }, 401);
+  }
+
+  const id = decoded.sub;
+
+  // Check if the code is already in the DB
+  const existingDonation = await db.db.collection('key-codes').findOne({
+    code,
+  });
+
+  if (existingDonation) {
+    return c.json({ error: 'Code already used' }, 400);
+  }
+
+  const targetUser = await db.db
+    .collection('launcher')
+    .findOne<LauncherAuthTokens>({
+      account_id: process.env.ADMIN_ACCOUNT_ID,
+    });
+
+  const url = new URL(
+    'https://fulfillment-public-service-prod.ol.epicgames.com/fulfillment/api/public/accounts/:accountId/codes/:code'
+      .replace(':accountId', process.env.ADMIN_ACCOUNT_ID as string)
+      .replace(':code', code)
+  );
+
+  console.log('Fetching code details from Epic Games');
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${targetUser?.access_token}`,
+    },
+  });
+
+  if (!response.ok) {
+    console.error('Failed to verify code', await response.json());
+    return c.json({ error: 'Failed to verify code' }, 400);
+  }
+
+  const parsedResponse = (await response.json()) as {
+    offerId: string;
+    accountId: string;
+    identityId: string;
+    details: {
+      entitlementId: string;
+      entitlementName: string;
+      itemId: string;
+      namespace: string;
+      country: string;
+    }[];
+  };
+
+  console.log('Code details', parsedResponse);
+
+  await db.db.collection('key-codes').insertOne({
+    code,
+    accountId: id,
+    offerId: parsedResponse.offerId,
+    identityId: parsedResponse.identityId,
+    details: parsedResponse.details,
+  });
+
+  return c.json({ message: 'ok', id: parsedResponse.offerId });
 });
 
 app.route('/sandboxes', SandboxRoute);

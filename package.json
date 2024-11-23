@@ -6,7 +6,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.645.0",
+    "@aws-sdk/client-s3": "^3.698.0",
     "@egdata/core.schemas.achievements": "latest",
     "@egdata/core.schemas.assets": "latest",
     "@egdata/core.schemas.bundles": "latest",
@@ -29,7 +29,7 @@
     "@hono/node-server": "1.12.0",
     "@hono/swagger-ui": "0.4.0",
     "@resvg/resvg-js": "^2.6.2",
-    "@tiptap/core": "^2.9.1",
+    "@tiptap/core": "^2.10.2",
     "@trigger.dev/hono": "3.2.0",
     "@trigger.dev/sdk": "3.2.0",
     "@types/node-telegram-bot-api": "^0.64.7",
@@ -52,7 +52,7 @@
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
     "@trigger.dev/build": "3.2.0",
-    "@types/bun": "^1.1.8",
+    "@types/bun": "^1.1.13",
     "@types/jsonwebtoken": "9.0.3",
     "@types/jwk-to-pem": "^2.0.3",
     "@types/node": "20.14.11",
