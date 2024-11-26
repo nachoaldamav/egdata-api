@@ -42,7 +42,7 @@ import { Event } from './db/schemas/events.js';
 import { meiliSearchClient } from './clients/meilisearch.js';
 import { Seller } from '@egdata/core.schemas.sellers';
 import { decode, verify } from 'jsonwebtoken';
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 
 config();
 db.connect();
@@ -59,6 +59,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:4000',
   'https://user-reviews-pr.egdata.app/',
+  'https://egdata-370475041422.us-central1.run.app',
 ];
 
 const app = new Hono();
