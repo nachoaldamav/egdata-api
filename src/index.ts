@@ -41,7 +41,7 @@ import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
 import { meiliSearchClient } from './clients/meilisearch.js';
 import { Seller } from '@egdata/core.schemas.sellers';
-import { decode, verify } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { readFileSync } from 'node:fs';
 
 config();
@@ -1404,7 +1404,7 @@ app.post('/donate/key/:code', async (c) => {
     return c.json({ error: 'Missing JWT_PUBLIC_KEY env variable' }, 401);
   }
 
-  const egdataJWT = verify(token, readFileSync(certificate, 'utf-8'), {
+  const egdataJWT = jwt.verify(token, readFileSync(certificate, 'utf-8'), {
     algorithms: ['RS256'],
   }) as {
     access_token: string;
@@ -1420,7 +1420,7 @@ app.post('/donate/key/:code', async (c) => {
   }
 
   // Inspect the token from "decoded.access_token" and save it to the database
-  const decoded = decode(egdataJWT.access_token as string) as {
+  const decoded = jwt.decode(egdataJWT.access_token as string) as {
     sub: string;
     iss: string;
     dn: string;
