@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { Hono } from 'hono/quick';
 import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
@@ -26,7 +26,7 @@ import OffersRoute from './routes/offers.js';
 import PromotionsRoute from './routes/promotions.js';
 import FreeGamesRoute from './routes/free-games.js';
 import MultisearchRoute from './routes/multisearch.js';
-import AuthRoute, { LauncherAuthTokens } from './routes/auth.js';
+import AuthRoute, { type LauncherAuthTokens } from './routes/auth.js';
 import AccountsRoute from './routes/accounts.js';
 import UsersRoute from './routes/users.js';
 import CollectionsRoute from './routes/collections.js';
@@ -43,6 +43,7 @@ import { meiliSearchClient } from './clients/meilisearch.js';
 import { Seller } from '@egdata/core.schemas.sellers';
 import jwt from 'jsonwebtoken';
 import { readFileSync } from 'node:fs';
+import chalk from 'chalk';
 
 config();
 db.connect();
@@ -1536,10 +1537,18 @@ app.route('/assets', AssetsRoute);
 
 app.route('/builds', BuildsRoute);
 
-serve({
+const server = serve({
   fetch: app.fetch,
   port: 4000,
   hostname: '0.0.0.0',
 });
 
-console.log('Listening on http://localhost:4000');
+server.on('listening', () => {
+  console.log(
+    `${chalk.gray('Listening on')} ${chalk.green(
+      'http://localhost:4000'
+    )} (${chalk.gray('took')} ${chalk.magenta(
+      `${(process.uptime() * 1000).toFixed(2)}ms`
+    )})`
+  );
+});
