@@ -1,5 +1,4 @@
 FROM node:22-slim AS base
-FROM ubuntu:22.04 as runner
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -16,7 +15,7 @@ FROM base AS build
 RUN pnpm install --frozen-lockfile
 RUN pnpm run sea
 
-FROM runner
+FROM ubuntu:22.04
 COPY --from=build /app/egdata /app/egdata
 EXPOSE 4000
 
