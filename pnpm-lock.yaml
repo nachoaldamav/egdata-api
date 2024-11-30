@@ -7,10 +7,13 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.698.0
         version: 3.698.0
+      '@biomejs/biome':
+        specifier: 1.8.3
+        version: 1.8.3
       '@egdata/core.schemas.achievements':
         specifier: latest
         version: 1.1.5(mongoose@8.5.2)
@@ -80,15 +83,33 @@ importers:
       '@tiptap/core':
         specifier: ^2.10.2
         version: 2.10.2(@tiptap/pm@2.9.1)
+      '@trigger.dev/build':
+        specifier: 3.2.0
+        version: 3.2.0(typescript@5.5.3)
       '@trigger.dev/hono':
         specifier: 3.2.0
         version: 3.2.0(@trigger.dev/sdk@3.2.0)(hono@4.5.0)
       '@trigger.dev/sdk':
         specifier: 3.2.0
         version: 3.2.0
+      '@types/bun':
+        specifier: ^1.1.13
+        version: 1.1.13
+      '@types/jsonwebtoken':
+        specifier: 9.0.3
+        version: 9.0.3
+      '@types/jwk-to-pem':
+        specifier: ^2.0.3
+        version: 2.0.3
+      '@types/node':
+        specifier: 20.14.11
+        version: 20.14.11
       '@types/node-telegram-bot-api':
         specifier: ^0.64.7
         version: 0.64.7
+      '@types/react':
+        specifier: ^18.3.5
+        version: 18.3.12
       axios:
         specifier: 1.7.4
         version: 1.7.4
@@ -137,28 +158,6 @@ importers:
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
-    devDependencies:
-      '@biomejs/biome':
-        specifier: 1.8.3
-        version: 1.8.3
-      '@trigger.dev/build':
-        specifier: 3.2.0
-        version: 3.2.0(typescript@5.5.3)
-      '@types/bun':
-        specifier: ^1.1.13
-        version: 1.1.13
-      '@types/jsonwebtoken':
-        specifier: 9.0.3
-        version: 9.0.3
-      '@types/jwk-to-pem':
-        specifier: ^2.0.3
-        version: 2.0.3
-      '@types/node':
-        specifier: 20.14.11
-        version: 20.14.11
-      '@types/react':
-        specifier: ^18.3.5
-        version: 18.3.12
       tsup:
         specifier: 8.2.0
         version: 8.2.0(tsx@4.16.2)(typescript@5.5.3)
