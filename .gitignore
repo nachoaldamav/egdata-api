@@ -5,3 +5,5 @@ dist/
 certs
 dump.rdb
 .trigger
+sea-prep.blob
+egdata

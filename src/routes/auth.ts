@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { deleteCookie, getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { cors } from 'hono/cors';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import { db } from '../db/index.js';
 import { readFileSync } from 'node:fs';

@@ -1,11 +1,26 @@
 {
   "scripts": {
     "dev": "bun run --watch src/index.ts",
-    "build": "tsup-node src/index.ts --format esm --sourcemap --splitting --target node22 --minify --cjsInterop",
-    "start": "node --enable-source-maps --env-file=.env dist/index.js"
+    "build": "tsup src/index.ts --format cjs --sourcemap --target node16 --minify --cjsInterop",
+    "start": "node --enable-source-maps --env-file=.env dist/index.cjs",
+    "sea": "pnpm sea:prepare && pnpm build && pnpm sea:bundle && pnpm sea:inject",
+    "sea:bundle": "node --experimental-sea-config sea-config.json",
+    "sea:inject": "cp $(command -v node) egdata && npx postject egdata NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
+    "sea:prepare": "rm -rf sea-prep.blob && rm -rf egdata"
   },
   "type": "module",
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "@biomejs/biome": "1.8.3",
+    "@trigger.dev/build": "3.2.0",
+    "@types/bun": "^1.1.13",
+    "@types/jsonwebtoken": "9.0.3",
+    "@types/jwk-to-pem": "^2.0.3",
+    "@types/node": "20.14.11",
+    "@types/react": "^18.3.5",
+    "tsup": "8.2.0",
+    "tsx": "4.16.2",
+    "typescript": "5.5.3",
     "@aws-sdk/client-s3": "^3.698.0",
     "@egdata/core.schemas.achievements": "latest",
     "@egdata/core.schemas.assets": "latest",
@@ -49,18 +64,6 @@
     "redis": "4.6.15",
     "satori": "^0.10.14",
     "sharp": "^0.33.5"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "1.8.3",
-    "@trigger.dev/build": "3.2.0",
-    "@types/bun": "^1.1.13",
-    "@types/jsonwebtoken": "9.0.3",
-    "@types/jwk-to-pem": "^2.0.3",
-    "@types/node": "20.14.11",
-    "@types/react": "^18.3.5",
-    "tsup": "8.2.0",
-    "tsx": "4.16.2",
-    "typescript": "5.5.3"
   },
   "trigger.dev": {
     "endpointId": "egdata-api"
