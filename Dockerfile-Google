@@ -16,6 +16,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm run sea
 
 FROM ubuntu:22.04
+WORKDIR /app
 COPY --from=build /app/egdata /app/egdata
 EXPOSE 4000
 
