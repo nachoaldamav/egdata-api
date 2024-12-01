@@ -11,11 +11,11 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-l
 
 FROM base AS build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm run build
+RUN pnpm sea
 
-FROM base
-COPY --from=prod-deps /app/node_modules /app/node_modules
-COPY --from=build /app/dist /app/dist
+FROM ubuntu:22.04
+WORKDIR /app
+COPY --from=build /app/egdata /app/egdata
 EXPOSE 4000
 
-CMD [ "node", "--enable-source-maps", "dist/index.js" ]
+CMD [ "./egdata" ]
