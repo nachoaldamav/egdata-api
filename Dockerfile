@@ -2,7 +2,6 @@ FROM node:22-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
-RUN apt-get update && apt-get install -y curl
 COPY . /app
 WORKDIR /app
 
@@ -14,6 +13,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm sea
 
 FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl
 WORKDIR /app
 COPY --from=build /app/egdata /app/egdata
 EXPOSE 4000
