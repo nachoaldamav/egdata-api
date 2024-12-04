@@ -632,7 +632,7 @@ app.get('/featured-discounts', async (c) => {
     });
   }
 
-  const cacheKey = `featured-discounts:${region}`;
+  const cacheKey = `featured-discounts:${region}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -667,13 +667,16 @@ app.get('/featured-discounts', async (c) => {
     ),
   ]);
 
-  const result = prices.map((p) => {
-    const offer = offers.find((o) => o.id === p.offerId);
-    return {
-      ...offer?.toObject(),
-      price: p,
-    };
-  });
+  const result = prices
+    .map((p) => {
+      const offer = offers.find((o) => o.id === p.offerId);
+      return {
+        ...offer?.toObject(),
+        price: p,
+      };
+    })
+    .filter((o) => o.title)
+    .slice(0, 20);
 
   // Save the result in cache, set the expiration to the first sale ending date
   await client.set(cacheKey, JSON.stringify(result), {
