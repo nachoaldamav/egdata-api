@@ -1,5 +1,5 @@
-import { OfferType } from "../db/schemas/offer";
-import { attributesToObject } from "./attributes-to-object";
+import type { OfferType } from '@egdata/core.schemas.offers';
+import { attributesToObject } from './attributes-to-object.js';
 
 export const orderOffersObject = (offer: OfferType) => {
   const {
@@ -53,7 +53,9 @@ export const orderOffersObject = (offer: OfferType) => {
     url,
     tags,
     items,
-    customAttributes: attributesToObject(customAttributes as any),
+    customAttributes: customAttributes
+      ? attributesToObject(customAttributes)
+      : undefined,
     categories,
     developerDisplayName,
     publisherDisplayName,

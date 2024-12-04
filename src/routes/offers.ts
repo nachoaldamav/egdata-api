@@ -634,42 +634,46 @@ app.get('/featured-discounts', async (c) => {
 
   const cacheKey = `featured-discounts:${region}`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     'Cache-Control': 'public, max-age=60',
+  //   });
+  // }
 
   const featuredOffers = await CollectionOffer.find({}, 'offers._id').lean();
   const offersIds = featuredOffers.flatMap((o) => o.offers.map((o) => o._id));
 
-  const offers = await Offer.find({
-    id: { $in: offersIds },
-    // Only show "BASE_GAME" and "DLC" offers
-    offerType: {
-      $in: ['BASE_GAME', 'DLC'],
-    },
+  const [offers, prices] = await Promise.all([
+    Offer.find({
+      id: { $in: offersIds },
+      offerType: {
+        $in: ['BASE_GAME', 'DLC'],
+      },
+    }),
+    PriceEngine.find(
+      {
+        offerId: { $in: offersIds },
+        region,
+        'price.discount': { $gt: 0 },
+      },
+      undefined,
+      {
+        sort: {
+          updatedAt: -1,
+        },
+      }
+    ),
+  ]);
+
+  const result = prices.map((p) => {
+    const offer = offers.find((o) => o.id === p.offerId);
+    return {
+      ...offer?.toObject(),
+      price: p,
+    };
   });
-
-  const prices = await PriceEngine.find({
-    offerId: { $in: offers.map((o) => o.id) },
-    region,
-    'price.discount': { $gt: 0 },
-  });
-
-  const result = offers
-    .map((o) => {
-      const price = prices.find((p) => p.offerId === o.id);
-
-      return {
-        ...o.toObject(),
-        price: price ?? null,
-      };
-    })
-    .filter((o) => o.price)
-    .slice(0, 20);
 
   // Save the result in cache, set the expiration to the first sale ending date
   await client.set(cacheKey, JSON.stringify(result), {
