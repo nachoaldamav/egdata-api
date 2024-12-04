@@ -634,13 +634,13 @@ app.get('/featured-discounts', async (c) => {
 
   const cacheKey = `featured-discounts:${region}`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
   const featuredOffers = await CollectionOffer.find({}, 'offers._id').lean();
   const offersIds = featuredOffers.flatMap((o) => o.offers.map((o) => o._id));
