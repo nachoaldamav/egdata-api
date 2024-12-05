@@ -2907,6 +2907,12 @@ app.get('/:id/has-regular', async (c) => {
     });
   }
 
+  if (offer.prePurchase !== true) {
+    return c.json({
+      isPrepurchase: false,
+    });
+  }
+
   const { namespace } = offer;
 
   const prePurchaseOffer = await Offer.findOne({
