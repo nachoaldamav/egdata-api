@@ -956,28 +956,6 @@ app.get('/v2/refresh', async (c) => {
       return c.json({ error: 'Invalid JWT' }, 401);
     }
 
-    // Inspect the token from "decoded.access_token"
-    const decoded = jwt.decode(egdataJWT.access_token as string) as {
-      sub: string;
-      iss: string;
-      dn: string;
-      nonce: string;
-      pfpid: string;
-      sec: number;
-      aud: string;
-      t: string;
-      scope: string;
-      appid: string;
-      exp: number;
-      iat: number;
-      jti: string;
-    };
-
-    if (!decoded || !decoded.sub || !decoded.iss) {
-      console.error('Invalid Epic JWT');
-      return c.json({ error: 'Invalid Epic JWT' }, 401);
-    }
-
     // Get the token from the database
     let dbtoken = await db.db
       .collection<{
