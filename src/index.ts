@@ -1540,7 +1540,6 @@ app.route('/builds', BuildsRoute);
 const server = serve({
   fetch: app.fetch,
   port: 4000,
-  hostname: '0.0.0.0',
 });
 
 server.on('listening', () => {

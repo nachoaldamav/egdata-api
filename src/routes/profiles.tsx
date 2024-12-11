@@ -543,7 +543,7 @@ app.get('/:id/achievements', async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:achievements:${limit}:${page}:v0.1`;
+  const cacheKey = `epic-profile:${id}:achievements:${limit}:${page}:v0.3`;
 
   const cached = await client.get(cacheKey);
 
@@ -573,20 +573,36 @@ app.get('/:id/achievements', async (c) => {
           },
         },
         {
-          $sort: {
-            'playerAchievements.playerAchievement.unlockDate': -1,
+          $addFields: {
+            unlockDate: '$playerAchievements.playerAchievement.unlockDate',
           },
         },
         {
-          $skip: skip,
+          $group: {
+            _id: {
+              achievementName:
+                '$playerAchievements.playerAchievement.achievementName',
+              sandboxId: '$playerAchievements.playerAchievement.sandboxId',
+            },
+            doc: {
+              $first: '$$ROOT',
+            },
+            latestUnlockDate: { $max: '$unlockDate' },
+          },
         },
         {
-          $limit: limit,
+          $replaceRoot: {
+            newRoot: '$doc',
+          },
+        },
+        {
+          $sort: {
+            unlockDate: -1,
+          },
         },
         {
           $lookup: {
             from: 'achievementsets',
-            // Replace with the actual name of your achievements definitions collection
             let: {
               achievementName:
                 '$playerAchievements.playerAchievement.achievementName',
@@ -638,6 +654,8 @@ app.get('/:id/achievements', async (c) => {
             achievementDetails: '$achievementDetails.achievementDetails',
           },
         },
+        { $skip: skip },
+        { $limit: limit },
       ])
       .toArray(),
     db.db
@@ -646,6 +664,15 @@ app.get('/:id/achievements', async (c) => {
         { $match: { epicAccountId: id } },
         { $unwind: '$playerAchievements' },
         { $match: { 'playerAchievements.playerAchievement.unlocked': true } },
+        {
+          $group: {
+            _id: {
+              achievementName:
+                '$playerAchievements.playerAchievement.achievementName',
+              sandboxId: '$playerAchievements.playerAchievement.sandboxId',
+            },
+          },
+        },
         { $count: 'count' },
       ])
       .toArray(),
@@ -665,7 +692,7 @@ app.get('/:id/achievements', async (c) => {
       .find((o) => o.namespace === r.sandboxId);
     return {
       ...r.achievementDetails,
-      unlocked: r.unlocked,
+      unlocked: true,
       unlockDate: r.unlockDate,
       offer: offer ?? null,
     };
