@@ -773,6 +773,9 @@ app.patch('/refresh-admin', async (c) => {
 
   if (!response.ok) {
     console.error('Failed to refresh admin user tokens', await response.json());
+    telegramBotService.sendMessage(
+      `Failed to refresh admin user tokens, the bot won't be able to get new data from Epic Games.`
+    );
     return c.json({ error: 'Failed to refresh admin user tokens' }, 401);
   }
 
