@@ -1352,7 +1352,10 @@ app.get('/active-sales', async (c) => {
       });
 
       const everyPriceIsOnSale =
-        prices.length > 0 && prices.every((p) => p.price.discount > 0);
+        prices.length > 0 &&
+        prices.every(
+          (p) => p.price.discount > 0 || p.price.originalPrice === 0
+        );
 
       result.push({
         id: t.id,
