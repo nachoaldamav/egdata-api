@@ -33,7 +33,7 @@ export class DB {
         tlsCAFile: process.env['MONGO_CA'],
         tlsCertificateKeyFile: process.env['MONGO_CERT'],
         tls: true,
-        tlsAllowInvalidCertificates: true,
+        tlsInsecure: true,
       }
     );
     console.log('Connected to MongoDB');

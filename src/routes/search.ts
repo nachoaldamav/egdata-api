@@ -1,52 +1,52 @@
-import { createHash } from 'node:crypto';
-import { Hono } from 'hono';
-import client from '../clients/redis.js';
-import { Offer } from '@egdata/core.schemas.offers';
-import { Tags } from '@egdata/core.schemas.tags';
-import type { PipelineStage } from 'mongoose';
-import { regions } from '../utils/countries.js';
-import { getCookie } from 'hono/cookie';
-import { db } from '../db/index.js';
-import type { ChangelogType } from '@egdata/core.schemas.changelog';
-import { meiliSearchClient } from '../clients/meilisearch.js';
-import { Item } from '@egdata/core.schemas.items';
-import { Asset } from '@egdata/core.schemas.assets';
+import { createHash } from "node:crypto";
+import { Hono } from "hono";
+import client from "../clients/redis.js";
+import { Offer } from "@egdata/core.schemas.offers";
+import { Tags } from "@egdata/core.schemas.tags";
+import type { PipelineStage } from "mongoose";
+import { regions } from "../utils/countries.js";
+import { getCookie } from "hono/cookie";
+import { db } from "../db/index.js";
+import type { ChangelogType } from "@egdata/core.schemas.changelog";
+import { meiliSearchClient } from "../clients/meilisearch.js";
+import { Item } from "@egdata/core.schemas.items";
+import { Asset } from "@egdata/core.schemas.assets";
 
 interface SearchBody {
   title?: string;
   offerType?:
-    | 'IN_GAME_PURCHASE'
-    | 'BASE_GAME'
-    | 'EXPERIENCE'
-    | 'UNLOCKABLE'
-    | 'ADD_ON'
-    | 'Bundle'
-    | 'CONSUMABLE'
-    | 'WALLET'
-    | 'OTHERS'
-    | 'DEMO'
-    | 'DLC'
-    | 'VIRTUAL_CURRENCY'
-    | 'BUNDLE'
-    | 'DIGITAL_EXTRA'
-    | 'EDITION';
+    | "IN_GAME_PURCHASE"
+    | "BASE_GAME"
+    | "EXPERIENCE"
+    | "UNLOCKABLE"
+    | "ADD_ON"
+    | "Bundle"
+    | "CONSUMABLE"
+    | "WALLET"
+    | "OTHERS"
+    | "DEMO"
+    | "DLC"
+    | "VIRTUAL_CURRENCY"
+    | "BUNDLE"
+    | "DIGITAL_EXTRA"
+    | "EDITION";
   tags?: string[];
   customAttributes?: string[];
   seller?: string;
   sortBy?:
-    | 'releaseDate'
-    | 'lastModifiedDate'
-    | 'effectiveDate'
-    | 'creationDate'
-    | 'viewableDate'
-    | 'pcReleaseDate'
-    | 'upcoming'
-    | 'priceAsc'
-    | 'priceDesc'
-    | 'price'
-    | 'discount'
-    | 'discountPercent';
-  sortDir?: 'asc' | 'desc';
+    | "releaseDate"
+    | "lastModifiedDate"
+    | "effectiveDate"
+    | "creationDate"
+    | "viewableDate"
+    | "pcReleaseDate"
+    | "upcoming"
+    | "priceAsc"
+    | "priceDesc"
+    | "price"
+    | "discount"
+    | "discountPercent";
+  sortDir?: "asc" | "desc";
   limit?: number;
   page?: number;
   refundType?: string;
@@ -57,25 +57,27 @@ interface SearchBody {
   };
   onSale?: boolean;
   categories?: string[];
+  developerDisplayName?: string;
+  publisherDisplayName?: string;
 }
 
 const app = new Hono();
 
-app.get('/', (c) => c.json('Hello, World!'));
+app.get("/", (c) => c.json("Hello, World!"));
 
-app.post('/', async (c) => {
+app.post("/", async (c) => {
   const start = new Date();
 
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region =
     Object.keys(regions).find((r) =>
-      regions[r].countries.includes(selectedCountry)
-    ) || 'US';
+      regions[r].countries.includes(selectedCountry),
+    ) || "US";
 
   const body = await c.req.json().catch((err) => {
     c.status(400);
@@ -84,21 +86,21 @@ app.post('/', async (c) => {
 
   if (!body) {
     return c.json({
-      message: 'Invalid body',
+      message: "Invalid body",
     });
   }
 
   const query = body as SearchBody;
 
-  const queryId = createHash('md5')
+  const queryId = createHash("md5")
     .update(
       JSON.stringify({
         ...query,
         page: undefined,
         limit: undefined,
-      })
+      }),
     )
-    .digest('hex');
+    .digest("hex");
 
   const cacheKey = `offers:search:${queryId}:${region}:${query.page}:${query.limit}:v0.1`;
 
@@ -107,7 +109,7 @@ app.post('/', async (c) => {
   if (cached) {
     console.warn(`Cache hit for ${cacheKey}`);
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -128,9 +130,9 @@ app.post('/', async (c) => {
 
   const page = Math.max(query.page || 1, 1);
 
-  let sort = query.sortBy || 'lastModifiedDate';
-  const sortDir = query.sortDir || 'desc';
-  const dir = sortDir === 'asc' ? 1 : -1;
+  let sort = query.sortBy || "lastModifiedDate";
+  const sortDir = query.sortDir || "desc";
+  const dir = sortDir === "asc" ? 1 : -1;
 
   const sortQuery = {
     lastModifiedDate: dir,
@@ -145,18 +147,18 @@ app.post('/', async (c) => {
   const priceQuery: Record<string, any> = {};
 
   if (query.title) {
-    mongoQuery['$text'] = {
+    mongoQuery["$text"] = {
       $search: query.title
         .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .split(' ')
+        .replace(/[^a-z0-9\s]/g, "")
+        .split(" ")
         .map((q) => `"${q.trim()}"`)
-        .join(' | '),
-      $language: 'en',
+        .join(" | "),
+      $language: "en",
     };
 
     // Force the sort to be 'lastModifiedDate' if the title is provided
-    sort = 'lastModifiedDate';
+    sort = "lastModifiedDate";
   }
 
   if (query.offerType) {
@@ -167,7 +169,7 @@ app.post('/', async (c) => {
    * tags provided by the user are tags.id, so we just need to check the tags array of the offers to find the offers that have the tags
    */
   if (query.tags) {
-    mongoQuery['tags.id'] = { $all: query.tags };
+    mongoQuery["tags.id"] = { $all: query.tags };
   }
 
   if (query.customAttributes) {
@@ -177,14 +179,14 @@ app.post('/', async (c) => {
   }
 
   if (query.categories) {
-    mongoQuery['categories'] = { $all: query.categories };
+    mongoQuery["categories"] = { $all: query.categories };
   }
 
   /**
    * The seller is the ID of the seller, so we just need to check the seller.id field in the offers
    */
   if (query.seller) {
-    mongoQuery['seller.id'] = query.seller;
+    mongoQuery["seller.id"] = query.seller;
   }
 
   if (query.refundType) {
@@ -195,19 +197,27 @@ app.post('/', async (c) => {
     mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
   }
 
-  if (['effectiveDate', 'creationDate', 'viewableDate'].includes(sort)) {
-    // If any of those sorts are used, we need to ignore the offers that are from after 2090 (mock date for unknown dates)
-    mongoQuery[sort] = { $lt: new Date('2090-01-01') };
+  if (query.developerDisplayName) {
+    mongoQuery.developerDisplayName = query.developerDisplayName;
   }
 
-  if (['releaseDate', 'pcReleaseDate'].includes(sort)) {
+  if (query.publisherDisplayName) {
+    mongoQuery.publisherDisplayName = query.publisherDisplayName;
+  }
+
+  if (["effectiveDate", "creationDate", "viewableDate"].includes(sort)) {
+    // If any of those sorts are used, we need to ignore the offers that are from after 2090 (mock date for unknown dates)
+    mongoQuery[sort] = { $lt: new Date("2090-01-01") };
+  }
+
+  if (["releaseDate", "pcReleaseDate"].includes(sort)) {
     // If the sort is releaseDate or pcReleaseDate, we need to ignore the offers that are from after the current date
     mongoQuery[sort] = { $lte: new Date() };
   }
 
-  if (['upcoming'].includes(sort)) {
+  if (["upcoming"].includes(sort)) {
     // If the sort is upcoming, we need to ignore the offers that are from before the current date
-    mongoQuery['releaseDate'] = {
+    mongoQuery["releaseDate"] = {
       $gte: new Date(),
     };
   }
@@ -218,21 +228,21 @@ app.post('/', async (c) => {
 
   if (query.price) {
     if (query.price.min) {
-      priceQuery['price.discountPrice'] = {
+      priceQuery["price.discountPrice"] = {
         $gte: query.price.min,
       };
     }
 
     if (query.price.max) {
-      priceQuery['price.discountPrice'] = {
-        ...priceQuery['price.discountPrice'],
+      priceQuery["price.discountPrice"] = {
+        ...priceQuery["price.discountPrice"],
         $lte: query.price.max,
       };
     }
   }
 
-  if (query.onSale || ['discount', 'discountPercent'].includes(sort)) {
-    priceQuery['price.discount'] = { $gt: 0 };
+  if (query.onSale || ["discount", "discountPercent"].includes(sort)) {
+    priceQuery["price.discount"] = { $gt: 0 };
   }
 
   const sortingParams = () => {
@@ -240,23 +250,23 @@ app.post('/', async (c) => {
 
     if (query.title) {
       sortParams = {
-        score: { $meta: 'textScore' },
+        score: { $meta: "textScore" },
       };
     }
 
     if (
       ![
-        'upcoming',
-        'priceAsc',
-        'priceDesc',
-        'price',
-        'discount',
-        'discountPercent',
+        "upcoming",
+        "priceAsc",
+        "priceDesc",
+        "price",
+        "discount",
+        "discountPercent",
       ].includes(sort)
     ) {
       // @ts-expect-error
       sortParams[sort] = sortQuery[sort];
-    } else if (sort === 'upcoming') {
+    } else if (sort === "upcoming") {
       sortParams = {
         releaseDate: 1,
       };
@@ -270,39 +280,39 @@ app.post('/', async (c) => {
   };
 
   let offersPipeline: PipelineStage[] = [];
-  let collection = 'offers';
+  let collection = "offers";
 
   if (
-    ['priceAsc', 'priceDesc', 'price', 'discount', 'discountPercent'].includes(
-      sort
+    ["priceAsc", "priceDesc", "price", "discount", "discountPercent"].includes(
+      sort,
     )
   ) {
     // If sorting by price, start with the pricing collection
     let priceSortOrder: 1 | -1 =
-      sort === 'priceAsc' || sort === 'priceDesc'
-        ? sort === 'priceAsc'
+      sort === "priceAsc" || sort === "priceDesc"
+        ? sort === "priceAsc"
           ? 1
           : -1
         : dir;
 
     const sortKey = () => {
-      if (sort === 'discountPercent') {
-        return 'appliedRules.discountSetting.discountPercentage';
+      if (sort === "discountPercent") {
+        return "appliedRules.discountSetting.discountPercentage";
       }
 
-      if (sort === 'discount') {
-        return 'price.discount';
+      if (sort === "discount") {
+        return "price.discount";
       }
 
-      return 'price.discountPrice';
+      return "price.discountPrice";
     };
 
-    if (sort === 'discountPercent') {
+    if (sort === "discountPercent") {
       // Revert the order if sorting by discount percentage
       priceSortOrder = priceSortOrder * -1;
     }
 
-    collection = 'pricev2';
+    collection = "pricev2";
     offersPipeline = [
       {
         $match: {
@@ -318,24 +328,24 @@ app.post('/', async (c) => {
       // Move the root content (all of it) to the price field
       {
         $addFields: {
-          price: '$$ROOT',
+          price: "$$ROOT",
         },
       },
       {
         $lookup: {
-          from: 'offers',
-          localField: 'offerId',
-          foreignField: 'id',
-          as: 'offerDetails',
+          from: "offers",
+          localField: "offerId",
+          foreignField: "id",
+          as: "offerDetails",
         },
       },
       {
-        $unwind: '$offerDetails',
+        $unwind: "$offerDetails",
       },
       {
         $replaceRoot: {
           newRoot: {
-            $mergeObjects: ['$offerDetails', '$$ROOT'],
+            $mergeObjects: ["$offerDetails", "$$ROOT"],
           },
         },
       },
@@ -368,16 +378,16 @@ app.post('/', async (c) => {
       },
       {
         $sort: {
-          ...(query.title ? { score: { $meta: 'textScore' } } : {}),
+          ...(query.title ? { score: { $meta: "textScore" } } : {}),
           ...sortingParams(),
         },
       },
       {
         $lookup: {
-          from: 'pricev2',
-          localField: 'id',
-          foreignField: 'offerId',
-          as: 'priceEngine',
+          from: "pricev2",
+          localField: "id",
+          foreignField: "offerId",
+          as: "priceEngine",
           pipeline: [
             {
               $match: {
@@ -390,7 +400,7 @@ app.post('/', async (c) => {
       },
       {
         $addFields: {
-          price: { $arrayElemAt: ['$priceEngine', 0] },
+          price: { $arrayElemAt: ["$priceEngine", 0] },
         },
       },
       {
@@ -412,16 +422,17 @@ app.post('/', async (c) => {
     ];
   }
 
-  const offersData = await db.db
-    .collection(collection)
-    .aggregate(offersPipeline)
-    .toArray();
+  const dbColl = db.db.collection(collection);
+
+  const aggregation = await dbColl.aggregate(offersPipeline);
+
+  const offersData = await aggregation.toArray();
 
   const result = {
     // If sortBy is 'price and it's using title, we sort the page by the price direction
     elements: offersData.sort((a, b) => {
-      if (query.sortBy === 'price' && query.title) {
-        if (sortDir === 'asc') {
+      if (query.sortBy === "price" && query.title) {
+        if (sortDir === "asc") {
           return a.price.price.discountPrice - b.price.price.discountPrice;
         }
         return b.price.price.discountPrice - a.price.price.discountPrice;
@@ -439,35 +450,91 @@ app.post('/', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
-app.get('/tags', async (c) => {
+app.get("/tags", async (c) => {
   const tags = await Tags.find({
-    status: 'ACTIVE',
+    status: "ACTIVE",
   });
 
   return c.json(tags, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/offer-types', async (c) => {
+app.get("/offer-types", async (c) => {
   const types = await Offer.aggregate([
-    { $group: { _id: '$offerType', count: { $sum: 1 } } },
+    { $group: { _id: "$offerType", count: { $sum: 1 } } },
   ]);
 
   return c.json(
     types.filter((t) => t._id),
     200,
     {
-      'Cache-Control': 'public, max-age=60',
-    }
+      "Cache-Control": "public, max-age=60",
+    },
   );
 });
 
-app.get('/changelog', async (c) => {
+app.get("/developers", async (c) => {
+  const query = c.req.query("query");
+
+  const pipeline: PipelineStage[] = [
+    {
+      $group: {
+        _id: "$developerDisplayName",
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+  ];
+
+  if (query) {
+    pipeline.unshift({
+      $match: {
+        developerDisplayName: { $regex: new RegExp(query, "i") },
+      },
+    });
+  }
+
+  const developers = await Offer.aggregate(pipeline);
+
+  return c.json(developers, 200, {
+    "Cache-Control": "public, max-age=60",
+  });
+});
+
+app.get("/publishers", async (c) => {
+  const query = c.req.query("query");
+
+  const pipeline: PipelineStage[] = [
+    {
+      $group: {
+        _id: "$publisherDisplayName",
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+  ];
+
+  if (query) {
+    pipeline.unshift({
+      $match: {
+        publisherDisplayName: { $regex: new RegExp(query, "i") },
+      },
+    });
+  }
+
+  const publishers = await Offer.aggregate(pipeline);
+
+  return c.json(publishers, 200, {
+    "Cache-Control": "public, max-age=60",
+  });
+});
+
+app.get("/changelog", async (c) => {
   // Get the search opts (query, page, limit, type)
   const {
     query,
@@ -480,14 +547,14 @@ app.get('/changelog', async (c) => {
   const page = Math.max(Number.parseInt(requestedPage, 10) || 1, 1);
   const limit = Math.min(Number.parseInt(requestedLimit, 10) || 10, 50);
 
-  const changelogs = await meiliSearchClient.index('changelog').search<
+  const changelogs = await meiliSearchClient.index("changelog").search<
     ChangelogType & {
       document: unknown;
     }
   >(query, {
     offset: (page - 1) * limit,
     limit,
-    sort: ['timestamp:desc'],
+    sort: ["timestamp:desc"],
   });
 
   await Promise.all(
@@ -497,17 +564,17 @@ app.get('/changelog', async (c) => {
         const type = hit.metadata.contextType;
         const id = hit.metadata.contextId;
 
-        if (type === 'offer') {
+        if (type === "offer") {
           hit.document = await Offer.findOne({ id });
         }
 
-        if (type === 'item') {
+        if (type === "item") {
           hit.document = await Item.findOne({
             id,
           });
         }
 
-        if (type === 'asset') {
+        if (type === "asset") {
           const asset = await Asset.findOne({
             artifactId: id,
           });
@@ -518,16 +585,16 @@ app.get('/changelog', async (c) => {
         }
 
         return hit;
-      })
+      }),
   );
 
   // Return the changelogs
   return c.json(changelogs, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:id', async (c) => {
+app.get("/:id", async (c) => {
   const { id } = c.req.param();
 
   const queryKey = `q:${id}`;
@@ -537,24 +604,24 @@ app.get('/:id', async (c) => {
   if (!cachedQuery) {
     c.status(404);
     return c.json({
-      message: 'Query not found',
+      message: "Query not found",
     });
   }
 
   return c.json(JSON.parse(cachedQuery));
 });
 
-app.get('/:id/count', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+app.get("/:id/count", async (c) => {
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region =
     Object.keys(regions).find((r) =>
-      regions[r].countries.includes(selectedCountry)
-    ) || 'US';
+      regions[r].countries.includes(selectedCountry),
+    ) || "US";
 
   const { id } = c.req.param();
 
@@ -566,7 +633,7 @@ app.get('/:id/count', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -575,7 +642,7 @@ app.get('/:id/count', async (c) => {
   if (!cachedQuery) {
     c.status(404);
     return c.json({
-      message: 'Query not found',
+      message: "Query not found",
     });
   }
 
@@ -585,7 +652,7 @@ app.get('/:id/count', async (c) => {
   const priceQuery: Record<string, any> = {};
 
   if (query.title) {
-    mongoQuery.title = { $regex: new RegExp(query.title, 'i') };
+    mongoQuery.title = { $regex: new RegExp(query.title, "i") };
   }
 
   if (query.offerType) {
@@ -596,7 +663,7 @@ app.get('/:id/count', async (c) => {
    * The tags query should be "and", so we need to find the offers that have all the tags provided by the user
    */
   if (query.tags) {
-    mongoQuery['tags.id'] = { $all: query.tags };
+    mongoQuery["tags.id"] = { $all: query.tags };
   }
 
   if (query.customAttributes) {
@@ -606,11 +673,19 @@ app.get('/:id/count', async (c) => {
   }
 
   if (query.categories) {
-    mongoQuery['categories'] = { $all: query.categories };
+    mongoQuery["categories"] = { $all: query.categories };
   }
 
   if (query.seller) {
-    mongoQuery['seller.id'] = query.seller;
+    mongoQuery["seller.id"] = query.seller;
+  }
+
+  if (query.developerDisplayName) {
+    mongoQuery.developerDisplayName = query.developerDisplayName;
+  }
+
+  if (query.publisherDisplayName) {
+    mongoQuery.publisherDisplayName = query.publisherDisplayName;
   }
 
   if (query.refundType) {
@@ -623,133 +698,167 @@ app.get('/:id/count', async (c) => {
 
   if (query.price) {
     if (query.price.min) {
-      priceQuery['price.discountPrice'] = {
+      priceQuery["price.discountPrice"] = {
         $gte: query.price.min,
       };
     }
 
     if (query.price.max) {
-      priceQuery['price.discountPrice'] = {
-        ...priceQuery['price.discountPrice'],
+      priceQuery["price.discountPrice"] = {
+        ...priceQuery["price.discountPrice"],
         $lte: query.price.max,
       };
     }
   }
 
   if (query.onSale) {
-    priceQuery['price.discount'] = { $gt: 0 };
+    priceQuery["price.discount"] = { $gt: 0 };
   }
 
   try {
-    const [tagCountsData, offerTypeCountsData, totalCountData] =
-      await Promise.allSettled([
-        Offer.aggregate([
-          { $match: mongoQuery },
-          {
-            $lookup: {
-              from: 'pricev2',
-              localField: 'id',
-              foreignField: 'offerId',
-              as: 'priceEngine',
-              pipeline: [
-                {
-                  $match: {
-                    region: 'EURO',
-                    ...priceQuery,
-                  },
+    const [
+      tagCountsData,
+      offerTypeCountsData,
+      totalCountData,
+      developerData,
+      publisherData,
+    ] = await Promise.allSettled([
+      Offer.aggregate([
+        { $match: mongoQuery },
+        {
+          $lookup: {
+            from: "pricev2",
+            localField: "id",
+            foreignField: "offerId",
+            as: "priceEngine",
+            pipeline: [
+              {
+                $match: {
+                  region: "EURO",
+                  ...priceQuery,
                 },
-              ],
-            },
+              },
+            ],
           },
-          {
-            $addFields: {
-              price: { $arrayElemAt: ['$priceEngine', 0] },
-            },
+        },
+        {
+          $addFields: {
+            price: { $arrayElemAt: ["$priceEngine", 0] },
           },
-          {
-            $match: {
-              price: { $ne: null },
-            },
+        },
+        {
+          $match: {
+            price: { $ne: null },
           },
-          { $unwind: '$tags' },
-          { $group: { _id: '$tags.id', count: { $sum: 1 } } },
-        ]),
-        Offer.aggregate([
-          { $match: mongoQuery },
-          {
-            $lookup: {
-              from: 'pricev2',
-              localField: 'id',
-              foreignField: 'offerId',
-              as: 'priceEngine',
-              pipeline: [
-                {
-                  $match: {
-                    region: 'EURO',
-                    ...priceQuery,
-                  },
+        },
+        { $unwind: "$tags" },
+        { $group: { _id: "$tags.id", count: { $sum: 1 } } },
+      ]),
+      Offer.aggregate([
+        { $match: mongoQuery },
+        {
+          $lookup: {
+            from: "pricev2",
+            localField: "id",
+            foreignField: "offerId",
+            as: "priceEngine",
+            pipeline: [
+              {
+                $match: {
+                  region: "EURO",
+                  ...priceQuery,
                 },
-              ],
-            },
+              },
+            ],
           },
-          {
-            $addFields: {
-              price: { $arrayElemAt: ['$priceEngine', 0] },
-            },
+        },
+        {
+          $addFields: {
+            price: { $arrayElemAt: ["$priceEngine", 0] },
           },
-          {
-            $match: {
-              price: { $ne: null },
-            },
+        },
+        {
+          $match: {
+            price: { $ne: null },
           },
-          { $group: { _id: '$offerType', count: { $sum: 1 } } },
-        ]),
-        Offer.aggregate([
-          { $match: mongoQuery },
-          // Append the price query to the pipeline
-          {
-            $lookup: {
-              from: 'pricev2',
-              localField: 'id',
-              foreignField: 'offerId',
-              as: 'priceEngine',
-              pipeline: [
-                {
-                  $match: {
-                    region: 'EURO',
-                    ...priceQuery,
-                  },
+        },
+        { $group: { _id: "$offerType", count: { $sum: 1 } } },
+      ]),
+      Offer.aggregate([
+        { $match: mongoQuery },
+        // Append the price query to the pipeline
+        {
+          $lookup: {
+            from: "pricev2",
+            localField: "id",
+            foreignField: "offerId",
+            as: "priceEngine",
+            pipeline: [
+              {
+                $match: {
+                  region: "EURO",
+                  ...priceQuery,
                 },
-              ],
-            },
+              },
+            ],
           },
-          {
-            $addFields: {
-              price: { $arrayElemAt: ['$priceEngine', 0] },
-            },
+        },
+        {
+          $addFields: {
+            price: { $arrayElemAt: ["$priceEngine", 0] },
           },
-          {
-            $match: {
-              price: { $ne: null },
-            },
+        },
+        {
+          $match: {
+            price: { $ne: null },
           },
-          {
-            $count: 'total',
+        },
+        {
+          $count: "total",
+        },
+      ]),
+      Offer.aggregate([
+        { $match: mongoQuery },
+        {
+          $unwind: "$developerDisplayName",
+        },
+        {
+          $group: {
+            _id: "$developerDisplayName",
+            count: { $sum: 1 },
           },
-        ]),
-      ]);
+        },
+      ]),
+      Offer.aggregate([
+        { $match: mongoQuery },
+        {
+          $unwind: "$publisherDisplayName",
+        },
+        {
+          $group: {
+            _id: "$publisherDisplayName",
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
 
     const result = {
       tagCounts:
-        tagCountsData.status === 'fulfilled' ? tagCountsData.value : [],
+        tagCountsData.status === "fulfilled" ? tagCountsData.value : [],
       offerTypeCounts:
-        offerTypeCountsData.status === 'fulfilled'
+        offerTypeCountsData.status === "fulfilled"
           ? offerTypeCountsData.value
           : [],
       total:
-        totalCountData.status === 'fulfilled'
+        totalCountData.status === "fulfilled"
           ? totalCountData.value[0]?.total
           : 0,
+      developer:
+        developerData.status === "fulfilled" ? developerData.value : [],
+      publisher:
+        publisherData.status === "fulfilled" ? publisherData.value : [],
     };
 
     await client.set(cacheKey, JSON.stringify(result), {
@@ -757,11 +866,11 @@ app.get('/:id/count', async (c) => {
     });
 
     return c.json(result, 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   } catch (err) {
     c.status(500);
-    c.json({ message: 'Error while counting tags' });
+    c.json({ message: "Error while counting tags" });
   }
 });
 

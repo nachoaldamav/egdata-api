@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono/quick';
+import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { inspectRoutes } from 'hono/dev';
 import { getCookie } from 'hono/cookie';
@@ -46,7 +46,6 @@ import { readFileSync } from 'node:fs';
 import chalk from 'chalk';
 
 config();
-db.connect();
 
 const internalNamespaces = [
   'epic',
@@ -1540,17 +1539,29 @@ app.route('/assets', AssetsRoute);
 
 app.route('/builds', BuildsRoute);
 
-const server = serve({
-  fetch: app.fetch,
-  port: 4000,
-});
+async function startServer() {
+  try {
+    await db.connect();
 
-server.on('listening', () => {
-  console.log(
-    `${chalk.gray('Listening on')} ${chalk.green(
-      'http://localhost:4000'
-    )} (${chalk.gray('took')} ${chalk.magenta(
-      `${(process.uptime() * 1000).toFixed(2)}ms`
-    )})`
-  );
-});
+    const server = serve({
+      fetch: app.fetch,
+      port: 4000,
+    });
+
+    server.on('listening', () => {
+      console.log(
+        `${chalk.gray('Listening on')} ${chalk.green(
+          'http://localhost:4000'
+        )} (${chalk.gray('took')} ${chalk.magenta(
+          `${(process.uptime() * 1000).toFixed(2)}ms`
+        )})`
+      );
+    });
+  } catch (error) {
+    console.error('Failed to connect to MongoDB', error);
+    process.exit(1); // Exit the process if DB connection fails
+  }
+}
+
+startServer();
+

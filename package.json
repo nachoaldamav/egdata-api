@@ -45,7 +45,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.6",
     "meilisearch": "^0.41.0",
-    "mongodb": "^6.9.0",
+    "mongodb": "^6.12.0",
     "mongoose": "8.5.2",
     "nanoid": "^5.0.7",
     "node-telegram-bot-api": "^0.66.0",
@@ -56,6 +56,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
+    "@rslib/core": "^0.1.4",
     "@trigger.dev/build": "3.2.0",
     "@types/bun": "^1.1.13",
     "@types/jsonwebtoken": "9.0.3",
@@ -64,8 +65,7 @@
     "@types/react": "^18.3.5",
     "tsup": "8.2.0",
     "tsx": "4.16.2",
-    "typescript": "5.5.3",
-    "@rslib/core": "^0.1.1"
+    "typescript": "5.5.3"
   },
   "trigger.dev": {
     "endpointId": "egdata-api"
