@@ -627,7 +627,7 @@ app.get("/:id/count", async (c) => {
 
   const queryKey = `q:${id}`;
 
-  const cacheKey = `search:count:${id}:${region}:v0.1`;
+  const cacheKey = `search:count:${id}:${region}:v0.5`;
 
   const cached = await client.get(cacheKey);
 
@@ -722,6 +722,7 @@ app.get("/:id/count", async (c) => {
       totalCountData,
       developerData,
       publisherData,
+      priceRangeData 
     ] = await Promise.allSettled([
       Offer.aggregate([
         { $match: mongoQuery },
@@ -842,6 +843,36 @@ app.get("/:id/count", async (c) => {
         },
         { $sort: { count: -1 } },
       ]),
+      Offer.aggregate([
+        { $match: mongoQuery },
+        {
+          $lookup: {
+            from: "pricev2",
+            localField: "id",
+            foreignField: "offerId",
+            as: "priceEngine",
+            pipeline: [
+              {
+                $match: {
+                  region: region,
+                  ...priceQuery,
+                },
+              },
+            ],
+          },
+        },
+        {
+          $unwind: "$priceEngine"
+        },
+        {
+          $group: {
+            _id: null,
+            minPrice: { $min: "$priceEngine.price.discountPrice" },
+            maxPrice: { $max: "$priceEngine.price.discountPrice" },
+            currency: { $first: "$priceEngine.price.currencyCode" },
+          }
+        }
+      ])
     ]);
 
     const result = {
@@ -859,6 +890,10 @@ app.get("/:id/count", async (c) => {
         developerData.status === "fulfilled" ? developerData.value : [],
       publisher:
         publisherData.status === "fulfilled" ? publisherData.value : [],
+      priceRange:
+        priceRangeData.status === "fulfilled" && priceRangeData.value.length > 0
+          ? priceRangeData.value[0]
+          : { minPrice: null, maxPrice: null },
     };
 
     await client.set(cacheKey, JSON.stringify(result), {
