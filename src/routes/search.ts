@@ -855,7 +855,6 @@ app.get("/:id/count", async (c) => {
               {
                 $match: {
                   region: region,
-                  ...priceQuery,
                 },
               },
             ],
