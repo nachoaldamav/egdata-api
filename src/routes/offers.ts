@@ -1458,7 +1458,7 @@ app.get('/:id/changelog', async (c) => {
   }
 
   await client.set(cacheKey, JSON.stringify(changelist), {
-    EX: 3600,
+    EX: 60,
   });
 
   return c.json(changelist);
