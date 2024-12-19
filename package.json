@@ -46,7 +46,7 @@
     "jwk-to-pem": "^2.0.6",
     "meilisearch": "^0.41.0",
     "mongodb": "^6.12.0",
-    "mongoose": "8.5.2",
+    "mongoose": "8.9.2",
     "nanoid": "^5.0.7",
     "node-telegram-bot-api": "^0.66.0",
     "react": "^18.3.1",

@@ -5,7 +5,7 @@ import { regions } from '../utils/countries.js';
 import client from '../clients/redis.js';
 import { PriceEngine } from '@egdata/core.schemas.price';
 import { orderOffersObject } from '../utils/order-offers-object.js';
-import { CollectionOffer } from '@egdata/core.schemas.collections';
+import { GamePosition } from '@egdata/core.schemas.collections';
 import { Item } from '@egdata/core.schemas.items';
 import { FreeGames } from '@egdata/core.schemas.free-games';
 import { Seller } from '@egdata/core.schemas.sellers';
@@ -107,7 +107,10 @@ app.get('/:id/cover', async (c) => {
     });
   }
 
-  const topSellers = await CollectionOffer.findById('top-sellers');
+  const topSellers = await GamePosition.find({
+    collectionId: 'top-sellers',
+    position: { $gt: 0 },
+  });
 
   if (!topSellers) {
     c.status(404);
@@ -118,7 +121,7 @@ app.get('/:id/cover', async (c) => {
 
   const offersInTopSellers = await Offer.find(
     {
-      id: { $in: topSellers.offers.map((o) => o._id) },
+      id: { $in: topSellers.map((o) => o.offerId) },
       'seller.id': id,
     },
     undefined,

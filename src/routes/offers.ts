@@ -19,7 +19,7 @@ import { TagModel, Tags } from '@egdata/core.schemas.tags';
 import { orderOffersObject } from '../utils/order-offers-object.js';
 import { getImage } from '../utils/get-image.js';
 import { Media } from '@egdata/core.schemas.media';
-import { CollectionOffer } from '@egdata/core.schemas.collections';
+import { GamePosition } from '@egdata/core.schemas.collections';
 import { Sandbox } from '@egdata/core.schemas.sandboxes';
 import { FreeGames } from '@egdata/core.schemas.free-games';
 import { db } from '../db/index.js';
@@ -394,469 +394,6 @@ app.get('/genres', async (c) => {
       };
     })
   );
-
-  return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
-  });
-});
-
-app.get('/top-wishlisted', async (c) => {
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 10);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-  const skip = (page - 1) * limit;
-
-  const start = new Date();
-
-  const cacheKey = `top-wishlisted:${page}:${limit}:v0.1`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
-  const result = await CollectionOffer.aggregate([
-    {
-      $match: {
-        _id: 'top-wishlisted',
-      },
-    },
-    {
-      $project: {
-        offers: {
-          $filter: {
-            input: { $slice: ['$offers', skip, limit] },
-            as: 'offer',
-            cond: { $ne: ['$$offer.position', 0] },
-          },
-        },
-      },
-    },
-    {
-      $lookup: {
-        from: 'offers',
-        localField: 'offers._id',
-        foreignField: 'id',
-        as: 'offerDetails',
-      },
-    },
-    {
-      $unwind: '$offerDetails',
-    },
-    {
-      $sort: {
-        'offerDetails.id': -1,
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        total: {
-          $first: {
-            $size: '$offers',
-          },
-        },
-        elements: {
-          $push: '$offerDetails',
-        },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        page: {
-          $literal: 1,
-        },
-        limit: {
-          $literal: 1,
-        },
-        total: 1,
-        elements: 1,
-      },
-    },
-  ]);
-
-  if (result.length > 0) {
-    const response = {
-      elements: result[0].elements.map((o: OfferType) => orderOffersObject(o)),
-      page,
-      limit,
-      total:
-        (
-          await CollectionOffer.findOne({
-            _id: 'top-wishlisted',
-          }).exec()
-        )?.offers.length ?? 0,
-    };
-
-    await client.set(cacheKey, JSON.stringify(response), {
-      EX: 3600,
-    });
-
-    return c.json(response, 200, {
-      'Cache-Control': 'public, max-age=60',
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    });
-  }
-
-  return c.json({ elements: [], page, limit, total: 0 }, 200, {
-    'Cache-Control': 'public, max-age=60',
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-  });
-});
-
-app.get('/top-sellers', async (c) => {
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-  const skip = (page - 1) * limit;
-
-  const start = new Date();
-
-  const cacheKey = `top-sellers:${page}:${limit}:v0.1`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
-  const result = await CollectionOffer.aggregate([
-    {
-      $match: {
-        _id: 'top-sellers',
-      },
-    },
-    {
-      $unwind: '$offers',
-    },
-    {
-      $match: {
-        'offers.position': { $ne: 0 },
-      },
-    },
-    {
-      $sort: {
-        'offers.position': 1, // Sort by position in ascending order
-      },
-    },
-    {
-      $group: {
-        _id: '$_id',
-        offers: { $push: '$offers' },
-      },
-    },
-    {
-      $project: {
-        offers: { $slice: ['$offers', skip, limit] },
-      },
-    },
-    {
-      $unwind: '$offers',
-    },
-    {
-      $lookup: {
-        from: 'offers',
-        localField: 'offers._id',
-        foreignField: 'id',
-        as: 'offerDetails',
-      },
-    },
-    {
-      $unwind: '$offerDetails',
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: 1 },
-        elements: { $push: '$offerDetails' },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        page: { $literal: page },
-        limit: { $literal: limit },
-        total: 1,
-        elements: 1,
-      },
-    },
-  ]);
-
-  if (result.length > 0) {
-    const response = {
-      elements: result[0].elements.map((o: OfferType) => orderOffersObject(o)),
-      page,
-      limit,
-      total:
-        (
-          await CollectionOffer.findOne({
-            _id: 'top-sellers',
-          }).exec()
-        )?.offers.length ?? 0,
-    };
-
-    await client.set(cacheKey, JSON.stringify(response), {
-      EX: 360,
-    });
-
-    return c.json(response, 200, {
-      'Cache-Control': 'public, max-age=60',
-      'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-    });
-  }
-
-  return c.json({ elements: [], page, limit, total: 0 }, 200, {
-    'Cache-Control': 'public, max-age=60',
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
-  });
-});
-
-app.get('/featured-discounts', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
-
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
-
-  if (!region) {
-    c.status(404);
-    return c.json({
-      message: 'Country not found',
-    });
-  }
-
-  const cacheKey = `featured-discounts:${region}:v0.1`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
-  const featuredOffers = await CollectionOffer.find({}, 'offers._id').lean();
-  const offersIds = featuredOffers.flatMap((o) => o.offers.map((o) => o._id));
-
-  const [offers, prices] = await Promise.all([
-    Offer.find({
-      id: { $in: offersIds },
-      offerType: {
-        $in: ['BASE_GAME', 'DLC'],
-      },
-    }),
-    PriceEngine.find(
-      {
-        offerId: { $in: offersIds },
-        region,
-        'price.discount': { $gt: 0 },
-      },
-      undefined,
-      {
-        sort: {
-          updatedAt: -1,
-        },
-      }
-    ),
-  ]);
-
-  const result = prices
-    .map((p) => {
-      const offer = offers.find((o) => o.id === p.offerId);
-      return {
-        ...offer?.toObject(),
-        price: p,
-      };
-    })
-    .filter((o) => o.title)
-    .slice(0, 20);
-
-  // Save the result in cache, set the expiration to the first sale ending date
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
-
-  return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
-  });
-});
-
-app.get('/latest-achievements', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
-
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
-
-  if (!region) {
-    c.status(404);
-    return c.json({
-      message: 'Country not found',
-    });
-  }
-
-  const cacheKey = `latest-achievements:${region}:v0.1`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
-  const limit = 15; // Number of games to fetch per page
-  let skip = 0;
-  let result: any[] = [];
-
-  while (result.length < 20) {
-    const offers = await Offer.find({
-      offerType: { $in: ['BASE_GAME'] },
-      'tags.id': '19847',
-      effectiveDate: { $lte: new Date() },
-    })
-      .sort({ effectiveDate: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const [achievementsData, pricesData] = await Promise.allSettled([
-      AchievementSet.find({
-        sandboxId: { $in: offers.map((o) => o.namespace) },
-        isBase: true,
-      }),
-      PriceEngine.find({
-        offerId: { $in: offers.map((o) => o.id) },
-        region,
-      }),
-    ]);
-
-    const achievements =
-      achievementsData.status === 'fulfilled' ? achievementsData.value : [];
-    const prices = pricesData.status === 'fulfilled' ? pricesData.value : [];
-
-    const pageResults = offers
-      .map((o) => {
-        const price = prices.find((p) => p.offerId === o.id);
-        const achievement = achievements.find(
-          (a) => a.sandboxId === o.namespace
-        );
-        return {
-          ...orderOffersObject(o),
-          achievements: achievement,
-          price: price ?? null,
-        };
-      })
-      .filter((o) => o.achievements);
-
-    result = result.concat(pageResults);
-    skip += limit;
-
-    if (offers.length < limit) {
-      // Reached the end of the data
-      break;
-    }
-  }
-
-  result = result.slice(0, 20);
-
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
-
-  return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
-  });
-});
-
-app.get('/latest-released', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
-
-  const selectedCountry = country ?? cookieCountry ?? 'US';
-
-  const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
-  );
-
-  if (!region) {
-    c.status(404);
-    return c.json({
-      message: 'Country not found',
-    });
-  }
-
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-  const skip = (page - 1) * limit;
-
-  const cacheKey = `latest-released:${region}`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-    });
-  }
-
-  const offers = await Offer.find(
-    {
-      effectiveDate: {
-        $lte: new Date(),
-      },
-      offerType: {
-        $in: ['BASE_GAME', 'DLC'],
-      },
-      releaseDate: {
-        $ne: null,
-        $lte: new Date(),
-      },
-    },
-    undefined,
-    {
-      sort: {
-        releaseDate: -1,
-      },
-      limit,
-      skip,
-    }
-  );
-
-  const prices = await PriceEngine.find({
-    offerId: { $in: offers.map((o) => o.id) },
-    region,
-  });
-
-  const result = {
-    elements: offers.map((o) => {
-      const price = prices.find((p) => p.offerId === o.id);
-      return {
-        ...orderOffersObject(o),
-        price: price ?? null,
-      };
-    }),
-    limit,
-    start: skip,
-    page,
-    count: await Offer.countDocuments({
-      releaseDate: { $ne: null },
-      offerType: { $in: ['BASE_GAME'] },
-    }),
-  };
-
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
 
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',
@@ -1919,40 +1456,46 @@ app.get('/:id/tops', async (c) => {
 
   const cacheKey = `tops:${id}`;
 
-  // const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), 200, {
-  //     'Cache-Control': 'public, max-age=60',
-  //   });
-  // }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  }
 
-  const [topWishlisted, topSellers, topDemos] = await Promise.all([
-    CollectionOffer.findOne({
-      _id: 'top-wishlisted',
-      'offers._id': id,
+  const [topWishlisted, topSellers, topDemos, mostPlayed] = await Promise.all([
+    GamePosition.findOne({
+      collectionId: 'top-wishlisted',
+      offerId: id,
     }),
-    CollectionOffer.findOne({
-      _id: 'top-sellers',
-      'offers._id': id,
+    GamePosition.findOne({
+      collectionId: 'top-sellers',
+      offerId: id,
     }),
-    CollectionOffer.findOne({
-      _id: 'top-demos',
-      'offers._id': id,
+    GamePosition.findOne({
+      collectionId: 'top-demos',
+      offerId: id,
+    }),
+    GamePosition.findOne({
+      collectionId: 'most-played',
+      offerId: id,
     }),
   ]);
 
   const whishlistedPosition =
-    topWishlisted?.offers.find((o) => o._id === id)?.position ?? 0;
+    topWishlisted?.position ?? 0;
   const sellersPosition =
-    topSellers?.offers.find((o) => o._id === id)?.position ?? 0;
+    topSellers?.position ?? 0;
   const demosPosition =
-    topDemos?.offers.find((o) => o._id === id)?.position ?? 0;
+    topDemos?.position ?? 0;
+    const playedPosition = mostPlayed?.position ?? 0;
 
   const result = {
     topWishlisted: whishlistedPosition === 0 ? undefined : whishlistedPosition,
     topSellers: sellersPosition === 0 ? undefined : sellersPosition,
     topDemos: demosPosition === 0 ? undefined : demosPosition,
+    mostPlayed: playedPosition === 0 ? undefined : playedPosition,
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
