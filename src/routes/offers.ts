@@ -2992,4 +2992,66 @@ app.get("/:id/technologies", async (c) => {
   return c.json(technologies);
 });
 
+app.get("/:id/builds", async (c) => {
+  const { id } = c.req.param();
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    return c.json({ error: "Offer not found" }, 404);
+  }
+
+  const itemsSpecified = offer.items.map((item) => item.id);
+
+  const subItems = await OfferSubItems.find({
+    _id: id,
+  });
+
+  const items = await Item.find({
+    $or: [
+      {
+        id: {
+          $in: [
+            ...itemsSpecified,
+            ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+          ],
+        },
+      },
+      { linkedOffers: id },
+    ],
+  });
+
+  const assets = await Asset.find({
+    itemId: { $in: items.map((i) => i.id) },
+  });
+
+  const builds = await db.db
+    .collection<{
+      appName: string;
+      labelName: string;
+      buildVersion: string;
+      hash: string;
+      metadata: {
+        installationPoolId: string;
+      };
+      createdAt: {
+        $date: string;
+      };
+      updatedAt: {
+        $date: string;
+      };
+      technologies: Array<{
+        section: string;
+        technology: string;
+      }>;
+      downloadSizeBytes: number;
+      installedSizeBytes: number;
+    }>("builds")
+    .find({
+      appName: { $in: assets.map((a) => a.artifactId) },
+    }).toArray();
+
+    return c.json(builds);
+});
+
 export default app;
