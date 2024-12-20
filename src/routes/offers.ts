@@ -428,12 +428,14 @@ app.get("/top-wishlisted", async (c) => {
 
   if (result.length > 0) {
     const response = {
-      elements: offers.map((o: OfferType) => {
-        return  {
-          ...orderOffersObject(o),
-          position: result.find((r) => r.offerId === o.id)?.position,
-        }
-      }).sort((a, b) => a.position - b.position),
+      elements: offers
+        .map((o: OfferType) => {
+          return {
+            ...orderOffersObject(o),
+            position: result.find((r) => r.offerId === o.id)?.position,
+          };
+        })
+        .sort((a, b) => a.position - b.position),
       page,
       limit,
       total: await GamePosition.countDocuments({
@@ -461,13 +463,13 @@ app.get("/top-sellers", async (c) => {
   const skip = (page - 1) * limit;
   const start = new Date();
   const cacheKey = `top-sellers:${page}:${limit}:v0.1`;
-   const cached = await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
 
-   if (cached) {
-     return c.json(JSON.parse(cached), 200, {
-       "Cache-Control": "public, max-age=60",
-     });
-   }
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
 
   const result = await GamePosition.find({
     collectionId: "top-sellers",
@@ -483,12 +485,14 @@ app.get("/top-sellers", async (c) => {
 
   if (result.length > 0) {
     const response = {
-      elements: offers.map((o: OfferType) => {
-        return {
-          ...orderOffersObject(o),
-          position: result.find((r) => r.offerId === o.id)?.position,
-        }
-      }).sort((a, b) => a.position - b.position),
+      elements: offers
+        .map((o: OfferType) => {
+          return {
+            ...orderOffersObject(o),
+            position: result.find((r) => r.offerId === o.id)?.position,
+          };
+        })
+        .sort((a, b) => a.position - b.position),
       page,
       limit,
       total: await GamePosition.countDocuments({
@@ -2913,6 +2917,79 @@ app.get("/:id/price-stats", async (c) => {
     lowest: lowestPrice,
     lastDiscount: lastDiscountPrice,
   });
+});
+
+app.get("/:id/technologies", async (c) => {
+  const { id } = c.req.param();
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    return c.json({ error: "Offer not found" }, 404);
+  }
+
+  const itemsSpecified = offer.items.map((item) => item.id);
+
+  const subItems = await OfferSubItems.find({
+    _id: id,
+  });
+
+  const items = await Item.find({
+    $or: [
+      {
+        id: {
+          $in: [
+            ...itemsSpecified,
+            ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+          ],
+        },
+      },
+      { linkedOffers: id },
+    ],
+  });
+
+  const assets = await Asset.find({
+    itemId: { $in: items.map((i) => i.id) },
+  });
+
+  const builds = await db.db
+    .collection<{
+      appName: string;
+      labelName: string;
+      buildVersion: string;
+      hash: string;
+      metadata: {
+        installationPoolId: string;
+      };
+      createdAt: {
+        $date: string;
+      };
+      updatedAt: {
+        $date: string;
+      };
+      technologies: Array<{
+        section: string;
+        technology: string;
+      }>;
+      downloadSizeBytes: number;
+      installedSizeBytes: number;
+    }>("builds")
+    .find({
+      appName: { $in: assets.map((a) => a.artifactId) },
+    }).toArray();
+
+    // Merge all the technologies into a single array, removing duplicates
+  const technologies = builds.flatMap((b) => b.technologies).reduce((acc, tech) => {
+    if (!acc.find((a) => a.technology === tech.technology)) {
+      acc.push(tech);
+    }
+    return acc;
+  }, [] as {
+    section: string;
+    technology: string;
+  }[]);
+
+  return c.json(technologies);
 });
 
 export default app;
