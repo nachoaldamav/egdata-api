@@ -104,6 +104,7 @@ app.get("/:slug", async (c) => {
     limit,
     title: collection.name,
     total: totalOffersCount,
+    updatedAt: collection.updatedAt.toISOString(),
   };
 
   await client.set(cacheKey, JSON.stringify(result), {
