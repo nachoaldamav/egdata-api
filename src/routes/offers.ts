@@ -3054,4 +3054,40 @@ app.get("/:id/builds", async (c) => {
     return c.json(builds);
 });
 
+app.get("/:id/assets", async (c) => {
+  const { id } = c.req.param();
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    return c.json({ error: "Offer not found" }, 404);
+  }
+
+  const itemsSpecified = offer.items.map((item) => item.id);
+
+  const subItems = await OfferSubItems.find({
+    _id: id,
+  });
+
+  const items = await Item.find({
+    $or: [
+      {
+        id: {
+          $in: [
+            ...itemsSpecified,
+            ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+          ],
+        },
+      },
+      { linkedOffers: id },
+    ],
+  });
+
+  const assets = await Asset.find({
+    itemId: { $in: items.map((i) => i.id) },
+  });
+
+    return c.json(assets);
+});
+
 export default app;
