@@ -2974,20 +2974,34 @@ app.get("/:id/technologies", async (c) => {
       downloadSizeBytes: number;
       installedSizeBytes: number;
     }>("builds")
-    .find({
-      appName: { $in: assets.map((a) => a.artifactId) },
-    }).toArray();
+    .aggregate([
+      { $match: { appName: { $in: assets.map((a) => a.artifactId) } } },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$appName",
+          doc: { $first: "$$ROOT" },
+        },
+      },
+    ])
+    .toArray();
 
-    // Merge all the technologies into a single array, removing duplicates
-  const technologies = builds.flatMap((b) => b.technologies).reduce((acc, tech) => {
-    if (!acc.find((a) => a.technology === tech.technology)) {
-      acc.push(tech);
-    }
-    return acc;
-  }, [] as {
-    section: string;
-    technology: string;
-  }[]);
+  const latestBuilds = builds.map((b) => b.doc);
+
+  const technologies = latestBuilds
+    .flatMap((b) => b.technologies)
+    .filter(Boolean)
+    .reduce((acc, tech) => {
+      if (
+        !acc.find(
+          (a: { section: string; technology: string }) =>
+            a.technology === tech.technology
+        )
+      ) {
+        acc.push(tech);
+      }
+      return acc;
+    }, [] as { section: string; technology: string }[]);
 
   return c.json(technologies);
 });
@@ -3049,9 +3063,10 @@ app.get("/:id/builds", async (c) => {
     }>("builds")
     .find({
       appName: { $in: assets.map((a) => a.artifactId) },
-    }).toArray();
+    })
+    .toArray();
 
-    return c.json(builds);
+  return c.json(builds);
 });
 
 app.get("/:id/assets", async (c) => {
@@ -3087,7 +3102,7 @@ app.get("/:id/assets", async (c) => {
     itemId: { $in: items.map((i) => i.id) },
   });
 
-    return c.json(assets);
+  return c.json(assets);
 });
 
 export default app;
