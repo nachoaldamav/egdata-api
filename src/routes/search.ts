@@ -59,6 +59,7 @@ interface SearchBody {
   categories?: string[];
   developerDisplayName?: string;
   publisherDisplayName?: string;
+  spt?: boolean;
 }
 
 const app = new Hono();
@@ -203,6 +204,11 @@ app.post("/", async (c) => {
 
   if (query.publisherDisplayName) {
     mongoQuery.publisherDisplayName = query.publisherDisplayName;
+  }
+
+  if (query.spt) {
+    // To know if a offer is SPT ('Self Publishing Tools'), we need to check if in `keyImages[n].url` there is a string that contains `spt`
+    mongoQuery["keyImages.url"] = { $regex: /spt/i };
   }
 
   if (["effectiveDate", "creationDate", "viewableDate"].includes(sort)) {

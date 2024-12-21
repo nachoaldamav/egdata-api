@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
+    "dev": "rslib build --watch & node --enable-source-maps --env-file=.env --watch-path=./dist dist/index.cjs",
     "build": "rslib build",
     "start": "node --enable-source-maps --env-file=.env dist/index.cjs",
     "sea": "pnpm sea:prepare && pnpm build && pnpm sea:bundle && pnpm sea:inject",
