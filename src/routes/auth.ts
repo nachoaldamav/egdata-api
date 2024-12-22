@@ -659,7 +659,7 @@ app.patch('/refresh', async (c) => {
     } catch (e) {
       await telegramBotService.sendMessage(
         `Failed to refresh token for ${token.tokenId}
-        \`\`\`${JSON.stringify(e)}\`\`\`
+        ${e}
         `
       );
       // Revoke the token and delete it from the database
