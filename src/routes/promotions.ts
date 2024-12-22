@@ -23,6 +23,10 @@ app.get('/', async (c) => {
   const events = await Tags.find({
     groupName: 'event',
     status: 'ACTIVE',
+  }, undefined, {
+    sort: {
+      referenceCount: -1
+    }
   });
 
   return c.json(events, 200, {
