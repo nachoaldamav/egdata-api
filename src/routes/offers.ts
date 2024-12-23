@@ -19,7 +19,7 @@ import { TagModel, Tags } from "@egdata/core.schemas.tags";
 import { orderOffersObject } from "../utils/order-offers-object.js";
 import { getImage } from "../utils/get-image.js";
 import { Media } from "@egdata/core.schemas.media";
-import { GamePosition } from "@egdata/core.schemas.collections";
+import { Collection, GamePosition } from "@egdata/core.schemas.collections";
 import { Sandbox } from "@egdata/core.schemas.sandboxes";
 import { FreeGames } from "@egdata/core.schemas.free-games";
 import { db } from "../db/index.js";
@@ -2414,6 +2414,33 @@ app.get("/:id/collection", async (c) => {
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
+  });
+});
+
+app.get("/:id/collections/:collection",async (c) => {
+  const { id, collection } = c.req.param();
+  
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    return c.json({ error: "Offer not found" }, 404);
+  }
+
+  const [game, collectionData] = await Promise.all([
+    GamePosition.findOne({
+      collectionId: collection,
+      offerId: id,
+    }),
+    Collection.findOne({ _id: collection }),
+  ]);
+
+  if (!game || !collectionData) {
+    return c.json({ error: "Game not found" }, 404);
+  }
+
+  return c.json({
+    ...game.toJSON(),
+    name: collectionData.name,
   });
 });
 
