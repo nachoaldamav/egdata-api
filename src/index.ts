@@ -37,6 +37,7 @@ import AdminRoute from './routes/admin.js';
 import AssetsRoute from './routes/assets.js';
 import BuildsRoute from './routes/builds.js';
 import LauncherRoute from './routes/launcher.js';
+import UsersServiceRoute from './routes/users-service.js';
 import { config } from 'dotenv';
 import { gaClient } from './clients/ga.js';
 import { Event } from './db/schemas/events.js';
@@ -1541,6 +1542,8 @@ app.route('/assets', AssetsRoute);
 app.route('/builds', BuildsRoute);
 
 app.route('/launcher', LauncherRoute);
+
+app.route('/users-service', UsersServiceRoute);
 
 async function startServer() {
   try {

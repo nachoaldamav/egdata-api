@@ -270,6 +270,20 @@ app.get('/:sandboxId/base-game', async (c) => {
     if (prePurchaseGame) {
       baseGame = prePurchaseGame;
     } else {
+      // Try to find an "EXECUTABLE" item, with at least one asset
+      const executableGame = await Item.findOne({
+        namespace: sandboxId,
+        entitlementType: 'EXECUTABLE',
+        'releaseInfo.appId': { $ne: null },
+      });
+
+      if (executableGame) {
+        return c.json({
+          ...executableGame.toObject(),
+          isItem: true,
+        });
+      }
+
       c.status(404);
 
       return c.json({
