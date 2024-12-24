@@ -1,25 +1,25 @@
-import { Hono } from 'hono';
-import client from '../clients/redis.js';
-import { AchievementSet } from '@egdata/core.schemas.achievements';
-import { Namespace } from '@egdata/core.schemas.namespace';
-import { Item } from '@egdata/core.schemas.items';
-import { Offer } from '@egdata/core.schemas.offers';
-import { Asset } from '@egdata/core.schemas.assets';
-import { db } from '../db/index.js';
-import { PriceEngine } from '@egdata/core.schemas.price';
-import { regions } from '../utils/countries.js';
-import { getCookie } from 'hono/cookie';
-import { orderOffersObject } from '../utils/order-offers-object.js';
-import { Changelog } from '@egdata/core.schemas.changelog';
-import { ObjectId } from 'mongodb';
+import { Hono } from "hono";
+import client from "../clients/redis.js";
+import { AchievementSet } from "@egdata/core.schemas.achievements";
+import { Namespace } from "@egdata/core.schemas.namespace";
+import { Item } from "@egdata/core.schemas.items";
+import { Offer } from "@egdata/core.schemas.offers";
+import { Asset } from "@egdata/core.schemas.assets";
+import { db } from "../db/index.js";
+import { PriceEngine } from "@egdata/core.schemas.price";
+import { regions } from "../utils/countries.js";
+import { getCookie } from "hono/cookie";
+import { orderOffersObject } from "../utils/order-offers-object.js";
+import { Changelog } from "@egdata/core.schemas.changelog";
+import { ObjectId } from "mongodb";
 
 const app = new Hono();
 
-app.get('/', async (ctx) => {
+app.get("/", async (ctx) => {
   const start = Date.now();
-  const page = Number.parseInt(ctx.req.query('page') || '1', 10);
+  const page = Number.parseInt(ctx.req.query("page") || "1", 10);
   const limit = Math.min(
-    Number.parseInt(ctx.req.query('limit') || '10', 10),
+    Number.parseInt(ctx.req.query("limit") || "10", 10),
     100
   );
   const skip = (page - 1) * limit;
@@ -47,15 +47,84 @@ app.get('/', async (ctx) => {
     },
     200,
     {
-      'Server-Timing': `db;dur=${Date.now() - start}`,
+      "Server-Timing": `db;dur=${Date.now() - start}`,
     }
   );
 });
 
-app.get('/:sandboxId', async (c) => {
+app.get("/sitemap.xml", async (c) => {
+  const start = Date.now();
+  const limit = 1000;
+  const { page } = c.req.query();
+
+  if (!page) {
+    // Show the sitemap index, which contains the other sitemaps for all pages
+    const count = await db.db.collection("sandboxes").countDocuments();
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${Array.from(
+    { length: Math.ceil(count / limit) },
+    (_, i) =>
+      `<sitemap><loc>https://api.egdata.app/sandboxes/sitemap.xml?page=${
+        i + 1
+      }</loc></sitemap>`
+  ).join("")}
+</sitemapindex>`;
+
+    return c.text(sitemap, 200, {
+      "Content-Type": "application/xml",
+    });
+  }
+
+  const sandboxes = await db.db
+    .collection("sandboxes")
+    .find(
+      {},
+      {
+        limit,
+        skip: (Number.parseInt(page, 10) - 1) * limit,
+        sort: {
+          lastModified: -1,
+        },
+      }
+    )
+    .toArray();
+
+  const sections = ["/items", "/offers", "/assets", "/achievements"];
+
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    ${sandboxes
+      .map((sandbox) => {
+        const url = `https://egdata.app/sandboxes/${sandbox._id}`;
+        return `<url>
+            <loc>${url}</loc>
+            <lastmod>${(sandbox.updated as Date).toISOString()}</lastmod>
+            </url>
+            ${sections
+              .map(
+                (section) => `
+            <url>
+              <loc>${url}${section}</loc>
+              <lastmod>${(sandbox.updated as Date).toISOString()}</lastmod>
+            </url>
+            `
+              )
+              .join("\n")}
+            `;
+      })
+      .join("\n")}
+  </urlset>`;
+
+  return c.text(sitemap, 200, {
+    "Content-Type": "application/xml",
+  });
+});
+
+app.get("/:sandboxId", async (c) => {
   const { sandboxId } = c.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -64,17 +133,17 @@ app.get('/:sandboxId', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
   return c.json(sandbox);
 });
 
-app.get('/:sandboxId/items', async (ctx) => {
+app.get("/:sandboxId/items", async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -83,7 +152,7 @@ app.get('/:sandboxId/items', async (ctx) => {
     ctx.status(404);
 
     return ctx.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -100,14 +169,14 @@ app.get('/:sandboxId/items', async (ctx) => {
   );
 
   return ctx.json(items, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/:sandboxId/offers', async (ctx) => {
+app.get("/:sandboxId/offers", async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -116,7 +185,7 @@ app.get('/:sandboxId/offers', async (ctx) => {
     ctx.status(404);
 
     return ctx.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -135,10 +204,10 @@ app.get('/:sandboxId/offers', async (ctx) => {
   return ctx.json(offers);
 });
 
-app.get('/:sandboxId/assets', async (ctx) => {
+app.get("/:sandboxId/assets", async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -147,7 +216,7 @@ app.get('/:sandboxId/assets', async (ctx) => {
     ctx.status(404);
 
     return ctx.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -210,12 +279,12 @@ app.get('/:sandboxId/assets', async (ctx) => {
   return ctx.json(result);
 });
 
-app.get('/:sandboxId/base-game', async (c) => {
+app.get("/:sandboxId/base-game", async (c) => {
   const { sandboxId } = c.req.param();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
@@ -225,11 +294,11 @@ app.get('/:sandboxId/base-game', async (c) => {
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -238,7 +307,7 @@ app.get('/:sandboxId/base-game', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -248,13 +317,13 @@ app.get('/:sandboxId/base-game', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   let baseGame = await Offer.findOne({
     namespace: sandboxId,
-    offerType: 'BASE_GAME',
+    offerType: "BASE_GAME",
     prePurchase: { $ne: true },
     isCodeRedemptionOnly: false,
   });
@@ -263,7 +332,7 @@ app.get('/:sandboxId/base-game', async (c) => {
     // If no game found, try to find a pre-purchase game
     const prePurchaseGame = await Offer.findOne({
       namespace: sandboxId,
-      offerType: 'BASE_GAME',
+      offerType: "BASE_GAME",
       prePurchase: true,
     });
 
@@ -273,8 +342,8 @@ app.get('/:sandboxId/base-game', async (c) => {
       // Try to find an "EXECUTABLE" item, with at least one asset
       const executableGame = await Item.findOne({
         namespace: sandboxId,
-        entitlementType: 'EXECUTABLE',
-        "releaseInfo.0": { $exists: true }
+        entitlementType: "EXECUTABLE",
+        "releaseInfo.0": { $exists: true },
       });
 
       if (executableGame) {
@@ -287,7 +356,7 @@ app.get('/:sandboxId/base-game', async (c) => {
       c.status(404);
 
       return c.json({
-        message: 'Base game not found',
+        message: "Base game not found",
       });
     }
   }
@@ -309,10 +378,10 @@ app.get('/:sandboxId/base-game', async (c) => {
   return c.json(offer);
 });
 
-app.get('/:sandboxId/achievements', async (c) => {
+app.get("/:sandboxId/achievements", async (c) => {
   const { sandboxId } = c.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -321,7 +390,7 @@ app.get('/:sandboxId/achievements', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -332,10 +401,10 @@ app.get('/:sandboxId/achievements', async (c) => {
   return c.json(achievements);
 });
 
-app.get('/:sandboxId/changelog', async (c) => {
+app.get("/:sandboxId/changelog", async (c) => {
   const { sandboxId } = c.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -344,7 +413,7 @@ app.get('/:sandboxId/changelog', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -364,7 +433,7 @@ app.get('/:sandboxId/changelog', async (c) => {
 
   const changelist = await Changelog.find(
     {
-      'metadata.contextId': { $in: [...offersIds, ...itemsIds, sandboxId] },
+      "metadata.contextId": { $in: [...offersIds, ...itemsIds, sandboxId] },
     },
     undefined,
     {
@@ -376,10 +445,10 @@ app.get('/:sandboxId/changelog', async (c) => {
   return c.json(changelist);
 });
 
-app.get('/:sandboxId/builds', async (c) => {
+app.get("/:sandboxId/builds", async (c) => {
   const { sandboxId } = c.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -388,7 +457,7 @@ app.get('/:sandboxId/builds', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -397,7 +466,7 @@ app.get('/:sandboxId/builds', async (c) => {
   });
 
   const builds = await db.db
-    .collection('builds')
+    .collection("builds")
     .find({
       appName: {
         $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
@@ -408,10 +477,10 @@ app.get('/:sandboxId/builds', async (c) => {
   return c.json(builds);
 });
 
-app.get('/:sandboxId/stats', async (c) => {
+app.get("/:sandboxId/stats", async (c) => {
   const { sandboxId } = c.req.param();
 
-  const sandbox = await db.db.collection('sandboxes').findOne({
+  const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
   });
@@ -420,7 +489,7 @@ app.get('/:sandboxId/stats', async (c) => {
     c.status(404);
 
     return c.json({
-      message: 'Sandbox not found',
+      message: "Sandbox not found",
     });
   }
 
@@ -441,7 +510,7 @@ app.get('/:sandboxId/stats', async (c) => {
       namespace: sandboxId,
     }),
     db.db
-      .collection('builds')
+      .collection("builds")
       .find({
         appName: {
           $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
