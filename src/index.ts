@@ -172,6 +172,7 @@ Disallow: /
 Allow: /sitemap.xml
 Allow: /promotions-sitemap.xml
 Allow: /profiles/sitemap.xml
+Allow: /sandboxes/sitemap.xml
 `;
 
   return c.text(robots, 200, {
