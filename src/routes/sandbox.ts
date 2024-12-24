@@ -274,7 +274,7 @@ app.get('/:sandboxId/base-game', async (c) => {
       const executableGame = await Item.findOne({
         namespace: sandboxId,
         entitlementType: 'EXECUTABLE',
-        'releaseInfo.appId': { $ne: null },
+        "releaseInfo.0": { $exists: true }
       });
 
       if (executableGame) {
