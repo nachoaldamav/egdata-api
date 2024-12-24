@@ -65,7 +65,7 @@ app.get("/sitemap.xml", async (c) => {
   ${Array.from(
     { length: Math.ceil(count / limit) },
     (_, i) =>
-      `<sitemap><loc>https://api.egdata.app/sandboxes/sitemap.xml?page=${
+      `<sitemap><loc>https://eu.api.egdata.app/sandboxes/sitemap.xml?page=${
         i + 1
       }</loc></sitemap>`
   ).join("")}
