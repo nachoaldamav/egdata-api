@@ -1325,6 +1325,113 @@ app.get("/:id/changelog", async (c) => {
   return c.json(changelist);
 });
 
+/**
+ * Retrieve the stats for the offer changelog in a given timeframe
+ * - Daily changes number
+ * - Weekday changes number
+ * - Change-types number
+ * - Change field number
+ */
+app.get("/:id/changelog/stats", async (c) => {
+  const { id } = c.req.param();
+  const { from, to } = c.req.query();
+
+  // Check if from and to are parseable as Dates
+  if (!from || !to) {
+    return c.json({
+      message: "Missing from or to query parameter",
+    });
+  }
+
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return c.json({
+      message: "Invalid from or to query parameter",
+    });
+  }
+
+  const cacheKey = `changelog-stats:${id}:${fromDate.toISOString()}:${toDate.toISOString()}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
+  const changes = await Changelog.find(
+    {
+      "metadata.contextId": id,
+      timestamp: {
+        $gte: fromDate,
+        $lte: toDate,
+      },
+    },
+    undefined,
+    {
+      sort: {
+        timestamp: -1,
+      },
+    }
+  );
+
+  // Corrected: Get the full date string (YYYY-MM-DD)
+  const dailyChanges = changes.reduce((acc, change) => {
+    const date = change.timestamp.toISOString().split("T")[0]; // Get YYYY-MM-DD
+    if (!acc[date]) {
+      acc[date] = 0;
+    }
+    acc[date]++;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const weekdayChanges = changes.reduce((acc, change) => {
+    const day = change.timestamp.getDay();
+    if (!acc[day]) {
+      acc[day] = 0;
+    }
+    acc[day]++;
+    return acc;
+  }, {} as Record<number, number>);
+
+  // Corrected: Use change.metadata.changes[].changeType
+  const changeTypes = changes.reduce((acc, change) => {
+    change.metadata.changes.forEach((item) => {
+      if (!acc[item.changeType]) {
+        acc[item.changeType] = 0;
+      }
+      acc[item.changeType]++;
+    });
+
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Corrected: Use change.metadata.changes[].field
+  const changeFields = changes.reduce((acc, change) => {
+    change.metadata.changes.forEach((item) => {
+      if (!acc[item.field]) {
+        acc[item.field] = 0;
+      }
+      acc[item.field]++;
+    });
+    return acc;
+  }, {} as Record<string, number>);
+
+  await client.set(cacheKey, JSON.stringify(changeFields), {
+    EX: 3600,
+  });
+
+  return c.json({
+    dailyChanges,
+    weekdayChanges,
+    changeTypes,
+    changeFields,
+  });
+});
+
 app.get("/:id/achievements", async (c) => {
   const { id } = c.req.param();
 
@@ -2417,9 +2524,9 @@ app.get("/:id/collection", async (c) => {
   });
 });
 
-app.get("/:id/collections/:collection",async (c) => {
+app.get("/:id/collections/:collection", async (c) => {
   const { id, collection } = c.req.param();
-  
+
   const offer = await Offer.findOne({ id });
 
   if (!offer) {
