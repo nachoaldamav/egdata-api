@@ -612,11 +612,12 @@ app.patch('/refresh', async (c) => {
       });
 
       if (!response.ok) {
-        console.error('Failed to refresh token', await response.json());
+        const error = await response.json();
+        console.error('Failed to refresh token', error);
 
         await telegramBotService.sendMessage(
           `Failed to refresh token for ${token.tokenId}
-          \`\`\`${JSON.stringify(await response.json())}\`\`\`
+          \`\`\`${JSON.stringify(error)}\`\`\`
           `
         );
 
