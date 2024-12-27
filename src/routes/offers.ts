@@ -1885,7 +1885,7 @@ app.get("/:id/ratings", async (c) => {
 app.get("/:id/tops", async (c) => {
   const { id } = c.req.param();
 
-  const cacheKey = `tops:${id}`;
+  const cacheKey = `tops:${id}:all`;
 
   const cached = await client.get(cacheKey);
 
@@ -1895,36 +1895,14 @@ app.get("/:id/tops", async (c) => {
     });
   }
 
-  const [topWishlisted, topSellers, topDemos, mostPlayed] = await Promise.all([
-    GamePosition.findOne({
-      collectionId: "top-wishlisted",
-      offerId: id,
-    }),
-    GamePosition.findOne({
-      collectionId: "top-sellers",
-      offerId: id,
-    }),
-    GamePosition.findOne({
-      collectionId: "top-demos",
-      offerId: id,
-    }),
-    GamePosition.findOne({
-      collectionId: "most-played",
-      offerId: id,
-    }),
-  ]);
+  const positions = await GamePosition.find({ 
+    offerId: id,
+  });
 
-  const whishlistedPosition = topWishlisted?.position ?? 0;
-  const sellersPosition = topSellers?.position ?? 0;
-  const demosPosition = topDemos?.position ?? 0;
-  const playedPosition = mostPlayed?.position ?? 0;
-
-  const result = {
-    topWishlisted: whishlistedPosition === 0 ? undefined : whishlistedPosition,
-    topSellers: sellersPosition === 0 ? undefined : sellersPosition,
-    topDemos: demosPosition === 0 ? undefined : demosPosition,
-    mostPlayed: playedPosition === 0 ? undefined : playedPosition,
-  };
+  const result = positions.reduce((acc, position) => {
+    acc[position.collectionId] = position.position;
+    return acc;
+  }, {} as Record<string, number>);
 
   await client.set(cacheKey, JSON.stringify(result), {
     EX: 3600,
