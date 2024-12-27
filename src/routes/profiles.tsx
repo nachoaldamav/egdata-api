@@ -884,7 +884,7 @@ app.get('/:id/games', async (c) => {
     const savedPlayerAchievementsCursor = db.db
       .collection('player-achievements')
       .find({ epicAccountId: id })
-      .sort({ totalXP: -1 })
+      .sort({ totalXP: -1, _id: 1 })
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum);
 
