@@ -11,6 +11,7 @@ import type { ChangelogType } from "@egdata/core.schemas.changelog";
 import { meiliSearchClient } from "../clients/meilisearch.js";
 import { Item } from "@egdata/core.schemas.items";
 import { Asset } from "@egdata/core.schemas.assets";
+import { Filter } from "meilisearch";
 
 interface SearchBody {
   title?: string;
@@ -547,11 +548,25 @@ app.get("/changelog", async (c) => {
     page: requestedPage,
     limit: requestedLimit,
     type,
+    id
   } = c.req.query();
 
   // Parse the page and limit
   const page = Math.max(Number.parseInt(requestedPage, 10) || 1, 1);
   const limit = Math.min(Number.parseInt(requestedLimit, 10) || 10, 50);
+
+  const filter: Filter = [];
+
+  if (id) {
+    filter.push(`metadata.contextId = "${id}"`);
+  }
+
+  if (type) {
+    filter.push(`metadata.contextType = "${type}"`);
+  }
+
+  // Remove contextType = 'file' from the results
+  filter.push(`metadata.contextType != "file"`);
 
   const changelogs = await meiliSearchClient.index("changelog").search<
     ChangelogType & {
@@ -561,6 +576,7 @@ app.get("/changelog", async (c) => {
     offset: (page - 1) * limit,
     limit,
     sort: ["timestamp:desc"],
+    filter
   });
 
   await Promise.all(
