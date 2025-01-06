@@ -1079,8 +1079,6 @@ app.post("/v2/validate-state", async (c) => {
     return c.json({ error: "Invalid state code" }, 400);
   }
 
-  await client.del(`state-code:${state}`);
-
   return c.json({ valid: true });
 });
 
@@ -1088,7 +1086,7 @@ app.post("/v2/save-state", async (c) => {
   // Generate a random code
   const code = randomUUID().replaceAll('-', '').toUpperCase();
 
-  await client.set(`state-code:${code}`, "", {
+  await client.set(`state-code:${code}`, "true", {
     EX: 600
   });
 
