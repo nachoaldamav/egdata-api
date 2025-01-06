@@ -7,6 +7,8 @@ import { ObjectId } from "mongodb";
 import { db } from "../db/index.js";
 import { readFileSync } from "node:fs";
 import { telegramBotService } from "../clients/telegram.js";
+import { randomUUID } from "node:crypto";
+import client from "../clients/redis.js";
 
 interface EpicProfileResponse {
   accountId: string;
@@ -613,7 +615,7 @@ app.patch("/refresh", async (c) => {
 
       if (!response.ok) {
         const error = await response.json();
-        console.error('Failed to refresh token', error);
+        console.error("Failed to refresh token", error);
 
         await telegramBotService.sendMessage(
           `Failed to refresh token for ${token.tokenId}
@@ -1062,6 +1064,37 @@ app.get("/logout", async (c) => {
     domain: "egdata.app",
   });
   return c.redirect("https://egdata.app/");
+});
+
+app.post("/v2/validate-state", async (c) => {
+  const { state } = await c.req.json<{ state: string }>();
+
+  if (!state) {
+    return c.json({ error: "Missing state parameter" }, 400);
+  }
+
+  const user = await client.get(`state-code:${state}`);
+
+  if (!user) {
+    return c.json({ error: "Invalid state code" }, 400);
+  }
+
+  await client.del(`state-code:${state}`);
+
+  return c.json({ valid: true });
+});
+
+app.post("/v2/save-state", async (c) => {
+  // Generate a random code
+  const code = randomUUID().replaceAll('-', '').toUpperCase();
+
+  await client.set(`state-code:${code}`, "", {
+    EX: 600
+  });
+
+  return c.json({
+    state: code,
+  });
 });
 
 export default app;
