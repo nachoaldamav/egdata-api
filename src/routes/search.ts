@@ -11,7 +11,8 @@ import type { ChangelogType } from "@egdata/core.schemas.changelog";
 import { meiliSearchClient } from "../clients/meilisearch.js";
 import { Item } from "@egdata/core.schemas.items";
 import { Asset } from "@egdata/core.schemas.assets";
-import { Filter } from "meilisearch";
+import { ObjectId } from "mongodb";
+import type { Filter } from "meilisearch";
 
 interface SearchBody {
   title?: string;
@@ -604,6 +605,14 @@ app.get("/changelog", async (c) => {
           hit.document = await Item.findOne({
             id: asset?.itemId,
           });
+        }
+
+        if (type === "build") {
+          const build = await db.db.collection('builds').findOne({
+            _id: new ObjectId(id),
+          });
+
+          hit.document = build;
         }
 
         return hit;
