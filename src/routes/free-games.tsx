@@ -733,7 +733,7 @@ app.get("/og", async (c) => {
               <div
                 style={{
                   fontSize: "16px",
-                  color: "rgba(255, 255, 255, 0.6)",
+                  color: "rgba(255, 255, 255, 1)",
                   display: "flex",
                 }}
               >

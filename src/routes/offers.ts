@@ -1243,7 +1243,7 @@ app.get("/:id/changelog", async (c) => {
   const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `changelog:${id}:${page}:${limit}:v0.1`;
+  const cacheKey = `changelog:${id}:${page}:${limit}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -1311,18 +1311,47 @@ app.get("/:id/changelog", async (c) => {
     }
   );
 
-  if (!changelist) {
+  const changelistWithDocuments = await Promise.all(
+    changelist.map(async (changelist) => {
+      if (changelist.metadata.contextType === "offer") {
+        return {
+          ...changelist.toJSON(),
+          document: await Offer.findOne({ id: changelist.metadata.contextId }).exec(),
+        };
+      }
+
+      if (changelist.metadata.contextType === "item") {
+        return {
+          ...changelist.toJSON(),
+          document: await Item.findOne({ id: changelist.metadata.contextId }).exec(),
+        };
+      }
+
+      if (changelist.metadata.contextType === "asset") {
+        return {
+          ...changelist.toJSON(),
+          document: await Asset.findOne({ id: changelist.metadata.contextId }).exec(),
+        };
+      }
+
+      return {
+        ...changelist.toJSON(),
+      };
+    })
+  );
+
+  if (!changelistWithDocuments) {
     c.status(404);
     return c.json({
       message: "Changelist not found",
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(changelist), {
+  await client.set(cacheKey, JSON.stringify(changelistWithDocuments), {
     EX: 60,
   });
 
-  return c.json(changelist);
+  return c.json(changelistWithDocuments);
 });
 
 /**
