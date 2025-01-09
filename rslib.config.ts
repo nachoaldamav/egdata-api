@@ -10,4 +10,10 @@ export default defineConfig({
       },
     },
   ],
+  output: {
+    target: 'node',
+    externals: [
+      "@resvg/resvg-js"
+    ]
+  }
 });

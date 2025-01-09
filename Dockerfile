@@ -12,10 +12,10 @@ FROM base AS build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm sea
 
-FROM ubuntu:22.04
+FROM base AS runner
 RUN apt-get update && apt-get install -y curl
 WORKDIR /app
-COPY --from=build /app/egdata /app/egdata
+COPY --from=build /app/ /app/
 EXPOSE 4000
 
-CMD [ "./egdata" ]
+CMD [ "node", "dist/index.cjs" ]
