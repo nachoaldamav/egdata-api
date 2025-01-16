@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import { getImage } from "../utils/get-image.js";
-import { hash } from "node:crypto";
+import { createHash, hash } from "node:crypto";
 import { db } from "../db/index.js";
 
 const app = new Hono();
