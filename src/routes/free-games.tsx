@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import { getImage } from "../utils/get-image.js";
-import { hash } from "node:crypto";
+import { createHash } from "node:crypto";
 import { db } from "../db/index.js";
 
 const app = new Hono();
@@ -536,11 +536,14 @@ app.get("/og", async (c) => {
     }
   );
 
+  const hash = createHash("sha256");
+  hash.update(JSON.stringify(freeGames));
+
   // Check if the image already exists in the database
   const cachedImage = await db.db
     .collection("freebies-og")
     .findOne({
-      hash: hash("sha256", JSON.stringify(freeGames)).toString(),
+      hash: hash.digest("hex"),
     });
 
   if (cachedImage) {
@@ -790,7 +793,7 @@ app.get("/og", async (c) => {
     "file",
     new Blob([pngBuffer], { type: "image/png" }),
     // Generate a hash from the free games data
-    `freebies-og/${hash("sha256", JSON.stringify(freeGames)).toString()}.png`
+    `freebies-og/${hash.digest("hex")}.png`
   );
 
   const response = await fetch(cfImagesUrl, {
@@ -816,7 +819,7 @@ app.get("/og", async (c) => {
     {
       $set: {
         imageId: responseData.result.id,
-        hash: hash("sha256", JSON.stringify(freeGames)).toString(),
+        hash: hash.digest("hex"),
       },
     },
     {
