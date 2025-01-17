@@ -249,6 +249,7 @@ app.get("/:slug/:week", async (c) => {
     }),
     PriceEngine.find({
       offerId: { $in: offerIds },
+      region
     }),
   ]);
 
