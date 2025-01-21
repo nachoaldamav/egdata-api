@@ -52,7 +52,7 @@ app.get("/:slug", async (c) => {
   const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
@@ -120,11 +120,11 @@ app.get("/:slug", async (c) => {
       .map((o) => {
         const price = prices.find((p) => p.offerId === o.id);
         const collectionOffer = offersList.find(
-          (i) => i.toJSON().offerId === o.id
+          (i) => i.toJSON().offerId === o.id,
         );
 
         console.log(
-          `Offer ${o.title} has position ${collectionOffer?.position}`
+          `Offer ${o.title} has position ${collectionOffer?.position}`,
         );
 
         return {
@@ -137,7 +137,7 @@ app.get("/:slug", async (c) => {
       })
       .sort(
         (a, b) =>
-          (a.position ?? totalOffersCount) - (b.position ?? totalOffersCount)
+          (a.position ?? totalOffersCount) - (b.position ?? totalOffersCount),
       ),
     page,
     limit,
@@ -167,7 +167,7 @@ app.get("/:slug/:week", async (c) => {
   const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
@@ -210,8 +210,8 @@ app.get("/:slug/:week", async (c) => {
     offer.positions.some(
       (position) =>
         new Date(position.date).getTime() >= start.getTime() &&
-        new Date(position.date).getTime() <= end.getTime()
-    )
+        new Date(position.date).getTime() <= end.getTime(),
+    ),
   );
 
   console.log(`Found ${offersInsideWeek.length} offers inside the week`);
@@ -221,7 +221,7 @@ app.get("/:slug/:week", async (c) => {
     const closestPosition = offer.positions
       .filter((position) => new Date(position.date).getTime() <= end.getTime())
       .sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() // Sort descending by date
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(), // Sort descending by date
       )[0]; // Pick the most recent position within the week
 
     return {
@@ -229,7 +229,7 @@ app.get("/:slug/:week", async (c) => {
       position: closestPosition?.position,
       // Keep only the positions that occur within the week
       positions: offer.positions.filter(
-        (position) => new Date(position.date).getTime() <= end.getTime()
+        (position) => new Date(position.date).getTime() <= end.getTime(),
       ),
     };
   });
@@ -249,7 +249,7 @@ app.get("/:slug/:week", async (c) => {
     }),
     PriceEngine.find({
       offerId: { $in: offerIds },
-      region
+      region,
     }),
   ]);
 
@@ -291,13 +291,14 @@ app.get("/:slug/:week", async (c) => {
 
 app.get("/:slug/:week/og", async (c) => {
   const { slug, week } = c.req.param();
+  const render = c.req.query("svg");
   const country = c.req.query("country");
   const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
   const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
-    regions[r].countries.includes(selectedCountry)
+    regions[r].countries.includes(selectedCountry),
   );
 
   if (!region) {
@@ -340,8 +341,8 @@ app.get("/:slug/:week/og", async (c) => {
     offer.positions.some(
       (position) =>
         new Date(position.date).getTime() >= start.getTime() &&
-        new Date(position.date).getTime() <= end.getTime()
-    )
+        new Date(position.date).getTime() <= end.getTime(),
+    ),
   );
 
   console.log(`Found ${offersInsideWeek.length} offers inside the week`);
@@ -351,7 +352,7 @@ app.get("/:slug/:week/og", async (c) => {
     const closestPosition = offer.positions
       .filter((position) => new Date(position.date).getTime() <= end.getTime())
       .sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() // Sort descending by date
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(), // Sort descending by date
       )[0]; // Pick the most recent position within the week
 
     return {
@@ -359,7 +360,7 @@ app.get("/:slug/:week/og", async (c) => {
       position: closestPosition?.position,
       // Keep only the positions that occur within the week
       positions: offer.positions.filter(
-        (position) => new Date(position.date).getTime() <= end.getTime()
+        (position) => new Date(position.date).getTime() <= end.getTime(),
       ),
     };
   });
@@ -378,12 +379,18 @@ app.get("/:slug/:week/og", async (c) => {
   const hex = hash.digest("hex");
 
   // Check if the image already exists in the database
-  const existingImage = await db.db
-    .collection("tops-og")
-    .findOne({ hash: hex });
+  const existingImage = !render
+    ? await db.db.collection("tops-og").findOne({ hash: hex })
+    : null;
 
   if (existingImage) {
-    return c.json({ id: existingImage.imageId, url: `https://cdn.egdata.app/cdn-cgi/imagedelivery/RlN2EBAhhGSZh5aeUaPz3Q/${existingImage.imageId}/og` }, 200);
+    return c.json(
+      {
+        id: existingImage.imageId,
+        url: `https://cdn.egdata.app/cdn-cgi/imagedelivery/RlN2EBAhhGSZh5aeUaPz3Q/${existingImage.imageId}/og`,
+      },
+      200,
+    );
   }
 
   const offerIds = offersWithPositions.map((offer) => offer.offerId);
@@ -448,6 +455,25 @@ app.get("/:slug/:week/og", async (c) => {
           opacity: 0.3,
         }}
       />
+      {/** url watermark bottom left */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "10px",
+          left: "10px",
+          fontSize: "16px",
+          fontWeight: 800,
+          color: "#FFFFFF",
+          textShadow: "0 0 30px rgba(0, 120, 242, 0.3)",
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "flex-start",
+          opacity: 0.4,
+        }}
+      >
+        egdata.app/collections/{slug}/{week}
+      </div>
+
       {/* Content Container */}
       <div
         style={{
@@ -466,9 +492,52 @@ app.get("/:slug/:week/og", async (c) => {
             marginBottom: "40px",
             display: "flex",
             flexDirection: "column",
+            // Justify between the title and the games
+            justifyContent: "space-between",
             width: "375px",
+            height: "100%",
           }}
         >
+          <div
+            style={{
+              fontSize: "72px",
+              fontWeight: 800,
+              color: "#FFFFFF",
+              textShadow: "0 0 30px rgba(0, 120, 242, 0.3)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "10px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "30px",
+                fontWeight: 800,
+                color: "#FFFFFF",
+                textShadow: "0 0 30px rgba(0, 120, 242, 0.3)",
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                opacity: 0.8,
+                gap: "5px",
+              }}
+            >
+              <img
+                src="https://cdn.egdata.app/logo_simple_white_clean.png"
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  objectFit: "cover",
+                  borderRadius: "8px",
+                }}
+                alt="egdata.app"
+              />
+              <span>Epic Games Store</span>
+            </div>
+            {collection.name}
+          </div>
           <div
             style={{
               fontSize: "32px",
@@ -489,16 +558,6 @@ app.get("/:slug/:week/og", async (c) => {
               month: "short",
               year: "numeric",
             })}
-          </div>
-          <div
-            style={{
-              fontSize: "72px",
-              fontWeight: 800,
-              color: "#FFFFFF",
-              textShadow: "0 0 30px rgba(0, 120, 242, 0.3)",
-            }}
-          >
-            {collection.name}
           </div>
         </div>
         {/* Games Grid */}
@@ -604,7 +663,7 @@ app.get("/:slug/:week/og", async (c) => {
           style: "normal",
         },
       ],
-    }
+    },
   );
 
   const resvg = new Resvg(svg, {
@@ -617,6 +676,7 @@ app.get("/:slug/:week/og", async (c) => {
       value: 2800,
     },
   });
+
   const pngData = resvg.render();
   const pngBuffer = pngData.asPng();
 
@@ -629,7 +689,7 @@ app.get("/:slug/:week/og", async (c) => {
     "file",
     new Blob([pngBuffer], { type: "image/png" }),
     // Generate a hash from the free games data
-    `tops-og/${hex}.png`
+    `tops-og/${hex}.png`,
   );
 
   const response = await fetch(cfImagesUrl, {
@@ -660,7 +720,7 @@ app.get("/:slug/:week/og", async (c) => {
     },
     {
       upsert: true,
-    }
+    },
   );
 
   return c.json(
@@ -668,7 +728,7 @@ app.get("/:slug/:week/og", async (c) => {
       id: responseData.result.id,
       url: `https://cdn.egdata.app/cdn-cgi/imagedelivery/RlN2EBAhhGSZh5aeUaPz3Q/${responseData.result.id}/og`,
     },
-    200
+    200,
   );
 });
 
