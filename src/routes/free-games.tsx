@@ -539,11 +539,13 @@ app.get('/og', async (c) => {
   const hash = createHash("sha256");
   hash.update(JSON.stringify(freeGames));
 
+  const hexHash = hash.digest("hex");
+
   // Check if the image already exists in the database
   const cachedImage = await db.db
     .collection("freebies-og")
     .findOne({
-      hash: hash.digest("hex"),
+      hash: hexHash,
     });
 
   if (cachedImage) {
@@ -793,7 +795,7 @@ app.get('/og', async (c) => {
     'file',
     new Blob([pngBuffer], { type: 'image/png' }),
     // Generate a hash from the free games data
-    `freebies-og/${hash.digest("hex")}.png`
+    `freebies-og/${hexHash}.png`
   );
 
   const response = await fetch(cfImagesUrl, {
@@ -819,7 +821,7 @@ app.get('/og', async (c) => {
     {
       $set: {
         imageId: responseData.result.id,
-        hash: hash.digest("hex"),
+        hash: hexHash,
       },
     },
     {
