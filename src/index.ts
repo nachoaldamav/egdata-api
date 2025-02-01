@@ -1,111 +1,111 @@
-import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { inspectRoutes } from 'hono/dev';
-import { getCookie } from 'hono/cookie';
-import { etag } from 'hono/etag';
-import { swaggerUI } from '@hono/swagger-ui';
-import { db } from './db/index.js';
-import { Offer, type OfferType } from '@egdata/core.schemas.offers';
-import { Item } from '@egdata/core.schemas.items';
-import { orderOffersObject } from './utils/order-offers-object.js';
-import { getFeaturedGames } from './utils/get-featured-games.js';
-import { countries, regions } from './utils/countries.js';
-import { TagModel, Tags } from '@egdata/core.schemas.tags';
-import { attributesToObject } from './utils/attributes-to-object.js';
-import { Asset } from '@egdata/core.schemas.assets';
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { inspectRoutes } from "hono/dev";
+import { getCookie } from "hono/cookie";
+import { etag } from "hono/etag";
+import { swaggerUI } from "@hono/swagger-ui";
+import { db } from "./db/index.js";
+import { Offer, type OfferType } from "@egdata/core.schemas.offers";
+import { Item } from "@egdata/core.schemas.items";
+import { orderOffersObject } from "./utils/order-offers-object.js";
+import { getFeaturedGames } from "./utils/get-featured-games.js";
+import { countries, regions } from "./utils/countries.js";
+import { TagModel, Tags } from "@egdata/core.schemas.tags";
+import { attributesToObject } from "./utils/attributes-to-object.js";
+import { Asset } from "@egdata/core.schemas.assets";
 import {
   PriceEngine,
   type PriceEngineType as PriceType,
-} from '@egdata/core.schemas.price';
-import { Changelog } from '@egdata/core.schemas.changelog';
-import client from './clients/redis.js';
-import SandboxRoute from './routes/sandbox.js';
-import SearchRoute from './routes/search.js';
-import OffersRoute from './routes/offers.js';
-import PromotionsRoute from './routes/promotions.js';
-import FreeGamesRoute from './routes/free-games.js';
-import MultisearchRoute from './routes/multisearch.js';
-import AuthRoute, { type LauncherAuthTokens } from './routes/auth.js';
-import AccountsRoute from './routes/accounts.js';
-import UsersRoute from './routes/users.js';
-import CollectionsRoute from './routes/collections.js';
-import ProfilesRoute from './routes/profiles.js';
-import ItemsRoute from './routes/items.js';
-import SellersRoute from './routes/sellers.js';
-import AdminRoute from './routes/admin.js';
-import AssetsRoute from './routes/assets.js';
-import BuildsRoute from './routes/builds.js';
-import LauncherRoute from './routes/launcher.js';
-import UsersServiceRoute from './routes/users-service.js';
-import { config } from 'dotenv';
-import { gaClient } from './clients/ga.js';
-import { Event } from './db/schemas/events.js';
-import { meiliSearchClient } from './clients/meilisearch.js';
-import { Seller } from '@egdata/core.schemas.sellers';
-import jwt from 'jsonwebtoken';
-import { readFileSync } from 'node:fs';
-import chalk from 'chalk';
+} from "@egdata/core.schemas.price";
+import { Changelog } from "@egdata/core.schemas.changelog";
+import client from "./clients/redis.js";
+import SandboxRoute from "./routes/sandbox.js";
+import SearchRoute from "./routes/search.js";
+import OffersRoute from "./routes/offers.js";
+import PromotionsRoute from "./routes/promotions.js";
+import FreeGamesRoute from "./routes/free-games.js";
+import MultisearchRoute from "./routes/multisearch.js";
+import AuthRoute, { type LauncherAuthTokens } from "./routes/auth.js";
+import AccountsRoute from "./routes/accounts.js";
+import UsersRoute from "./routes/users.js";
+import CollectionsRoute from "./routes/collections.js";
+import ProfilesRoute from "./routes/profiles.js";
+import ItemsRoute from "./routes/items.js";
+import SellersRoute from "./routes/sellers.js";
+import AdminRoute from "./routes/admin.js";
+import AssetsRoute from "./routes/assets.js";
+import BuildsRoute from "./routes/builds.js";
+import LauncherRoute from "./routes/launcher.js";
+import UsersServiceRoute from "./routes/users-service.js";
+import { config } from "dotenv";
+import { gaClient } from "./clients/ga.js";
+import { Event } from "./db/schemas/events.js";
+import { meiliSearchClient } from "./clients/meilisearch.js";
+import { Seller } from "@egdata/core.schemas.sellers";
+import jwt from "jsonwebtoken";
+import { readFileSync } from "node:fs";
+import chalk from "chalk";
 
 config();
 
 const internalNamespaces = [
-  'epic',
-  'SeaQA',
-  'd5241c76f178492ea1540fce45616757',
+  "epic",
+  "SeaQA",
+  "d5241c76f178492ea1540fce45616757",
 ];
 
 const ALLOWED_ORIGINS = [
-  'https://egdata.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:4000',
-  'https://user-reviews-pr.egdata.app/',
-  'https://egdata-370475041422.us-central1.run.app',
+  "https://egdata.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:4000",
+  "https://user-reviews-pr.egdata.app/",
+  "https://egdata-370475041422.us-central1.run.app",
 ];
 
 const app = new Hono();
 
 app.use(
-  '/*',
+  "/*",
   cors({
     origin: (origin: string) => {
       if (ALLOWED_ORIGINS.includes(origin)) {
         return origin;
       }
 
-      return origin.endsWith('egdata.app') ? origin : 'https://egdata.app';
+      return origin.endsWith("egdata.app") ? origin : "https://egdata.app";
     },
     allowHeaders: [],
-    allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
+    allowMethods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH"],
     credentials: true,
   })
 );
 
-app.use('/*', etag());
+app.use("/*", etag());
 
 app.get(
-  '/ui',
+  "/ui",
   swaggerUI({
-    url: '/doc',
+    url: "/doc",
   })
 );
 
 // app.use(logger());
 
-app.get('/health', (c) => {
+app.get("/health", (c) => {
   return c.json({
-    status: 'ok',
+    status: "ok",
   });
 });
 
-app.get('/', (c) => {
+app.get("/", (c) => {
   return c.json({
-    app: 'egdata',
-    version: '0.0.1-alpha',
+    app: "egdata",
+    version: "0.0.1-alpha",
     endpoints: inspectRoutes(app)
       .filter(
-        (x) => !x.isMiddleware && x.name === '[handler]' && x.path !== '/'
+        (x) => !x.isMiddleware && x.name === "[handler]" && x.path !== "/"
       )
       .sort((a, b) => {
         if (a.path !== b.path) {
@@ -118,12 +118,12 @@ app.get('/', (c) => {
   });
 });
 
-app.get('/doc', async (c) => {
+app.get("/doc", async (c) => {
   const endpoints = inspectRoutes(app);
 
   // Format endpoints to match OpenAPI paths structure
   const paths = endpoints.reduce((acc, endpoint) => {
-    if (endpoint.name === '[handler]' && !endpoint.isMiddleware) {
+    if (endpoint.name === "[handler]" && !endpoint.isMiddleware) {
       // Initialize the path object if it doesn't exist
       if (!acc[endpoint.path]) {
         acc[endpoint.path] = {};
@@ -133,15 +133,15 @@ app.get('/doc', async (c) => {
       acc[endpoint.path][endpoint.method.toLowerCase()] = {
         summary: `Endpoint for ${endpoint.method} ${endpoint.path}`,
         responses: {
-          '200': {
-            description: 'Successful response',
+          "200": {
+            description: "Successful response",
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
+                  type: "object",
                   properties: {
                     message: {
-                      type: 'string',
+                      type: "string",
                       example: `Response for ${endpoint.method} ${endpoint.path}`,
                     },
                   },
@@ -156,16 +156,16 @@ app.get('/doc', async (c) => {
   }, {});
 
   return c.json({
-    openapi: '3.0.0',
+    openapi: "3.0.0",
     info: {
-      title: 'Egdata API',
-      version: '1.0.0',
+      title: "Egdata API",
+      version: "1.0.0",
     },
     paths: paths,
   });
 });
 
-app.get('/robots.txt', async (c) => {
+app.get("/robots.txt", async (c) => {
   // Disallow all robots as this is an API (Besides the sitemap)
   const robots = `User-agent: *
 Disallow: /
@@ -177,25 +177,25 @@ Allow: /sandboxes/sitemap.xml?*
 `;
 
   return c.text(robots, 200, {
-    'Content-Type': 'text/plain',
-    'Cache-Control': 'public, max-age=60',
+    "Content-Type": "text/plain",
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/sitemap.xml', async (c) => {
-  const cacheKey = 'sitemap';
+app.get("/sitemap.xml", async (c) => {
+  const cacheKey = "sitemap";
   const cacheTimeInSec = 3600 * 24; // 1 day
   const cacheStaleTimeInSec = cacheTimeInSec * 7; // 7 days
   const cached = await client.get(cacheKey);
-  let siteMap = '';
+  let siteMap = "";
 
   const sections = [
-    'items',
-    'achievements',
-    'related',
-    'metadata',
-    'changelog',
-    'media',
+    "items",
+    "achievements",
+    "related",
+    "metadata",
+    "changelog",
+    "media",
   ];
 
   if (cached) {
@@ -237,7 +237,7 @@ app.get('/sitemap.xml', async (c) => {
         </url>
         `
           )
-          .join('')}
+          .join("")}
         `;
         });
 
@@ -245,7 +245,7 @@ app.get('/sitemap.xml', async (c) => {
       }
     }
 
-    siteMap += '</urlset>';
+    siteMap += "</urlset>";
 
     await client.set(cacheKey, siteMap, {
       EX: cacheTimeInSec,
@@ -253,17 +253,17 @@ app.get('/sitemap.xml', async (c) => {
   }
 
   return c.text(siteMap, 200, {
-    'Content-Type': 'application/xml',
-    'Cache-Control': `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
+    "Content-Type": "application/xml",
+    "Cache-Control": `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
   });
 });
 
-app.get('/promotions-sitemap.xml', async (c) => {
-  const cacheKey = 'promotions-sitemap';
+app.get("/promotions-sitemap.xml", async (c) => {
+  const cacheKey = "promotions-sitemap";
   const cacheTimeInSec = 3600 * 24; // 1 day
   const cacheStaleTimeInSec = cacheTimeInSec * 7; // 7 days
   const cached = await client.get(cacheKey);
-  let siteMap = '';
+  let siteMap = "";
 
   if (cached) {
     siteMap = cached;
@@ -277,7 +277,7 @@ app.get('/promotions-sitemap.xml', async (c) => {
 
     while (hasMore) {
       const tags = await TagModel.find(
-        { groupName: 'event', referenceCount: { $gt: 0 } },
+        { groupName: "event", referenceCount: { $gt: 0 } },
         undefined,
         {
           limit: pageSize,
@@ -300,7 +300,7 @@ app.get('/promotions-sitemap.xml', async (c) => {
       }
     }
 
-    siteMap += '</urlset>';
+    siteMap += "</urlset>";
 
     await client.set(cacheKey, siteMap, {
       EX: cacheTimeInSec,
@@ -308,12 +308,12 @@ app.get('/promotions-sitemap.xml', async (c) => {
   }
 
   return c.text(siteMap, 200, {
-    'Content-Type': 'application/xml',
-    'Cache-Control': `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
+    "Content-Type": "application/xml",
+    "Cache-Control": `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
   });
 });
 
-app.get('/items-from-offer/:id', async (c) => {
+app.get("/items-from-offer/:id", async (c) => {
   const { id } = c.req.param();
 
   const cacheKey = `items-from-offer:${id}`;
@@ -323,7 +323,7 @@ app.get('/items-from-offer/:id', async (c) => {
   if (cached) {
     console.log(`[CACHE] ${cacheKey} found`);
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -335,48 +335,48 @@ app.get('/items-from-offer/:id', async (c) => {
     },
     {
       $unwind: {
-        path: '$items',
+        path: "$items",
         preserveNullAndEmptyArrays: true,
       },
     },
     {
       $lookup: {
-        from: 'items',
-        localField: 'items.id',
-        foreignField: 'id',
-        as: 'itemDetails',
+        from: "items",
+        localField: "items.id",
+        foreignField: "id",
+        as: "itemDetails",
       },
     },
     {
       $unwind: {
-        path: '$itemDetails',
+        path: "$itemDetails",
         preserveNullAndEmptyArrays: true,
       },
     },
     {
       $lookup: {
-        from: 'items',
-        let: { offerId: '$id' },
+        from: "items",
+        let: { offerId: "$id" },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $isArray: '$linkedOffers' },
-                  { $in: ['$$offerId', '$linkedOffers'] },
+                  { $isArray: "$linkedOffers" },
+                  { $in: ["$$offerId", "$linkedOffers"] },
                 ],
               },
             },
           },
         ],
-        as: 'linkedItems',
+        as: "linkedItems",
       },
     },
     {
       $group: {
-        _id: '$_id',
-        offerItems: { $push: '$itemDetails' },
-        linkedItems: { $first: '$linkedItems' },
+        _id: "$_id",
+        offerItems: { $push: "$itemDetails" },
+        linkedItems: { $first: "$linkedItems" },
       },
     },
     {
@@ -384,9 +384,9 @@ app.get('/items-from-offer/:id', async (c) => {
         _id: 0,
         items: {
           $filter: {
-            input: { $concatArrays: ['$offerItems', '$linkedItems'] },
-            as: 'item',
-            cond: { $ne: ['$$item', null] },
+            input: { $concatArrays: ["$offerItems", "$linkedItems"] },
+            as: "item",
+            cond: { $ne: ["$$item", null] },
           },
         },
       },
@@ -415,16 +415,16 @@ app.get('/items-from-offer/:id', async (c) => {
   });
 
   return c.json(res, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/latest-games', async (c) => {
+app.get("/latest-games", async (c) => {
   const start = new Date();
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   // Get the region for the selected country
   const region = Object.keys(regions).find((r) =>
@@ -434,7 +434,7 @@ app.get('/latest-games', async (c) => {
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -444,14 +444,14 @@ app.get('/latest-games', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
-      'X-Cache': 'HIT',
+      "Cache-Control": "public, max-age=60",
+      "X-Cache": "HIT",
     });
   }
 
   const items = await Offer.find(
     {
-      offerType: { $in: ['BASE_GAME', 'DLC', 'ADDON'] },
+      offerType: { $in: ["BASE_GAME", "DLC", "ADDON"] },
     },
     undefined,
     {
@@ -482,12 +482,12 @@ app.get('/latest-games', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
-    'Server-Timing': `db;dur=${end.getTime() - start.getTime()}`,
+    "Cache-Control": "public, max-age=60",
+    "Server-Timing": `db;dur=${end.getTime() - start.getTime()}`,
   });
 });
 
-app.get('/featured', async (c) => {
+app.get("/featured", async (c) => {
   const GET_FEATURED_GAMES_START = new Date();
 
   const cacheKey = `featured:v0.1`;
@@ -502,7 +502,7 @@ app.get('/featured', async (c) => {
   if (cachedResponse) {
     console.log(`[CACHE] ${responseCacheKey} found`);
     return c.json(JSON.parse(cachedResponse), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -547,16 +547,16 @@ app.get('/featured', async (c) => {
     offers.map((o) => orderOffersObject(o)),
     200,
     {
-      'Cache-Control': 'public, max-age=60',
-      'Server-Timing': `db;dur=${
+      "Cache-Control": "public, max-age=60",
+      "Server-Timing": `db;dur=${
         GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
       }`,
     }
   );
 });
 
-app.get('/autocomplete', async (c) => {
-  const query = c.req.query('query');
+app.get("/autocomplete", async (c) => {
+  const query = c.req.query("query");
 
   if (!query) {
     return c.json({
@@ -565,10 +565,10 @@ app.get('/autocomplete', async (c) => {
     });
   }
 
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '5'), 5);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "5"), 5);
 
   const cacheKey = `autocomplete:${Buffer.from(query).toString(
-    'base64'
+    "base64"
   )}:${limit}`;
 
   const cached = await client.get(cacheKey);
@@ -581,7 +581,7 @@ app.get('/autocomplete', async (c) => {
   if (!query) {
     c.status(400);
     return c.json({
-      message: 'Missing query parameter',
+      message: "Missing query parameter",
     });
   }
 
@@ -590,10 +590,10 @@ app.get('/autocomplete', async (c) => {
     {
       $text: {
         $search: query
-          .split(' ')
+          .split(" ")
           .map((q) => `"${q.trim()}"`)
-          .join(' | '),
-        $language: 'en',
+          .join(" | "),
+        $language: "en",
       },
     },
     {
@@ -604,9 +604,9 @@ app.get('/autocomplete', async (c) => {
     },
     {
       limit,
-      collation: { locale: 'en', strength: 1 },
+      collation: { locale: "en", strength: 1 },
       sort: {
-        score: { $meta: 'textScore' },
+        score: { $meta: "textScore" },
         offerType: -1,
         lastModifiedDate: -1,
       },
@@ -619,13 +619,13 @@ app.get('/autocomplete', async (c) => {
       {
         $text: {
           $search: query
-            .split(' ')
+            .split(" ")
             .map((q) => `"${q.trim()}"`)
-            .join(' | '),
+            .join(" | "),
         },
       },
       {
-        collation: { locale: 'en', strength: 1 },
+        collation: { locale: "en", strength: 1 },
       }
     ),
   };
@@ -637,20 +637,20 @@ app.get('/autocomplete', async (c) => {
   }
 
   return c.json(response, 200, {
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
-app.get('/countries', async (c) => {
+app.get("/countries", async (c) => {
   return c.json(countries, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/sales', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+app.get("/sales", async (c) => {
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
     regions[r].countries.includes(selectedCountry)
@@ -659,12 +659,12 @@ app.get('/sales', async (c) => {
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 30);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 30);
   const skip = (page - 1) * limit;
 
   const cacheKey = `sales:${region}:${page}:${limit}:v1.3`;
@@ -673,8 +673,8 @@ app.get('/sales', async (c) => {
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=0',
-      'X-Cache': 'HIT',
+      "Cache-Control": "public, max-age=0",
+      "X-Cache": "HIT",
     });
   }
 
@@ -686,33 +686,33 @@ app.get('/sales', async (c) => {
     {
       $match: {
         region,
-        'price.discount': { $gt: 0 },
-        'appliedRules.endDate': { $ne: null },
+        "price.discount": { $gt: 0 },
+        "appliedRules.endDate": { $ne: null },
       },
     },
     {
       // Save the data under "price" key
       $addFields: {
-        price: '$$ROOT',
+        price: "$$ROOT",
       },
     },
     {
       $lookup: {
-        from: 'offers',
-        localField: 'offerId',
-        foreignField: 'id',
-        as: 'offer',
+        from: "offers",
+        localField: "offerId",
+        foreignField: "id",
+        as: "offer",
       },
     },
     {
       $unwind: {
-        path: '$offer',
+        path: "$offer",
         preserveNullAndEmptyArrays: true,
       },
     },
     {
       $sort: {
-        'appliedRules.endDate': 1,
+        "appliedRules.endDate": 1,
       },
     },
     {
@@ -724,7 +724,7 @@ app.get('/sales', async (c) => {
   ]);
 
   const count = await PriceEngine.countDocuments({
-    'price.discount': { $gt: 0 },
+    "price.discount": { $gt: 0 },
     region,
   });
 
@@ -745,18 +745,18 @@ app.get('/sales', async (c) => {
   });
 
   return c.json(res, 200, {
-    'Cache-Control': 'public, max-age=0',
-    'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
+    "Cache-Control": "public, max-age=0",
+    "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
   });
 });
 
-app.get('/base-game/:namespace', async (c) => {
+app.get("/base-game/:namespace", async (c) => {
   const { namespace } = c.req.param();
 
   if (internalNamespaces.includes(namespace)) {
     return c.json(
       {
-        error: 'Internal namespace',
+        error: "Internal namespace",
       },
       404
     );
@@ -764,7 +764,7 @@ app.get('/base-game/:namespace', async (c) => {
 
   const game = await Offer.findOne({
     namespace,
-    offerType: 'BASE_GAME',
+    offerType: "BASE_GAME",
     // Either null or false
     prePurchase: { $ne: true },
   });
@@ -773,7 +773,7 @@ app.get('/base-game/:namespace', async (c) => {
     // Try again with prePurchase = true
     const gameWithPrePurchase = await Offer.findOne({
       namespace,
-      offerType: 'BASE_GAME',
+      offerType: "BASE_GAME",
       prePurchase: true,
     });
 
@@ -783,16 +783,16 @@ app.get('/base-game/:namespace', async (c) => {
 
     c.status(404);
     return c.json({
-      message: 'Game not found',
+      message: "Game not found",
     });
   }
 
   return c.json(orderOffersObject(game));
 });
 
-app.get('/changelog', async (c) => {
-  const limit = Math.min(Number.parseInt(c.req.query('limit') || '10'), 50);
-  const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
+app.get("/changelog", async (c) => {
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 50);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
   const changelist = await Changelog.find({}, undefined, {
@@ -804,15 +804,15 @@ app.get('/changelog', async (c) => {
   });
 
   return c.json(changelist, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/region', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+app.get("/region", async (c) => {
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
     regions[r].countries.includes(selectedCountry)
@@ -821,7 +821,7 @@ app.get('/region', async (c) => {
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
@@ -831,22 +831,22 @@ app.get('/region', async (c) => {
     },
     200,
     {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     }
   );
 });
 
-app.get('/regions', async (c) => {
+app.get("/regions", async (c) => {
   return c.json(regions, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/changelist', async (ctx) => {
+app.get("/changelist", async (ctx) => {
   const start = Date.now();
 
-  const limit = Math.min(Number.parseInt(ctx.req.query('limit') || '10'), 50);
-  const page = Math.max(Number.parseInt(ctx.req.query('page') || '1'), 1);
+  const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10"), 50);
+  const page = Math.max(Number.parseInt(ctx.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
 
   const cacheKey = `changelist:${page}:${limit}`;
@@ -855,7 +855,7 @@ app.get('/changelist', async (ctx) => {
 
   if (cached) {
     return ctx.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -873,7 +873,7 @@ app.get('/changelist', async (ctx) => {
   const elements = await Promise.all(
     changelist.map(async (change) => {
       switch (change.metadata.contextType) {
-        case 'offer':
+        case "offer":
           return Offer.findOne(
             { id: change.metadata.contextId },
             {
@@ -883,7 +883,7 @@ app.get('/changelist', async (ctx) => {
               offerType: 1,
             }
           );
-        case 'item':
+        case "item":
           return Item.findOne(
             { id: change.metadata.contextId },
             {
@@ -892,7 +892,7 @@ app.get('/changelist', async (ctx) => {
               keyImages: 1,
             }
           );
-        case 'asset':
+        case "asset":
           return Asset.findOne(
             { id: change.metadata.contextId },
             {
@@ -925,19 +925,19 @@ app.get('/changelist', async (ctx) => {
   });
 
   return ctx.json(result, 200, {
-    'Server-Timing': `db;dur=${Date.now() - start}`,
-    'Cache-Control': 'public, max-age=60',
+    "Server-Timing": `db;dur=${Date.now() - start}`,
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/stats', async (c) => {
-  const cacheKey = 'stats:v0.3';
+app.get("/stats", async (c) => {
+  const cacheKey = "stats:v0.3";
 
   const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -959,8 +959,8 @@ app.get('/stats', async (c) => {
     Asset.countDocuments(),
     PriceEngine.countDocuments(),
     Changelog.countDocuments(),
-    db.db.collection('sandboxes').countDocuments(),
-    db.db.collection('products').countDocuments(),
+    db.db.collection("sandboxes").countDocuments(),
+    db.db.collection("products").countDocuments(),
     Offer.countDocuments({
       creationDate: {
         $gte: new Date(new Date().getFullYear(), 0, 1),
@@ -975,21 +975,21 @@ app.get('/stats', async (c) => {
     }),
   ]);
 
-  const offers = offersData.status === 'fulfilled' ? offersData.value : 0;
-  const items = itemsData.status === 'fulfilled' ? itemsData.value : 0;
-  const tags = tagsData.status === 'fulfilled' ? tagsData.value : 0;
-  const assets = assetsData.status === 'fulfilled' ? assetsData.value : 0;
+  const offers = offersData.status === "fulfilled" ? offersData.value : 0;
+  const items = itemsData.status === "fulfilled" ? itemsData.value : 0;
+  const tags = tagsData.status === "fulfilled" ? tagsData.value : 0;
+  const assets = assetsData.status === "fulfilled" ? assetsData.value : 0;
   const priceEngine =
-    priceEngineData.status === 'fulfilled' ? priceEngineData.value : 0;
+    priceEngineData.status === "fulfilled" ? priceEngineData.value : 0;
   const changelog =
-    changelogData.status === 'fulfilled' ? changelogData.value : 0;
-  const sandboxes = sandboxData.status === 'fulfilled' ? sandboxData.value : 0;
+    changelogData.status === "fulfilled" ? changelogData.value : 0;
+  const sandboxes = sandboxData.status === "fulfilled" ? sandboxData.value : 0;
   // @ts-ignore-next-line
-  const products = productsData.status === 'fulfilled' ? sandboxData.value : 0;
+  const products = productsData.status === "fulfilled" ? sandboxData.value : 0;
   const offersYear =
-    offersYearData.status === 'fulfilled' ? offersYearData.value : 0;
+    offersYearData.status === "fulfilled" ? offersYearData.value : 0;
   const itemsYear =
-    itemsYearData.status === 'fulfilled' ? itemsYearData.value : 0;
+    itemsYearData.status === "fulfilled" ? itemsYearData.value : 0;
 
   const res = {
     offers,
@@ -1009,24 +1009,24 @@ app.get('/stats', async (c) => {
   });
 
   return c.json(res, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.get('/tags', async (c) => {
-  const group = c.req.query('group');
+app.get("/tags", async (c) => {
+  const group = c.req.query("group");
 
   const tags = await Tags.find(group ? { groupName: group } : {});
 
   return c.json(tags);
 });
 
-app.post('/ping', async (c) => {
+app.post("/ping", async (c) => {
   try {
     const body = await c.req.json();
 
-    if (body?.location?.startsWith('http://localhost:5173') || !body.location) {
-      return c.json({ message: 'pong' });
+    if (body?.location?.startsWith("http://localhost:5173") || !body.location) {
+      return c.json({ message: "pong" });
     }
 
     console.log(`Tracking event from ${body.userId} (${body.event})`);
@@ -1044,19 +1044,19 @@ app.post('/ping', async (c) => {
 
     await gaClient.track(body);
 
-    return c.json({ message: 'pong' });
+    return c.json({ message: "pong" });
   } catch (e) {
     console.error(e);
-    return c.json({ message: 'error' }, 500);
+    return c.json({ message: "error" }, 500);
   }
 });
 
-app.get('/ping', async (c) => {
-  return c.json({ message: 'pong' });
+app.get("/ping", async (c) => {
+  return c.json({ message: "pong" });
 });
 
-app.options('/ping', async (c) => {
-  return c.json({ message: 'pong' });
+app.options("/ping", async (c) => {
+  return c.json({ message: "pong" });
 });
 
 const offerTypeRanks: {
@@ -1084,8 +1084,8 @@ const offerTypeRanks: {
 const PAGE_SIZE = 500;
 
 async function refreshChangelogIndex() {
-  console.log('Refreshing MeiliSearch changelog index');
-  const index = meiliSearchClient.index('changelog');
+  console.log("Refreshing MeiliSearch changelog index");
+  const index = meiliSearchClient.index("changelog");
 
   let page = 0;
   let totallogs = 0;
@@ -1108,7 +1108,7 @@ async function refreshChangelogIndex() {
     await index.addDocuments(
       logs.map((o) => o.toObject()),
       {
-        primaryKey: '_id',
+        primaryKey: "_id",
       }
     );
 
@@ -1119,8 +1119,8 @@ async function refreshChangelogIndex() {
 }
 
 async function refreshOffersIndex() {
-  console.log('Refreshing MeiliSearch offers index');
-  const index = meiliSearchClient.index('offers');
+  console.log("Refreshing MeiliSearch offers index");
+  const index = meiliSearchClient.index("offers");
 
   let page = 0;
   let totalOffers = 0;
@@ -1148,7 +1148,7 @@ async function refreshOffersIndex() {
         };
       }),
       {
-        primaryKey: '_id',
+        primaryKey: "_id",
       }
     );
 
@@ -1159,8 +1159,8 @@ async function refreshOffersIndex() {
 }
 
 async function refreshItemsIndex() {
-  console.log('Refreshing MeiliSearch items index');
-  const index = meiliSearchClient.index('items');
+  console.log("Refreshing MeiliSearch items index");
+  const index = meiliSearchClient.index("items");
 
   let page = 0;
   let totalItems = 0;
@@ -1183,7 +1183,7 @@ async function refreshItemsIndex() {
     await index.addDocuments(
       items.map((o) => o.toObject()),
       {
-        primaryKey: '_id',
+        primaryKey: "_id",
       }
     );
 
@@ -1194,8 +1194,8 @@ async function refreshItemsIndex() {
 }
 
 async function refreshSellersIndex() {
-  console.log('Refreshing MeiliSearch sellers index');
-  const index = meiliSearchClient.index('sellers');
+  console.log("Refreshing MeiliSearch sellers index");
+  const index = meiliSearchClient.index("sellers");
 
   let page = 0;
   let totalSellers = 0;
@@ -1220,7 +1220,7 @@ async function refreshSellersIndex() {
     await index.addDocuments(
       sellers.map((o) => o.toObject()),
       {
-        primaryKey: '_id',
+        primaryKey: "_id",
       }
     );
 
@@ -1230,8 +1230,8 @@ async function refreshSellersIndex() {
   console.log(`Total sellers processed: ${totalSellers}`);
 }
 
-app.patch('/refresh-meilisearch', async (c) => {
-  console.log('Refreshing MeiliSearch index');
+app.patch("/refresh-meilisearch", async (c) => {
+  console.log("Refreshing MeiliSearch index");
 
   await Promise.allSettled([
     refreshChangelogIndex(),
@@ -1240,44 +1240,44 @@ app.patch('/refresh-meilisearch', async (c) => {
     refreshSellersIndex(),
   ]);
 
-  return c.json({ message: 'ok' });
+  return c.json({ message: "ok" });
 });
 
-app.patch('/refresh/changelog', async (c) => {
+app.patch("/refresh/changelog", async (c) => {
   await refreshChangelogIndex();
 
-  return c.json({ message: 'ok' });
+  return c.json({ message: "ok" });
 });
 
-app.patch('/refresh/offers', async (c) => {
+app.patch("/refresh/offers", async (c) => {
   await refreshOffersIndex();
 
-  return c.json({ message: 'ok' });
+  return c.json({ message: "ok" });
 });
 
-app.patch('/refresh/items', async (c) => {
+app.patch("/refresh/items", async (c) => {
   await refreshItemsIndex();
 
-  return c.json({ message: 'ok' });
+  return c.json({ message: "ok" });
 });
 
-app.patch('/refresh/sellers', async (c) => {
+app.patch("/refresh/sellers", async (c) => {
   await refreshSellersIndex();
 
-  return c.json({ message: 'ok' });
+  return c.json({ message: "ok" });
 });
 
-app.get('/offer-by-slug/:slug', async (c) => {
+app.get("/offer-by-slug/:slug", async (c) => {
   const { slug } = c.req.param();
 
   const offer = await Offer.findOne({
-    'offerMappings.pageSlug': slug,
+    "offerMappings.pageSlug": slug,
   });
 
   if (!offer) {
     c.status(404);
     return c.json({
-      message: 'Offer not found',
+      message: "Offer not found",
     });
   }
 
@@ -1286,11 +1286,11 @@ app.get('/offer-by-slug/:slug', async (c) => {
   });
 });
 
-app.get('/active-sales', async (c) => {
-  const country = c.req.query('country');
-  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+app.get("/active-sales", async (c) => {
+  const country = c.req.query("country");
+  const cookieCountry = getCookie(c, "EGDATA_COUNTRY");
 
-  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const selectedCountry = country ?? cookieCountry ?? "US";
 
   const region = Object.keys(regions).find((r) =>
     regions[r].countries.includes(selectedCountry)
@@ -1299,26 +1299,25 @@ app.get('/active-sales', async (c) => {
   if (!region) {
     c.status(404);
     return c.json({
-      message: 'Country not found',
+      message: "Country not found",
     });
   }
 
-  const cacheKey = 'active-sales';
+  const cacheKey = "active-sales";
 
   const cached = await client.get(cacheKey);
 
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     });
   }
 
   const tags = await TagModel.find(
     {
       // To contain "Sale", "Savings" or "Promotion" case-insensitive
-      name: { $regex: '(Sale|Savings|Promotion)', $options: 'i' },
+      name: { $regex: "(Sale|Savings|Promotion|Deals)", $options: "i" },
       referenceCount: { $gt: 0 },
-      // Ignore IDs 33639
       id: { $nin: [33639] },
     },
     undefined,
@@ -1375,44 +1374,44 @@ app.get('/active-sales', async (c) => {
   });
 
   return c.json(result, 200, {
-    'Cache-Control': 'public, max-age=60',
+    "Cache-Control": "public, max-age=60",
   });
 });
 
-app.post('/donate/key/:code', async (c) => {
+app.post("/donate/key/:code", async (c) => {
   const { code } = c.req.param();
 
-  console.log('Received donation code', code);
+  console.log("Received donation code", code);
 
   if (!code || code.length !== 20) {
-    return c.json({ error: 'Invalid code' }, 400);
+    return c.json({ error: "Invalid code" }, 400);
   }
 
-  console.log('Verifying code');
+  console.log("Verifying code");
 
-  const authorization = getCookie(c, 'EGDATA_AUTH');
+  const authorization = getCookie(c, "EGDATA_AUTH");
 
   if (!authorization) {
-    console.error('Missing authorization header');
-    return c.json({ error: 'Missing authorization header' }, 401);
+    console.error("Missing authorization header");
+    return c.json({ error: "Missing authorization header" }, 401);
   }
 
-  const token = authorization.replace('Bearer ', '');
+  const token = authorization.replace("Bearer ", "");
 
   if (!token) {
-    console.error('Missing token');
-    return c.json({ error: 'Missing token' }, 401);
+    console.error("Missing token");
+    return c.json({ error: "Missing token" }, 401);
   }
 
   const certificate = process.env.JWT_PUBLIC_KEY;
 
   if (!certificate) {
-    console.error('Missing JWT_PUBLIC_KEY env variable');
-    return c.json({ error: 'Missing JWT_PUBLIC_KEY env variable' }, 401);
+    console.error("Missing JWT_PUBLIC_KEY env variable");
+    return c.json({ error: "Missing JWT_PUBLIC_KEY env variable" }, 401);
   }
 
-  const egdataJWT = jwt.verify(token, readFileSync(certificate, 'utf-8'), {
-    algorithms: ['RS256'],
+  const egdataJWT = jwt.verify(token, readFileSync(certificate, "utf-8"), {
+    algorithms: ["RS256"],
   }) as {
     access_token: string;
     refresh_token: string;
@@ -1422,8 +1421,8 @@ app.post('/donate/key/:code', async (c) => {
   };
 
   if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.jti) {
-    console.error('Invalid JWT');
-    return c.json({ error: 'Invalid JWT' }, 401);
+    console.error("Invalid JWT");
+    return c.json({ error: "Invalid JWT" }, 401);
   }
 
   // Inspect the token from "decoded.access_token" and save it to the database
@@ -1444,45 +1443,45 @@ app.post('/donate/key/:code', async (c) => {
   };
 
   if (!decoded || !decoded.sub || !decoded.iss) {
-    console.error('Invalid JWT');
-    return c.json({ error: 'Invalid JWT' }, 401);
+    console.error("Invalid JWT");
+    return c.json({ error: "Invalid JWT" }, 401);
   }
 
   const id = decoded.sub;
 
   // Check if the code is already in the DB
-  const existingDonation = await db.db.collection('key-codes').findOne({
+  const existingDonation = await db.db.collection("key-codes").findOne({
     code,
   });
 
   if (existingDonation) {
-    return c.json({ error: 'Code already used' }, 400);
+    return c.json({ error: "Code already used" }, 400);
   }
 
   const targetUser = await db.db
-    .collection('launcher')
+    .collection("launcher")
     .findOne<LauncherAuthTokens>({
       account_id: process.env.ADMIN_ACCOUNT_ID,
     });
 
   const url = new URL(
-    'https://fulfillment-public-service-prod.ol.epicgames.com/fulfillment/api/public/accounts/:accountId/codes/:code'
-      .replace(':accountId', process.env.ADMIN_ACCOUNT_ID as string)
-      .replace(':code', code)
+    "https://fulfillment-public-service-prod.ol.epicgames.com/fulfillment/api/public/accounts/:accountId/codes/:code"
+      .replace(":accountId", process.env.ADMIN_ACCOUNT_ID as string)
+      .replace(":code", code)
   );
 
-  console.log('Fetching code details from Epic Games');
+  console.log("Fetching code details from Epic Games");
 
   const response = await fetch(url.toString(), {
-    method: 'POST',
+    method: "POST",
     headers: {
       Authorization: `Bearer ${targetUser?.access_token}`,
     },
   });
 
   if (!response.ok) {
-    console.error('Failed to verify code', await response.json());
-    return c.json({ error: 'Failed to verify code' }, 400);
+    console.error("Failed to verify code", await response.json());
+    return c.json({ error: "Failed to verify code" }, 400);
   }
 
   const parsedResponse = (await response.json()) as {
@@ -1498,9 +1497,9 @@ app.post('/donate/key/:code', async (c) => {
     }[];
   };
 
-  console.log('Code details', parsedResponse);
+  console.log("Code details", parsedResponse);
 
-  await db.db.collection('key-codes').insertOne({
+  await db.db.collection("key-codes").insertOne({
     code,
     accountId: id,
     offerId: parsedResponse.offerId,
@@ -1508,44 +1507,44 @@ app.post('/donate/key/:code', async (c) => {
     details: parsedResponse.details,
   });
 
-  return c.json({ message: 'ok', id: parsedResponse.offerId });
+  return c.json({ message: "ok", id: parsedResponse.offerId });
 });
 
-app.route('/sandboxes', SandboxRoute);
+app.route("/sandboxes", SandboxRoute);
 
-app.route('/search', SearchRoute);
+app.route("/search", SearchRoute);
 
-app.route('/offers', OffersRoute);
+app.route("/offers", OffersRoute);
 
-app.route('/promotions', PromotionsRoute);
+app.route("/promotions", PromotionsRoute);
 
-app.route('/free-games', FreeGamesRoute);
+app.route("/free-games", FreeGamesRoute);
 
-app.route('/multisearch', MultisearchRoute);
+app.route("/multisearch", MultisearchRoute);
 
-app.route('/auth', AuthRoute);
+app.route("/auth", AuthRoute);
 
-app.route('/accounts', AccountsRoute);
+app.route("/accounts", AccountsRoute);
 
-app.route('/users', UsersRoute);
+app.route("/users", UsersRoute);
 
-app.route('/collections', CollectionsRoute);
+app.route("/collections", CollectionsRoute);
 
-app.route('/profiles', ProfilesRoute);
+app.route("/profiles", ProfilesRoute);
 
-app.route('/items', ItemsRoute);
+app.route("/items", ItemsRoute);
 
-app.route('/sellers', SellersRoute);
+app.route("/sellers", SellersRoute);
 
-app.route('/admin', AdminRoute);
+app.route("/admin", AdminRoute);
 
-app.route('/assets', AssetsRoute);
+app.route("/assets", AssetsRoute);
 
-app.route('/builds', BuildsRoute);
+app.route("/builds", BuildsRoute);
 
-app.route('/launcher', LauncherRoute);
+app.route("/launcher", LauncherRoute);
 
-app.route('/users-service', UsersServiceRoute);
+app.route("/users-service", UsersServiceRoute);
 
 async function startServer() {
   try {
@@ -1556,20 +1555,19 @@ async function startServer() {
       port: 4000,
     });
 
-    server.on('listening', () => {
+    server.on("listening", () => {
       console.log(
-        `${chalk.gray('Listening on')} ${chalk.green(
-          'http://localhost:4000'
-        )} (${chalk.gray('took')} ${chalk.magenta(
+        `${chalk.gray("Listening on")} ${chalk.green(
+          "http://localhost:4000"
+        )} (${chalk.gray("took")} ${chalk.magenta(
           `${(process.uptime() * 1000).toFixed(2)}ms`
         )})`
       );
     });
   } catch (error) {
-    console.error('Failed to connect to MongoDB', error);
+    console.error("Failed to connect to MongoDB", error);
     process.exit(1); // Exit the process if DB connection fails
   }
 }
 
 startServer();
-
