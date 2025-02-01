@@ -62,6 +62,7 @@ interface SearchBody {
   developerDisplayName?: string;
   publisherDisplayName?: string;
   spt?: boolean;
+  excludeBlockchain?: boolean;
 }
 
 const app = new Hono();
@@ -79,7 +80,7 @@ app.post("/", async (c) => {
   // Get the region for the selected country
   const region =
     Object.keys(regions).find((r) =>
-      regions[r].countries.includes(selectedCountry),
+      regions[r].countries.includes(selectedCountry)
     ) || "US";
 
   const body = await c.req.json().catch((err) => {
@@ -101,7 +102,7 @@ app.post("/", async (c) => {
         ...query,
         page: undefined,
         limit: undefined,
-      }),
+      })
     )
     .digest("hex");
 
@@ -200,6 +201,10 @@ app.post("/", async (c) => {
     mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
   }
 
+  if (query.excludeBlockchain) {
+    mongoQuery.excludeBlockchain = true;
+  }
+
   if (query.developerDisplayName) {
     mongoQuery.developerDisplayName = query.developerDisplayName;
   }
@@ -292,7 +297,7 @@ app.post("/", async (c) => {
 
   if (
     ["priceAsc", "priceDesc", "price", "discount", "discountPercent"].includes(
-      sort,
+      sort
     )
   ) {
     // If sorting by price, start with the pricing collection
@@ -482,7 +487,7 @@ app.get("/offer-types", async (c) => {
     200,
     {
       "Cache-Control": "public, max-age=60",
-    },
+    }
   );
 });
 
@@ -549,7 +554,7 @@ app.get("/changelog", async (c) => {
     page: requestedPage,
     limit: requestedLimit,
     type,
-    id
+    id,
   } = c.req.query();
 
   // Parse the page and limit
@@ -577,7 +582,7 @@ app.get("/changelog", async (c) => {
     offset: (page - 1) * limit,
     limit,
     sort: ["timestamp:desc"],
-    filter
+    filter,
   });
 
   await Promise.all(
@@ -608,7 +613,7 @@ app.get("/changelog", async (c) => {
         }
 
         if (type === "build") {
-          const build = await db.db.collection('builds').findOne({
+          const build = await db.db.collection("builds").findOne({
             _id: new ObjectId(id),
           });
 
@@ -616,7 +621,7 @@ app.get("/changelog", async (c) => {
         }
 
         return hit;
-      }),
+      })
   );
 
   // Return the changelogs
@@ -651,7 +656,7 @@ app.get("/:id/count", async (c) => {
   // Get the region for the selected country
   const region =
     Object.keys(regions).find((r) =>
-      regions[r].countries.includes(selectedCountry),
+      regions[r].countries.includes(selectedCountry)
     ) || "US";
 
   const { id } = c.req.param();
@@ -727,6 +732,10 @@ app.get("/:id/count", async (c) => {
     mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
   }
 
+  if (query.excludeBlockchain) {
+    mongoQuery.excludeBlockchain = true;
+  }
+
   if (query.price) {
     if (query.price.min) {
       priceQuery["price.discountPrice"] = {
@@ -753,7 +762,7 @@ app.get("/:id/count", async (c) => {
       totalCountData,
       developerData,
       publisherData,
-      priceRangeData 
+      priceRangeData,
     ] = await Promise.allSettled([
       Offer.aggregate([
         { $match: mongoQuery },
@@ -892,7 +901,7 @@ app.get("/:id/count", async (c) => {
           },
         },
         {
-          $unwind: "$priceEngine"
+          $unwind: "$priceEngine",
         },
         {
           $group: {
@@ -900,9 +909,9 @@ app.get("/:id/count", async (c) => {
             minPrice: { $min: "$priceEngine.price.discountPrice" },
             maxPrice: { $max: "$priceEngine.price.discountPrice" },
             currency: { $first: "$priceEngine.price.currencyCode" },
-          }
-        }
-      ])
+          },
+        },
+      ]),
     ]);
 
     const result = {
