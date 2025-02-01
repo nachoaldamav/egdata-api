@@ -202,7 +202,11 @@ app.post("/", async (c) => {
   }
 
   if (query.excludeBlockchain) {
-    mongoQuery.excludeBlockchain = true;
+    if (query.tags) {
+      mongoQuery["tags.id"].$ne = "21739";
+    } else {
+      mongoQuery["tags.id"] = { $ne: "21739" };
+    }
   }
 
   if (query.developerDisplayName) {
@@ -733,7 +737,11 @@ app.get("/:id/count", async (c) => {
   }
 
   if (query.excludeBlockchain) {
-    mongoQuery.excludeBlockchain = true;
+    if (query.tags) {
+      mongoQuery["tags.id"].$ne = "21739";
+    } else {
+      mongoQuery["tags.id"] = { $ne: "21739" };
+    }
   }
 
   if (query.price) {
