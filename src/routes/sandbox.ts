@@ -403,6 +403,20 @@ app.get("/:sandboxId/achievements", async (c) => {
 
 app.get("/:sandboxId/changelog", async (c) => {
   const { sandboxId } = c.req.param();
+  const limit = c.req.query("limit") || "30";
+  const page = c.req.query("page") || "1";
+
+  const skip = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
+
+  const cacheKey = `changelog:${sandboxId}:${skip}:${limit}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
 
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
@@ -417,32 +431,105 @@ app.get("/:sandboxId/changelog", async (c) => {
     });
   }
 
-  const [offers, items] = await Promise.all([
+  const [offers, items, assets] = await Promise.all([
     Offer.find({
       namespace: sandboxId,
     }),
     Item.find({
       namespace: sandboxId,
     }),
+    Asset.find({
+      namespace: sandboxId,
+    }),
   ]);
 
-  const [offersIds, itemsIds] = await Promise.all([
+  const builds = await db.db
+    .collection("builds")
+    .find({
+      appName: {
+        $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+      },
+    })
+    .toArray();
+
+  const [offersIds, itemsIds, assetsIds, buildsIds] = await Promise.all([
     offers.map((o) => o.id),
     items.map((i) => i.id),
+    assets.map((a) => a.artifactId),
+    builds.map((b) => b._id),
   ]);
 
   const changelist = await Changelog.find(
     {
-      "metadata.contextId": { $in: [...offersIds, ...itemsIds, sandboxId] },
+      "metadata.contextId": {
+        $in: [...offersIds, ...itemsIds, ...assetsIds, ...buildsIds, sandboxId],
+      },
     },
     undefined,
     {
       sort: {
         timestamp: -1,
       },
+      limit: Number.parseInt(limit, 10),
+      skip,
     }
   );
-  return c.json(changelist);
+
+  const count = await Changelog.countDocuments({
+    "metadata.contextId": {
+      $in: [...offersIds, ...itemsIds, ...assetsIds, ...buildsIds, sandboxId],
+    },
+  });
+
+  const result = {
+    hits: await Promise.all(
+      changelist
+        .map((c) => c.toJSON())
+        .map(async (c) => {
+          const type = c.metadata.contextType;
+          const id = c.metadata.contextId;
+
+          if (type === "offer") {
+            c.document = await Offer.findOne({ id });
+          }
+
+          if (type === "item") {
+            c.document = await Item.findOne({
+              id,
+            });
+          }
+
+          if (type === "asset") {
+            const asset = await Asset.findOne({
+              artifactId: id,
+            });
+
+            c.document = await Item.findOne({
+              id: asset?.itemId,
+            });
+          }
+
+          if (type === "build") {
+            const build = await db.db.collection("builds").findOne({
+              _id: new ObjectId(id),
+            });
+
+            c.document = build;
+          }
+
+          return c;
+        })
+    ),
+    estimatedTotalHits: count,
+    limit: Number.parseInt(limit, 10),
+    offset: skip,
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 600,
+  });
+
+  return c.json(result);
 });
 
 app.get("/:sandboxId/builds", async (c) => {
