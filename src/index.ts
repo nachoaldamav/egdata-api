@@ -1305,13 +1305,13 @@ app.get("/active-sales", async (c) => {
 
   const cacheKey = "active-sales";
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      "Cache-Control": "public, max-age=60",
-    });
-  }
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), 200, {
+  //     "Cache-Control": "public, max-age=60",
+  //   });
+  // }
 
   const tags = await TagModel.find(
     {
@@ -1354,10 +1354,12 @@ app.get("/active-sales", async (c) => {
       });
 
       const everyPriceIsOnSale =
-        prices.length > 0 &&
-        prices.every(
-          (p) => p.price.discount > 0 || p.price.originalPrice === 0
-        );
+        // if the sale is "29899", it's always active
+        t.id === "29899" ||
+        (prices.length > 0 &&
+          prices.every(
+            (p) => p.price.discount > 0 || p.price.originalPrice === 0
+          ));
 
       result.push({
         id: t.id,
