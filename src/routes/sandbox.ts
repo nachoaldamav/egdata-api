@@ -212,7 +212,7 @@ app.get("/:sandboxId/assets", async (ctx) => {
   const cached = await client.get(cacheKey);
 
   if (cached) {
-    return ctx.json(cached);
+    return ctx.json(JSON.parse(cached));
   }
 
   const sandbox = await db.db.collection("sandboxes").findOne({
