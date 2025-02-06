@@ -207,6 +207,14 @@ app.get("/:sandboxId/offers", async (ctx) => {
 app.get("/:sandboxId/assets", async (ctx) => {
   const { sandboxId } = ctx.req.param();
 
+  const cacheKey = `${sandboxId}-assets`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return ctx.json(cached);
+  }
+
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
@@ -220,17 +228,6 @@ app.get("/:sandboxId/assets", async (ctx) => {
     });
   }
 
-  // const assets = await Asset.find(
-  //   {
-  //     namespace: sandboxId,
-  //   },
-  //   undefined,
-  //   {
-  //     sort: {
-  //       lastModified: -1,
-  //     },
-  //   }
-  // );
   const [assets, items] = await Promise.all([
     Asset.find(
       {
@@ -251,11 +248,18 @@ app.get("/:sandboxId/assets", async (ctx) => {
         id: 1,
         namespace: 1,
         releaseInfo: 1,
+        title: 1,
       }
     ),
   ]);
 
-  const result = assets.map((a) => a.toObject());
+  const result = assets.map((a) => {
+    const item = items.find((i) => i.id === a.itemId);
+    return {
+      ...a.toObject(),
+      title: item?.title,
+    };
+  });
 
   // Some assets are not found because they are protected or hidden, but we know they exist, so we add them to the result with 0 sizes
   for (const item of items) {
@@ -270,11 +274,16 @@ app.get("/:sandboxId/assets", async (ctx) => {
             namespace: item.namespace,
             platform,
             _id: new ObjectId(),
+            title: item.title,
           });
         }
       }
     }
   }
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 3600,
+  });
 
   return ctx.json(result);
 });
