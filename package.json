@@ -70,6 +70,5 @@
   },
   "trigger.dev": {
     "endpointId": "egdata-api"
-  },
-  "packageManager": "pnpm@10.2.0"
+  }
 }
