@@ -13,67 +13,67 @@ importers:
         version: 3.715.0
       '@egdata/core.schemas.achievements':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.assets':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.bundles':
         specifier: latest
-        version: 1.0.0(mongoose@8.9.2)
+        version: 1.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.changelog':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.collections':
         specifier: latest
-        version: 2.0.2(mongoose@8.9.2)
+        version: 2.0.2(mongoose@8.10.0)
       '@egdata/core.schemas.free-games':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.hltb':
         specifier: latest
-        version: 1.0.0(mongoose@8.9.2)
+        version: 1.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.images':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.items':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.mappings':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.media':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.namespace':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.offers':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.price':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.ratings':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.sandboxes':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.sellers':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@egdata/core.schemas.subitems':
         specifier: ^0.0.1
-        version: 0.0.1(mongoose@8.9.2)
+        version: 0.0.1(mongoose@8.10.0)
       '@egdata/core.schemas.tags':
         specifier: latest
-        version: 2.0.0(mongoose@8.9.2)
+        version: 2.0.0(mongoose@8.10.0)
       '@hono/node-server':
         specifier: 1.12.0
         version: 1.12.0
       '@hono/swagger-ui':
         specifier: 0.4.0
-        version: 0.4.0(hono@4.5.0)
+        version: 0.4.0(hono@4.6.20)
       '@resvg/resvg-js':
         specifier: ^2.6.2
         version: 2.6.2
@@ -82,7 +82,7 @@ importers:
         version: 2.10.4(@tiptap/pm@2.10.4)
       '@trigger.dev/hono':
         specifier: 3.2.0
-        version: 3.2.0(@trigger.dev/sdk@3.2.0)(hono@4.5.0)
+        version: 3.2.0(@trigger.dev/sdk@3.2.0)(hono@4.6.20)
       '@trigger.dev/sdk':
         specifier: 3.2.0
         version: 3.2.0
@@ -105,8 +105,8 @@ importers:
         specifier: ^7.1.0
         version: 7.1.2(graphql@16.10.0)
       hono:
-        specifier: 4.5.0
-        version: 4.5.0
+        specifier: 4.6.20
+        version: 4.6.20
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
@@ -120,8 +120,8 @@ importers:
         specifier: ^6.12.0
         version: 6.12.0
       mongoose:
-        specifier: 8.9.2
-        version: 8.9.2
+        specifier: 8.10.0
+        version: 8.10.0
       nanoid:
         specifier: ^5.0.7
         version: 5.0.9
@@ -2343,9 +2343,9 @@ packages:
   hmac-drbg@1.0.1:
     resolution: {integrity: sha512-Tti3gMqLdZfhOQY1Mzf/AanLiqh1WTiJgEj26ZuYQ9fbkLomzGchCws4FyrSd4VkpBfiNhaE1On+lOz894jvXg==}
 
-  hono@4.5.0:
-    resolution: {integrity: sha512-ZbezypZfn4odyApjCCv+Fw5OgweBqRLA/EsMyc4FUknFvBJcBIKhHy4sqmD1rWpBc/3wUlaQ6tqOPjk36R1ckg==}
-    engines: {node: '>=16.0.0'}
+  hono@4.6.20:
+    resolution: {integrity: sha512-5qfNQeaIptMaJKyoJ6N/q4gIq0DBp2FCRaLNuUI3LlJKL4S37DY/rLL1uAxA4wrPB39tJ3s+f7kgI79O4ScSug==}
+    engines: {node: '>=16.9.0'}
 
   http-signature@1.2.0:
     resolution: {integrity: sha512-CAbnr6Rz4CYQkLYUtSNXxQPUH2gK8f3iWexVlsnMeD+GjlsQ0Xsy1cOX+mN3dtxYomRy21CiOzU8Uhw6OwncEQ==}
@@ -2733,8 +2733,35 @@ packages:
       socks:
         optional: true
 
-  mongoose@8.9.2:
-    resolution: {integrity: sha512-mLWynmZS1v8HTeMxyLhskQncS1SkrjW1eLNuFDYGQMQ/5QrFrxTLNwWXeCRZeKT2lXyaxW8bnJC9AKPT9jYMkw==}
+  mongodb@6.13.0:
+    resolution: {integrity: sha512-KeESYR5TEaFxOuwRqkOm3XOsMqCSkdeDMjaW5u2nuKfX7rqaofp7JQGoi7sVqQcNJTKuveNbzZtWMstb8ABP6Q==}
+    engines: {node: '>=16.20.1'}
+    peerDependencies:
+      '@aws-sdk/credential-providers': ^3.188.0
+      '@mongodb-js/zstd': ^1.1.0 || ^2.0.0
+      gcp-metadata: ^5.2.0
+      kerberos: ^2.0.1
+      mongodb-client-encryption: '>=6.0.0 <7'
+      snappy: ^7.2.2
+      socks: ^2.7.1
+    peerDependenciesMeta:
+      '@aws-sdk/credential-providers':
+        optional: true
+      '@mongodb-js/zstd':
+        optional: true
+      gcp-metadata:
+        optional: true
+      kerberos:
+        optional: true
+      mongodb-client-encryption:
+        optional: true
+      snappy:
+        optional: true
+      socks:
+        optional: true
+
+  mongoose@8.10.0:
+    resolution: {integrity: sha512-nLhk3Qrv6q/HpD2k1O7kbBqsq+/kmKpdv5KJ+LLhQlII3e1p/SSLoLP6jMuSiU6+iLK7zFw4T1niAk3mA3QVug==}
     engines: {node: '>=16.20.1'}
 
   mpath@0.9.0:
@@ -4125,84 +4152,84 @@ snapshots:
       tunnel-agent: 0.6.0
       uuid: 8.3.2
 
-  '@egdata/core.schemas.achievements@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.achievements@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.assets@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.assets@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.bundles@1.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.bundles@1.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.changelog@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.changelog@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.collections@2.0.2(mongoose@8.9.2)':
+  '@egdata/core.schemas.collections@2.0.2(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.free-games@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.free-games@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.hltb@1.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.hltb@1.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.images@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.images@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.items@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.items@2.0.0(mongoose@8.10.0)':
     dependencies:
-      '@egdata/core.schemas.images': 2.0.0(mongoose@8.9.2)
-      mongoose: 8.9.2
+      '@egdata/core.schemas.images': 2.0.0(mongoose@8.10.0)
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.mappings@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.mappings@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.media@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.media@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.namespace@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.namespace@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.offers@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.offers@2.0.0(mongoose@8.10.0)':
     dependencies:
-      '@egdata/core.schemas.images': 2.0.0(mongoose@8.9.2)
-      '@egdata/core.schemas.tags': 2.0.0(mongoose@8.9.2)
-      mongoose: 8.9.2
+      '@egdata/core.schemas.images': 2.0.0(mongoose@8.10.0)
+      '@egdata/core.schemas.tags': 2.0.0(mongoose@8.10.0)
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.price@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.price@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.ratings@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.ratings@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.sandboxes@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.sandboxes@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.sellers@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.sellers@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.subitems@0.0.1(mongoose@8.9.2)':
+  '@egdata/core.schemas.subitems@0.0.1(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
-  '@egdata/core.schemas.tags@2.0.0(mongoose@8.9.2)':
+  '@egdata/core.schemas.tags@2.0.0(mongoose@8.10.0)':
     dependencies:
-      mongoose: 8.9.2
+      mongoose: 8.10.0
 
   '@electric-sql/client@0.6.3':
     optionalDependencies:
@@ -4374,9 +4401,9 @@ snapshots:
 
   '@hono/node-server@1.12.0': {}
 
-  '@hono/swagger-ui@0.4.0(hono@4.5.0)':
+  '@hono/swagger-ui@0.4.0(hono@4.6.20)':
     dependencies:
-      hono: 4.5.0
+      hono: 4.6.20
 
   '@img/sharp-darwin-arm64@0.33.5':
     optionalDependencies:
@@ -5319,10 +5346,10 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@trigger.dev/hono@3.2.0(@trigger.dev/sdk@3.2.0)(hono@4.5.0)':
+  '@trigger.dev/hono@3.2.0(@trigger.dev/sdk@3.2.0)(hono@4.6.20)':
     dependencies:
       '@trigger.dev/sdk': 3.2.0
-      hono: 4.5.0
+      hono: 4.6.20
 
   '@trigger.dev/sdk@3.2.0':
     dependencies:
@@ -6143,7 +6170,7 @@ snapshots:
       minimalistic-assert: 1.0.1
       minimalistic-crypto-utils: 1.0.1
 
-  hono@4.5.0: {}
+  hono@4.6.20: {}
 
   http-signature@1.2.0:
     dependencies:
@@ -6493,11 +6520,17 @@ snapshots:
       bson: 6.10.1
       mongodb-connection-string-url: 3.0.1
 
-  mongoose@8.9.2:
+  mongodb@6.13.0:
+    dependencies:
+      '@mongodb-js/saslprep': 1.1.9
+      bson: 6.10.1
+      mongodb-connection-string-url: 3.0.1
+
+  mongoose@8.10.0:
     dependencies:
       bson: 6.10.1
       kareem: 2.6.3
-      mongodb: 6.12.0
+      mongodb: 6.13.0
       mpath: 0.9.0
       mquery: 5.0.0
       ms: 2.1.3
