@@ -2,11 +2,7 @@
   "scripts": {
     "dev": "rslib build --watch & node --enable-source-maps --env-file=.env --watch-path=./dist dist/index.cjs",
     "build": "rslib build",
-    "start": "node --enable-source-maps --env-file=.env dist/index.cjs",
-    "sea": "pnpm sea:prepare && pnpm build && pnpm sea:bundle && pnpm sea:inject",
-    "sea:bundle": "node --experimental-sea-config sea-config.json",
-    "sea:inject": "cp $(command -v node) egdata && npx postject egdata NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
-    "sea:prepare": "rm -rf sea-prep.blob && rm -rf egdata"
+    "start": "node --enable-source-maps --env-file=.env dist/index.js"
   },
   "type": "module",
   "dependencies": {

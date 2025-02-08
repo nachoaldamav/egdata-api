@@ -11,11 +11,11 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-l
 
 FROM base AS build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm sea
+RUN pnpm build
 
 FROM base AS runner
 WORKDIR /app
 COPY --from=build /app/ /app/
 EXPOSE 4000
 
-CMD [ "node", "dist/index.cjs" ]
+CMD [ "pnpm", "start" ]
