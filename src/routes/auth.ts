@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { telegramBotService } from "../clients/telegram.js";
 import { randomUUID } from "node:crypto";
 import client from "../clients/redis.js";
+import { auth } from "../utils/auth.js";
 
 interface EpicProfileResponse {
   accountId: string;
@@ -54,10 +55,21 @@ export interface EpicTokenInfo {
 type EpicAuthMiddleware = {
   Variables: {
     epic?: EpicTokenInfo;
+    session?: {
+      user: typeof auth.$Infer.Session.user | null;
+      session: typeof auth.$Infer.Session.session | null;
+    };
   };
 };
 
 export const epic = createMiddleware<EpicAuthMiddleware>(async (c, next) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+
+  if (session) {
+    c.set("session", session);
+    return next();
+  }
+
   // Get the authorization header or cookie "EPIC_AUTH"
   let epicAuth = c.req.header("Authorization") || getCookie(c, "EPIC_AUTH");
 
@@ -233,8 +245,9 @@ app.get("/", epic, async (c) => {
 
 app.post("/avatar", epic, async (c) => {
   const epicVar = c.var.epic;
+  const session = c.var.session;
 
-  if (!epicVar || !epicVar.account_id) {
+  if ((!epicVar || !epicVar.account_id) && !session) {
     console.error("Missing EPIC_ACCOUNT_ID", epicVar);
     return c.json({ error: "Missing EPIC_ACCOUNT_ID" }, 401);
   }
@@ -258,7 +271,9 @@ app.post("/avatar", epic, async (c) => {
   formData.set(
     "file",
     file,
-    `${epicVar.account_id}.${file.name.split(".").pop()}`
+    `${session?.user?.email.split("@")[0] ?? epicVar?.account_id}.${file.name
+      .split(".")
+      .pop()}`
   );
 
   const response = await fetch(cfImagesUrl, {
@@ -278,7 +293,7 @@ app.post("/avatar", epic, async (c) => {
 
   await db.db.collection("epic").updateOne(
     {
-      accountId: epicVar.account_id,
+      accountId: session.user?.email.split("@")[0] ?? epicVar.account_id,
     },
     {
       $set: {
@@ -1084,10 +1099,10 @@ app.post("/v2/validate-state", async (c) => {
 
 app.post("/v2/save-state", async (c) => {
   // Generate a random code
-  const code = randomUUID().replaceAll('-', '').toUpperCase();
+  const code = randomUUID().replaceAll("-", "").toUpperCase();
 
   await client.set(`state-code:${code}`, "true", {
-    EX: 600
+    EX: 600,
   });
 
   return c.json({

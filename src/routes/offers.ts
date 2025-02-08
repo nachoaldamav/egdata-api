@@ -1316,21 +1316,27 @@ app.get("/:id/changelog", async (c) => {
       if (changelist.metadata.contextType === "offer") {
         return {
           ...changelist.toJSON(),
-          document: await Offer.findOne({ id: changelist.metadata.contextId }).exec(),
+          document: await Offer.findOne({
+            id: changelist.metadata.contextId,
+          }).exec(),
         };
       }
 
       if (changelist.metadata.contextType === "item") {
         return {
           ...changelist.toJSON(),
-          document: await Item.findOne({ id: changelist.metadata.contextId }).exec(),
+          document: await Item.findOne({
+            id: changelist.metadata.contextId,
+          }).exec(),
         };
       }
 
       if (changelist.metadata.contextType === "asset") {
         return {
           ...changelist.toJSON(),
-          document: await Asset.findOne({ id: changelist.metadata.contextId }).exec(),
+          document: await Asset.findOne({
+            id: changelist.metadata.contextId,
+          }).exec(),
         };
       }
 
@@ -1924,7 +1930,7 @@ app.get("/:id/tops", async (c) => {
     });
   }
 
-  const positions = await GamePosition.find({ 
+  const positions = await GamePosition.find({
     offerId: id,
   });
 
@@ -2072,8 +2078,9 @@ app.post("/:id/reviews", epic, async (c) => {
     Omit<IReview, "id" | "createdAt" | "verified" | "userId">
   >();
   const epic = c.var.epic;
+  const session = c.var.session;
 
-  if (!epic || !epic.account_id) {
+  if ((!epic || !epic.account_id) && !session) {
     c.status(401);
     return c.json({
       message: "Unauthorized",
@@ -2089,7 +2096,7 @@ app.post("/:id/reviews", epic, async (c) => {
 
   // Check if the user already reviewed the product
   const existingReview = await Review.findOne({
-    userId: epic.account_id,
+    userId: session?.user?.email.split("@")[0] ?? epic?.account_id,
     id,
   });
 
@@ -2121,12 +2128,13 @@ app.post("/:id/reviews", epic, async (c) => {
     });
   }
 
-  const isOwned = epic.account_id
-    ? await verifyGameOwnership(
-        epic.account_id,
-        product._id as unknown as string
-      )
-    : false;
+  const isOwned =
+    session?.user?.email.split("@")[0] ?? epic?.account_id
+      ? await verifyGameOwnership(
+          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+          product._id as unknown as string
+        )
+      : false;
 
   const review: IReview = {
     id,
@@ -2135,7 +2143,7 @@ app.post("/:id/reviews", epic, async (c) => {
     content: body.content,
     tags: body.tags.slice(0, 5),
     verified: isOwned,
-    userId: epic.account_id,
+    userId: (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
     createdAt: new Date(),
     recommended: body.recommended,
     updatedAt: new Date(),
@@ -2155,8 +2163,9 @@ app.patch("/:id/reviews", epic, async (c) => {
   const { id } = c.req.param();
   const body = await c.req.json<Omit<IReview, "id" | "createdAt" | "userId">>();
   const epic = c.var.epic;
+  const session = c.var.session;
 
-  if (!epic || !epic.account_id) {
+  if ((!epic || !epic.account_id) && !session) {
     c.status(401);
     return c.json({
       message: "Unauthorized",
@@ -2179,15 +2188,16 @@ app.patch("/:id/reviews", epic, async (c) => {
     });
   }
 
-  const isOwned = epic.account_id
+  const isOwned = ((session?.user?.email.split("@")[0] ??
+    epic?.account_id) as string)
     ? await verifyGameOwnership(
-        epic.account_id,
+        (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
         product._id as unknown as string
       )
     : false;
 
   const oldReview = await Review.findOne({
-    userId: epic.account_id,
+    userId: (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
     id,
   });
 
@@ -2221,7 +2231,8 @@ app.patch("/:id/reviews", epic, async (c) => {
 
   await Review.findOneAndUpdate(
     {
-      userId: epic.account_id,
+      userId: (session?.user?.email.split("@")[0] ??
+        epic?.account_id) as string,
       id,
     },
     review
@@ -2238,15 +2249,16 @@ app.patch("/:id/reviews", epic, async (c) => {
 app.delete("/:id/reviews", epic, async (c) => {
   const { id } = c.req.param();
   const epic = c.var.epic;
+  const session = c.var.session;
 
-  if (!epic || !epic.account_id) {
+  if ((!epic || !epic.account_id) && !session) {
     c.status(401);
     return c.json({
       message: "Unauthorized",
     });
   }
   const review = await Review.findOne({
-    userId: epic.account_id,
+    userId: (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
     id,
   });
 
@@ -2258,7 +2270,7 @@ app.delete("/:id/reviews", epic, async (c) => {
   }
 
   await Review.deleteOne({
-    userId: epic.account_id,
+    userId: (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
     id,
   });
 
@@ -2338,8 +2350,9 @@ app.get("/:id/reviews-summary", async (c) => {
 app.get("/:id/reviews/permissions", epic, async (c) => {
   const { id } = c.req.param();
   const epic = c.var.epic;
+  const session = c.var.session;
 
-  if (!epic || !epic.account_id) {
+  if ((!epic || !epic.account_id) && !session) {
     c.status(401);
     return c.json({
       message: "Unauthorized",
@@ -2347,7 +2360,7 @@ app.get("/:id/reviews/permissions", epic, async (c) => {
   }
 
   const existingReview = await Review.findOne({
-    userId: epic.account_id,
+    userId: session?.user?.email.split("@")[0] ?? epic?.account_id,
     id,
   });
 
@@ -2357,10 +2370,11 @@ app.get("/:id/reviews/permissions", epic, async (c) => {
 });
 
 app.get("/:id/ownership", epic, async (c) => {
-  const epic = c.var.epic;
   const { id } = c.req.param();
+  const epic = c.var.epic;
+  const session = c.var.session;
 
-  if (!epic || !epic.account_id) {
+  if ((!epic || !epic.account_id) && !session) {
     c.status(401);
     return c.json({
       message: "Unauthorized",
@@ -2376,12 +2390,13 @@ app.get("/:id/ownership", epic, async (c) => {
     });
   }
 
-  const isOwned = epic.account_id
-    ? await verifyGameOwnership(
-        epic.account_id,
-        product._id as unknown as string
-      )
-    : false;
+  const isOwned =
+    session?.user?.email.split("@")[0] ?? epic?.account_id
+      ? await verifyGameOwnership(
+          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+          product._id as unknown as string
+        )
+      : false;
 
   return c.json({
     isOwned,
