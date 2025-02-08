@@ -1,13 +1,14 @@
-import { Hono } from 'hono';
-import { epicStoreClient } from '../clients/epic.js';
-import client from '../clients/redis.js';
-import type { AchievementsSummary } from '../types/get-user-achievements.js';
-import { db } from '../db/index.js';
-import { Sandbox } from '@egdata/core.schemas.sandboxes';
-import { Offer } from '@egdata/core.schemas.offers';
-import { AchievementSet } from '@egdata/core.schemas.achievements';
-import type { WithId } from 'mongodb';
-import type { AnyObject } from 'mongoose';
+import { Hono } from "hono";
+import { epicStoreClient } from "../clients/epic.js";
+import client from "../clients/redis.js";
+import type { AchievementsSummary } from "../types/get-user-achievements.js";
+import { db } from "../db/index.js";
+import { Sandbox } from "@egdata/core.schemas.sandboxes";
+import { Offer } from "@egdata/core.schemas.offers";
+import { AchievementSet } from "@egdata/core.schemas.achievements";
+import type { WithId } from "mongodb";
+import type { AnyObject } from "mongoose";
+import { auth } from "../utils/auth.js";
 
 export interface PlayerProductAchievements {
   _id: Id;
@@ -75,8 +76,8 @@ type SingleAchievement = {
 
 const app = new Hono();
 
-app.get('/sitemap.xml', async (c) => {
-  const profiles = await db.db.collection('epic').find({}).toArray();
+app.get("/sitemap.xml", async (c) => {
+  const profiles = await db.db.collection("epic").find({}).toArray();
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -85,25 +86,85 @@ app.get('/sitemap.xml', async (c) => {
       (profile) =>
         `<url>
           <loc>https://egdata.app/profile/${profile.accountId}</loc>
-        </url>`
+        </url>`,
     )
-    .join('\n')}
+    .join("\n")}
 </urlset>`;
 
   return c.text(sitemap, {
     headers: {
-      'Content-Type': 'application/xml',
+      "Content-Type": "application/xml",
     },
   });
 });
 
-app.get('/:id', async (c) => {
+app.get("/me", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+
+  if (!session) {
+    c.status(401);
+    return c.json({
+      message: "Unauthorized",
+    });
+  }
+
+  const { user } = session;
+
+  const { email } = user;
+
+  const id = email.split("@")[0];
+
+  const profile = await epicStoreClient.getUser(id);
+  const dbProfile = await db.db.collection("epic").findOne({
+    accountId: id,
+  });
+
+  if (dbProfile && !dbProfile.creationDate) {
+    dbProfile.creationDate = new Date();
+    await db.db.collection("epic").updateOne(
+      {
+        accountId: id,
+      },
+      {
+        $set: {
+          creationDate: dbProfile.creationDate,
+        },
+      },
+    );
+  }
+
+  if (!profile) {
+    c.status(404);
+    return c.json({
+      message: "Profile not found",
+    });
+  }
+
+  const result = {
+    ...profile,
+    avatar: {
+      small: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.small,
+      medium: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.medium,
+      large: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.large,
+    },
+    linkedAccounts: dbProfile?.linkedAccounts,
+    creationDate: dbProfile?.creationDate,
+  };
+
+  return c.json(result, {
+    headers: {
+      "Cache-Control": "public, max-age=60",
+    },
+  });
+});
+
+app.get("/:id", async (c) => {
   const { id } = c.req.param();
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -114,20 +175,20 @@ app.get('/:id', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
 
   try {
     const profile = await epicStoreClient.getUser(id);
-    const dbProfile = await db.db.collection('epic').findOne({
+    const dbProfile = await db.db.collection("epic").findOne({
       accountId: id,
     });
 
     if (dbProfile && !dbProfile.creationDate) {
       dbProfile.creationDate = new Date();
-      await db.db.collection('epic').updateOne(
+      await db.db.collection("epic").updateOne(
         {
           accountId: id,
         },
@@ -135,23 +196,23 @@ app.get('/:id', async (c) => {
           $set: {
             creationDate: dbProfile.creationDate,
           },
-        }
+        },
       );
     }
 
     const reviewsCount = await db.db
-      .collection('reviews')
+      .collection("reviews")
       .countDocuments({ userId: id });
 
     if (!profile) {
       c.status(404);
       return c.json({
-        message: 'Profile not found',
+        message: "Profile not found",
       });
     }
 
     const savedPlayerAchievements = await db.db
-      .collection('player-achievements')
+      .collection("player-achievements")
       .find<PlayerProductAchievements>({ epicAccountId: id })
       .toArray();
 
@@ -163,17 +224,17 @@ app.get('/:id', async (c) => {
           const sandbox = await Sandbox.findOne({ _id: entry.sandboxId });
 
           if (!sandbox) {
-            console.error('Sandbox not found', entry.sandboxId);
+            console.error("Sandbox not found", entry.sandboxId);
             return;
           }
 
           const [product, offer, achievementsSets] = await Promise.all([
             db.db
-              .collection('products')
+              .collection("products")
               .findOne({ _id: sandbox?.parent as unknown as Id }),
             Offer.findOne({
               namespace: entry.sandboxId,
-              offerType: 'BASE_GAME',
+              offerType: "BASE_GAME",
             }),
             AchievementSet.find({
               sandboxId: entry.sandboxId,
@@ -185,8 +246,8 @@ app.get('/:id', async (c) => {
           }
 
           achievements.push({
-            __typename: 'AchievementsSummaryResponseSuccess',
-            status: '200',
+            __typename: "AchievementsSummaryResponseSuccess",
+            status: "200",
             data: {
               playerAwards: entry.playerAwards,
               totalXP: entry.totalXP,
@@ -204,24 +265,24 @@ app.get('/:id', async (c) => {
               productAchievements: {
                 totalAchievements: achievementsSets.reduce(
                   (acc, curr) => acc + curr.achievements.length,
-                  0
+                  0,
                 ),
                 totalProductXP: achievementsSets.reduce(
                   (acc, curr) =>
                     acc +
                     curr.achievements.reduce((acc, curr) => acc + curr.xp, 0),
-                  0
+                  0,
                 ),
               },
             },
           });
-        })
+        }),
       );
 
       const result = {
         ...profile,
         achievements: {
-          __typename: 'AchievementsSummaryResponse',
+          __typename: "AchievementsSummaryResponse",
           status: 200,
           data: achievements.map((achievement) => achievement.data),
         },
@@ -241,7 +302,7 @@ app.get('/:id', async (c) => {
 
       return c.json(result, {
         headers: {
-          'Cache-Control': 'public, max-age=60',
+          "Cache-Control": "public, max-age=60",
         },
       });
     }
@@ -267,25 +328,25 @@ app.get('/:id', async (c) => {
 
     return c.json(result, {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   } catch (err) {
-    console.error('Error fetching profile', err);
+    console.error("Error fetching profile", err);
     c.status(400);
     return c.json({
-      message: 'Failed to fetch profile',
+      message: "Failed to fetch profile",
     });
   }
 });
 
-app.get('/:id/achievements/:sandboxId', async (c) => {
+app.get("/:id/achievements/:sandboxId", async (c) => {
   const { id, sandboxId } = c.req.param();
 
   if (!id || !sandboxId) {
     c.status(400);
     return c.json({
-      message: 'Missing id or sandboxId parameter',
+      message: "Missing id or sandboxId parameter",
     });
   }
 
@@ -296,13 +357,13 @@ app.get('/:id/achievements/:sandboxId', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
 
   const playerAchievements = await db.db
-    .collection('player-achievements')
+    .collection("player-achievements")
     .find<PlayerProductAchievements>({
       epicAccountId: id,
       sandboxId: sandboxId,
@@ -310,7 +371,7 @@ app.get('/:id/achievements/:sandboxId', async (c) => {
     .toArray();
 
   const achievementsSets = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId)
+    p.achievementSets.map((a) => a.achievementSetId),
   );
 
   const dedupedAchievementsSets = [...new Set(achievementsSets)];
@@ -327,13 +388,13 @@ app.get('/:id/achievements/:sandboxId', async (c) => {
   });
 });
 
-app.get('/:id/rare-achievements', async (c) => {
+app.get("/:id/rare-achievements", async (c) => {
   const { id } = c.req.param();
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -344,21 +405,21 @@ app.get('/:id/rare-achievements', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
 
   // Get all the achievements for the player
   const playerAchievements = await db.db
-    .collection('player-achievements')
+    .collection("player-achievements")
     .find<PlayerProductAchievements>({
       epicAccountId: id,
     })
     .toArray();
 
   const achievementsSetsIds = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId)
+    p.achievementSets.map((a) => a.achievementSetId),
   );
 
   const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
@@ -375,16 +436,16 @@ app.get('/:id/rare-achievements', async (c) => {
       ...achievement.toObject(),
       achievementSetId: set.achievementSetId, // Inject achievementSetId
       sandboxId: set.sandboxId, // Inject sandboxId
-    }))
+    })),
   );
 
   // Sort by rarity (completedPercent)
   const sortedAchievements = allAchievements.sort(
-    (a, b) => a.completedPercent - b.completedPercent
+    (a, b) => a.completedPercent - b.completedPercent,
   );
 
   const allPlayerAchievements = playerAchievements.flatMap(
-    (p) => p.playerAchievements
+    (p) => p.playerAchievements,
   );
 
   const result: (AchievementType & {
@@ -397,7 +458,7 @@ app.get('/:id/rare-achievements', async (c) => {
     const playerAchievement = allPlayerAchievements.find(
       (p) =>
         p.playerAchievement.achievementName === achievement.name &&
-        p.playerAchievement.achievementSetId === achievement.achievementSetId
+        p.playerAchievement.achievementSetId === achievement.achievementSetId,
     );
 
     if (!playerAchievement) {
@@ -417,13 +478,13 @@ app.get('/:id/rare-achievements', async (c) => {
     namespace: {
       $in: response.map((r) => r.sandboxId),
     },
-    offerType: ['BASE_GAME', 'DLC'],
+    offerType: ["BASE_GAME", "DLC"],
     prePurchase: { $ne: true },
   });
 
   const selectedAchievements = response.map((r) => {
     const offer = offers
-      .sort((a, b) => (a.offerType === 'BASE_GAME' ? -1 : 1))
+      .sort((a, b) => (a.offerType === "BASE_GAME" ? -1 : 1))
       .find((o) => o.namespace === r.sandboxId);
     return {
       ...r,
@@ -437,18 +498,18 @@ app.get('/:id/rare-achievements', async (c) => {
 
   return c.json(selectedAchievements, {
     headers: {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     },
   });
 });
 
-app.get('/:id/rare-achievements/:sandboxId', async (c) => {
+app.get("/:id/rare-achievements/:sandboxId", async (c) => {
   const { id, sandboxId } = c.req.param();
 
   if (!id || !sandboxId) {
     c.status(400);
     return c.json({
-      message: 'Missing id or sandboxId parameter',
+      message: "Missing id or sandboxId parameter",
     });
   }
 
@@ -459,14 +520,14 @@ app.get('/:id/rare-achievements/:sandboxId', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
 
   // Get all the achievements for the player
   const playerAchievements = await db.db
-    .collection('player-achievements')
+    .collection("player-achievements")
     .find<PlayerProductAchievements>({
       epicAccountId: id,
       sandboxId: sandboxId,
@@ -474,7 +535,7 @@ app.get('/:id/rare-achievements/:sandboxId', async (c) => {
     .toArray();
 
   const achievementsSetsIds = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId)
+    p.achievementSets.map((a) => a.achievementSetId),
   );
 
   const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
@@ -494,22 +555,22 @@ app.get('/:id/rare-achievements/:sandboxId', async (c) => {
       unlocked: playerAchievements
         .find((p) =>
           p.playerAchievements.some(
-            (pa) => pa.playerAchievement.achievementName === achievement.name
-          )
+            (pa) => pa.playerAchievement.achievementName === achievement.name,
+          ),
         )
         ?.playerAchievements.find(
-          (pa) => pa.playerAchievement.achievementName === achievement.name
+          (pa) => pa.playerAchievement.achievementName === achievement.name,
         )?.playerAchievement.unlocked,
       unlockDate: playerAchievements
         .find((p) =>
           p.playerAchievements.some(
-            (pa) => pa.playerAchievement.achievementName === achievement.name
-          )
+            (pa) => pa.playerAchievement.achievementName === achievement.name,
+          ),
         )
         ?.playerAchievements.find(
-          (pa) => pa.playerAchievement.achievementName === achievement.name
+          (pa) => pa.playerAchievement.achievementName === achievement.name,
         )?.playerAchievement.unlockDate,
-    }))
+    })),
   );
 
   // Sort by rarity (completedPercent)
@@ -525,21 +586,21 @@ app.get('/:id/rare-achievements/:sandboxId', async (c) => {
 
   return c.json(selectedAchievements, {
     headers: {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     },
   });
 });
 
-app.get('/:id/achievements', async (c) => {
+app.get("/:id/achievements", async (c) => {
   const { id } = c.req.param();
-  const limit = Math.min(Number.parseInt(c.req.query('limit') ?? '25'), 100);
-  const page = Math.min(Number.parseInt(c.req.query('page') ?? '1'), 100);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") ?? "25"), 100);
+  const page = Math.min(Number.parseInt(c.req.query("page") ?? "1"), 100);
   const skip = (page - 1) * limit;
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -550,14 +611,14 @@ app.get('/:id/achievements', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
 
   const [playerUnlockedAchievements, count] = await Promise.all([
     db.db
-      .collection('player-achievements')
+      .collection("player-achievements")
       .aggregate([
         {
           $match: {
@@ -565,34 +626,34 @@ app.get('/:id/achievements', async (c) => {
           },
         },
         {
-          $unwind: '$playerAchievements',
+          $unwind: "$playerAchievements",
         },
         {
           $match: {
-            'playerAchievements.playerAchievement.unlocked': true,
+            "playerAchievements.playerAchievement.unlocked": true,
           },
         },
         {
           $addFields: {
-            unlockDate: '$playerAchievements.playerAchievement.unlockDate',
+            unlockDate: "$playerAchievements.playerAchievement.unlockDate",
           },
         },
         {
           $group: {
             _id: {
               achievementName:
-                '$playerAchievements.playerAchievement.achievementName',
-              sandboxId: '$playerAchievements.playerAchievement.sandboxId',
+                "$playerAchievements.playerAchievement.achievementName",
+              sandboxId: "$playerAchievements.playerAchievement.sandboxId",
             },
             doc: {
-              $first: '$$ROOT',
+              $first: "$$ROOT",
             },
-            latestUnlockDate: { $max: '$unlockDate' },
+            latestUnlockDate: { $max: "$unlockDate" },
           },
         },
         {
           $replaceRoot: {
-            newRoot: '$doc',
+            newRoot: "$doc",
           },
         },
         {
@@ -602,43 +663,43 @@ app.get('/:id/achievements', async (c) => {
         },
         {
           $lookup: {
-            from: 'achievementsets',
+            from: "achievementsets",
             let: {
               achievementName:
-                '$playerAchievements.playerAchievement.achievementName',
-              sandboxId: '$playerAchievements.playerAchievement.sandboxId',
+                "$playerAchievements.playerAchievement.achievementName",
+              sandboxId: "$playerAchievements.playerAchievement.sandboxId",
             },
             pipeline: [
               {
                 $match: {
                   $expr: {
-                    $eq: ['$sandboxId', '$$sandboxId'],
+                    $eq: ["$sandboxId", "$$sandboxId"],
                   },
                 },
               },
               {
-                $unwind: '$achievements',
+                $unwind: "$achievements",
               },
               {
                 $match: {
                   $expr: {
-                    $eq: ['$achievements.name', '$$achievementName'],
+                    $eq: ["$achievements.name", "$$achievementName"],
                   },
                 },
               },
               {
                 $project: {
                   _id: 0,
-                  achievementDetails: '$achievements',
+                  achievementDetails: "$achievements",
                 },
               },
             ],
-            as: 'achievementDetails',
+            as: "achievementDetails",
           },
         },
         {
           $unwind: {
-            path: '$achievementDetails',
+            path: "$achievementDetails",
             preserveNullAndEmptyArrays: false,
           },
         },
@@ -646,12 +707,12 @@ app.get('/:id/achievements', async (c) => {
           $project: {
             _id: 0,
             achievementName:
-              '$playerAchievements.playerAchievement.achievementName',
-            unlockDate: '$playerAchievements.playerAchievement.unlockDate',
-            XP: '$playerAchievements.playerAchievement.XP',
-            sandboxId: '$playerAchievements.playerAchievement.sandboxId',
-            isBase: '$playerAchievements.playerAchievement.isBase',
-            achievementDetails: '$achievementDetails.achievementDetails',
+              "$playerAchievements.playerAchievement.achievementName",
+            unlockDate: "$playerAchievements.playerAchievement.unlockDate",
+            XP: "$playerAchievements.playerAchievement.XP",
+            sandboxId: "$playerAchievements.playerAchievement.sandboxId",
+            isBase: "$playerAchievements.playerAchievement.isBase",
+            achievementDetails: "$achievementDetails.achievementDetails",
           },
         },
         { $skip: skip },
@@ -659,21 +720,21 @@ app.get('/:id/achievements', async (c) => {
       ])
       .toArray(),
     db.db
-      .collection('player-achievements')
+      .collection("player-achievements")
       .aggregate([
         { $match: { epicAccountId: id } },
-        { $unwind: '$playerAchievements' },
-        { $match: { 'playerAchievements.playerAchievement.unlocked': true } },
+        { $unwind: "$playerAchievements" },
+        { $match: { "playerAchievements.playerAchievement.unlocked": true } },
         {
           $group: {
             _id: {
               achievementName:
-                '$playerAchievements.playerAchievement.achievementName',
-              sandboxId: '$playerAchievements.playerAchievement.sandboxId',
+                "$playerAchievements.playerAchievement.achievementName",
+              sandboxId: "$playerAchievements.playerAchievement.sandboxId",
             },
           },
         },
-        { $count: 'count' },
+        { $count: "count" },
       ])
       .toArray(),
   ]);
@@ -682,13 +743,13 @@ app.get('/:id/achievements', async (c) => {
     namespace: {
       $in: playerUnlockedAchievements.map((r) => r.sandboxId),
     },
-    offerType: ['BASE_GAME', 'DLC'],
+    offerType: ["BASE_GAME", "DLC"],
     prePurchase: { $ne: true },
   });
 
   const selectedAchievements = playerUnlockedAchievements.map((r) => {
     const offer = offers
-      .sort((a, b) => (a.offerType === 'BASE_GAME' ? -1 : 1))
+      .sort((a, b) => (a.offerType === "BASE_GAME" ? -1 : 1))
       .find((o) => o.namespace === r.sandboxId);
     return {
       ...r.achievementDetails,
@@ -711,18 +772,18 @@ app.get('/:id/achievements', async (c) => {
 
   return c.json(result, {
     headers: {
-      'Cache-Control': 'public, max-age=60',
+      "Cache-Control": "public, max-age=60",
     },
   });
 });
 
-app.get('/:id/information', async (c) => {
+app.get("/:id/information", async (c) => {
   const { id } = c.req.param();
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -732,7 +793,7 @@ app.get('/:id/information', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
@@ -744,18 +805,18 @@ app.get('/:id/information', async (c) => {
     if (!profile) {
       c.status(404);
       return c.json({
-        message: 'Profile not found',
+        message: "Profile not found",
       });
     }
 
     // Fetch user profile from the database
-    const dbProfile = await db.db.collection('epic').findOne({
+    const dbProfile = await db.db.collection("epic").findOne({
       accountId: id,
     });
 
     if (dbProfile && !dbProfile.creationDate) {
       dbProfile.creationDate = new Date();
-      await db.db.collection('epic').updateOne(
+      await db.db.collection("epic").updateOne(
         {
           accountId: id,
         },
@@ -763,13 +824,13 @@ app.get('/:id/information', async (c) => {
           $set: {
             creationDate: dbProfile.creationDate,
           },
-        }
+        },
       );
     }
 
     // Manually calculate stats by iterating through achievements
     const playerAchievements = await db.db
-      .collection('player-achievements')
+      .collection("player-achievements")
       .find({ epicAccountId: id })
       .toArray();
 
@@ -783,7 +844,7 @@ app.get('/:id/information', async (c) => {
     for (const achievement of playerAchievements) {
       if (
         !singleAchievementsLists.find(
-          (a) => a.sandboxId === achievement.sandboxId
+          (a) => a.sandboxId === achievement.sandboxId,
         )
       ) {
         singleAchievementsLists.push(achievement);
@@ -804,7 +865,7 @@ app.get('/:id/information', async (c) => {
 
     // Fetch reviews count
     const reviewsCount = await db.db
-      .collection('reviews')
+      .collection("reviews")
       .countDocuments({ userId: id });
 
     // Construct the result object
@@ -832,21 +893,21 @@ app.get('/:id/information', async (c) => {
 
     return c.json(result, {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   } catch (err) {
-    console.error('Error fetching profile', err);
+    console.error("Error fetching profile", err);
     c.status(400);
     return c.json({
-      message: 'Failed to fetch profile',
+      message: "Failed to fetch profile",
     });
   }
 });
 
-app.get('/:id/games', async (c) => {
+app.get("/:id/games", async (c) => {
   const { id } = c.req.param();
-  const { page = '1', limit = '10' } = c.req.query();
+  const { page = "1", limit = "10" } = c.req.query();
 
   const pageNum = Number.parseInt(page, 10);
   const limitNum = Number.parseInt(limit, 10);
@@ -854,7 +915,7 @@ app.get('/:id/games', async (c) => {
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
@@ -864,7 +925,7 @@ app.get('/:id/games', async (c) => {
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
@@ -876,13 +937,13 @@ app.get('/:id/games', async (c) => {
     if (!profile) {
       c.status(404);
       return c.json({
-        message: 'Profile not found',
+        message: "Profile not found",
       });
     }
 
     // Fetch paginated achievements
     const savedPlayerAchievementsCursor = db.db
-      .collection('player-achievements')
+      .collection("player-achievements")
       .find({ epicAccountId: id })
       .sort({ totalXP: -1, _id: 1 })
       .skip((pageNum - 1) * limitNum)
@@ -893,7 +954,7 @@ app.get('/:id/games', async (c) => {
 
     // Fetch total number of games for pagination
     const totalGames = await db.db
-      .collection('player-achievements')
+      .collection("player-achievements")
       .countDocuments({ epicAccountId: id });
 
     const achievements: SingleAchievement[] = [];
@@ -904,17 +965,17 @@ app.get('/:id/games', async (c) => {
           const sandbox = await Sandbox.findOne({ _id: entry.sandboxId });
 
           if (!sandbox) {
-            console.error('Sandbox not found', entry.sandboxId);
+            console.error("Sandbox not found", entry.sandboxId);
             return;
           }
 
           const [product, offer, achievementsSets] = await Promise.all([
             db.db
-              .collection('products')
+              .collection("products")
               .findOne({ _id: sandbox?.parent as unknown as Id }),
             Offer.findOne({
               namespace: entry.sandboxId,
-              offerType: 'BASE_GAME',
+              offerType: "BASE_GAME",
             }),
             AchievementSet.find({
               sandboxId: entry.sandboxId,
@@ -942,24 +1003,24 @@ app.get('/:id/games', async (c) => {
             productAchievements: {
               totalAchievements: achievementsSets.reduce(
                 (acc, curr) => acc + curr.achievements.length,
-                0
+                0,
               ),
               totalProductXP: achievementsSets.reduce(
                 (acc, curr) =>
                   acc +
                   curr.achievements.reduce((acc, curr) => acc + curr.xp, 0),
-                0
+                0,
               ),
             },
           });
-        })
+        }),
       );
     }
 
     // Deduplicate based on sandboxId after assembling achievements
     const deduplicatedAchievements = achievements.filter(
       (achievement, index, self) =>
-        index === self.findIndex((t) => t.sandboxId === achievement.sandboxId)
+        index === self.findIndex((t) => t.sandboxId === achievement.sandboxId),
     );
 
     // Construct the result object
@@ -979,37 +1040,37 @@ app.get('/:id/games', async (c) => {
 
     return c.json(result, {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   } catch (err) {
-    console.error('Error fetching achievements', err);
+    console.error("Error fetching achievements", err);
     c.status(400);
     return c.json({
-      message: 'Failed to fetch achievements',
+      message: "Failed to fetch achievements",
     });
   }
 });
 
-app.get('/:id/random-game', async (c) => {
+app.get("/:id/random-game", async (c) => {
   const { id } = c.req.param();
   const { sandbox } = c.req.query();
 
   if (!id) {
     c.status(400);
     return c.json({
-      message: 'Missing id parameter',
+      message: "Missing id parameter",
     });
   }
 
   // Update the cache key to include the sandbox if provided
-  const cacheKey = `epic-profile:${id}:random-game:${sandbox || 'random'}`;
+  const cacheKey = `epic-profile:${id}:random-game:${sandbox || "random"}`;
 
   const cached = await client.get(cacheKey);
   if (cached) {
     return c.json(JSON.parse(cached), {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   }
@@ -1021,7 +1082,7 @@ app.get('/:id/random-game', async (c) => {
     if (!profile) {
       c.status(404);
       return c.json({
-        message: 'Profile not found',
+        message: "Profile not found",
       });
     }
 
@@ -1030,25 +1091,25 @@ app.get('/:id/random-game', async (c) => {
     if (sandbox) {
       // Override random logic: fetch the achievement for the provided sandbox
       savedPlayerAchievement = await db.db
-        .collection('player-achievements')
+        .collection("player-achievements")
         .findOne({ epicAccountId: id, sandboxId: sandbox });
     } else {
       // Fetch a random achievement
       const totalAchievements = await db.db
-        .collection('player-achievements')
+        .collection("player-achievements")
         .countDocuments({ epicAccountId: id });
 
       if (totalAchievements === 0) {
         c.status(404);
         return c.json({
-          message: 'No achievements found for this user',
+          message: "No achievements found for this user",
         });
       }
 
       const randomSkip = Math.floor(Math.random() * totalAchievements);
 
       const savedPlayerAchievements = await db.db
-        .collection('player-achievements')
+        .collection("player-achievements")
         .find({ epicAccountId: id })
         .skip(randomSkip)
         .limit(1)
@@ -1060,7 +1121,7 @@ app.get('/:id/random-game', async (c) => {
     if (!savedPlayerAchievement) {
       c.status(404);
       return c.json({
-        message: 'No achievements found for this user in the specified sandbox',
+        message: "No achievements found for this user in the specified sandbox",
       });
     }
 
@@ -1070,23 +1131,23 @@ app.get('/:id/random-game', async (c) => {
     });
 
     if (!sandboxData) {
-      console.error('Sandbox not found', savedPlayerAchievement.sandboxId);
+      console.error("Sandbox not found", savedPlayerAchievement.sandboxId);
       c.status(404);
       return c.json({
-        message: 'Sandbox not found',
+        message: "Sandbox not found",
       });
     }
 
     // Fetch the offer
     const offer = await Offer.findOne({
       namespace: savedPlayerAchievement.sandboxId,
-      offerType: 'BASE_GAME',
+      offerType: "BASE_GAME",
     });
 
     if (!offer) {
       c.status(404);
       return c.json({
-        message: 'Offer not found',
+        message: "Offer not found",
       });
     }
 
@@ -1099,14 +1160,14 @@ app.get('/:id/random-game', async (c) => {
 
     return c.json(result, {
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "public, max-age=60",
       },
     });
   } catch (err) {
-    console.error('Error fetching offer', err);
+    console.error("Error fetching offer", err);
     c.status(400);
     return c.json({
-      message: 'Failed to fetch offer',
+      message: "Failed to fetch offer",
     });
   }
 });
