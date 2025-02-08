@@ -114,6 +114,18 @@ app.get("/me", async (c) => {
 
   const id = email.split("@")[0];
 
+  const cacheKey = `epic-me:${id}`;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), {
+      headers: {
+        "Cache-Control": "public, max-age=60",
+      },
+    });
+  }
+
   const profile = await epicStoreClient.getUser(id);
   const dbProfile = await db.db.collection("epic").findOne({
     accountId: id,
@@ -150,6 +162,10 @@ app.get("/me", async (c) => {
     linkedAccounts: dbProfile?.linkedAccounts,
     creationDate: dbProfile?.creationDate,
   };
+
+  await client.set(cacheKey, JSON.stringify(result), {
+    EX: 60,
+  });
 
   return c.json(result, {
     headers: {
