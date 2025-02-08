@@ -70,11 +70,13 @@ export const epic = createMiddleware<EpicAuthMiddleware>(async (c, next) => {
     return next();
   }
 
+  console.log("No session found");
+
   // Get the authorization header or cookie "EPIC_AUTH"
   let epicAuth = c.req.header("Authorization") || getCookie(c, "EPIC_AUTH");
 
   if (!epicAuth) {
-    console.error("Missing EPIC_AUTH header or cookie");
+    console.error("Missing EPIC_AUTH header or cookie", c.req.url);
     return c.json({ error: "Missing EPIC_AUTH header or cookie" }, 401);
   }
 

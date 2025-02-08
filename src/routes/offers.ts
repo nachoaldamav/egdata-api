@@ -1998,6 +1998,7 @@ app.get("/:id/polls", async (c) => {
 
 app.get("/:id/reviews", epicInfo, async (c) => {
   const epic = c.var.epic;
+  const session = c.var.session;
   const { id } = c.req.param();
   const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 25);
@@ -2005,7 +2006,7 @@ app.get("/:id/reviews", epicInfo, async (c) => {
 
   const verifiedFilter = c.req.query("verified");
 
-  const currentUser = epic?.account_id;
+  const currentUser = session?.user?.email.split("@")[0] ?? epic?.account_id;
 
   const query: any = {
     id: id,
