@@ -18,4 +18,4 @@ WORKDIR /app
 COPY --from=build /app/ /app/
 EXPOSE 4000
 
-CMD [ "pnpm", "start" ]
+CMD [ "node", "--enable-source-maps" ,"dist/index.js" ]
