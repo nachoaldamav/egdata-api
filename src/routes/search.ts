@@ -578,6 +578,9 @@ app.get("/changelog", async (c) => {
   // Remove contextType = 'file' from the results
   filter.push(`metadata.contextType != "file"`);
 
+  // Remove contextType = 'achievements' from the results
+  filter.push(`metadata.contextType != "achievements"`);
+
   const changelogs = await meiliSearchClient.index("changelog").search<
     ChangelogType & {
       document: unknown;

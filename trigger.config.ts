@@ -14,5 +14,6 @@ export default defineConfig({
       randomize: true,
     },
   },
+  maxDuration: 240,
   dirs: ["./src/trigger"],
 });
