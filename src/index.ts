@@ -88,9 +88,14 @@ app.use("/*", etag());
 app.use(
   rateLimiter({
     limit: 1000,
+    windowMs: 30 * 1000,
     standardHeaders: "draft-6",
     keyGenerator: (c) => "egdata-api",
     skip(c) {
+      console.log("Checking rate limit", {
+        ip: c.req.header("CF-Connecting-IP"),
+        referer: c.req.header("Referer"),
+      });
       // If the referer is 'egdata.app', skip rate limiting
       if (c.req.header("Referer") === "https://egdata.app") {
         return false;
