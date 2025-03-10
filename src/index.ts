@@ -94,7 +94,7 @@ app.use(
     skip(c) {
       // If the referer is 'egdata.app', skip rate limiting
       if (c.req.header("Referer") === "https://egdata.app/") {
-        return false;
+        return true;
       }
 
       return c.req.header("CF-Connecting-IP") === process.env.SERVER_IP;
