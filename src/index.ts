@@ -87,8 +87,7 @@ app.use("/*", etag());
 
 app.use(
   rateLimiter({
-    windowMs: 1 * 60 * 1000,
-    limit: 100,
+    limit: 1000,
     standardHeaders: "draft-6",
     keyGenerator: (c) => "egdata-api",
     skip(c) {
