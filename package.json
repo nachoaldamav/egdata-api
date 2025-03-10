@@ -41,6 +41,7 @@
     "dotenv": "16.4.5",
     "graphql-request": "^7.1.0",
     "hono": "4.6.20",
+    "hono-rate-limiter": "^0.4.2",
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.6",
     "meilisearch": "^0.41.0",

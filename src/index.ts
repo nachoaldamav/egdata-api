@@ -46,6 +46,7 @@ import { Seller } from "@egdata/core.schemas.sellers";
 import jwt from "jsonwebtoken";
 import { readFileSync } from "node:fs";
 import chalk from "chalk";
+import { rateLimiter } from "hono-rate-limiter";
 
 config();
 
@@ -84,14 +85,29 @@ app.use(
 
 app.use("/*", etag());
 
+app.use(
+  rateLimiter({
+    windowMs: 1 * 60 * 1000,
+    limit: 100,
+    standardHeaders: "draft-6",
+    keyGenerator: (c) => "egdata-api",
+    skip(c) {
+      // If the referer is 'egdata.app', skip rate limiting
+      if (c.req.header("Referer") === "https://egdata.app") {
+        return false;
+      }
+
+      return c.req.header("CF-Connecting-IP") === process.env.SERVER_IP;
+    },
+  })
+);
+
 app.get(
   "/ui",
   swaggerUI({
     url: "/doc",
   })
 );
-
-// app.use(logger());
 
 app.get("/health", (c) => {
   return c.json({
