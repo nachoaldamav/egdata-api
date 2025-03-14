@@ -622,15 +622,15 @@ app.get("/:id/achievements", async (c) => {
 
   const cacheKey = `epic-profile:${id}:achievements:${limit}:${page}:v0.3`;
 
-  const cached = await client.get(cacheKey);
+  // const cached = await client.get(cacheKey);
 
-  if (cached) {
-    return c.json(JSON.parse(cached), {
-      headers: {
-        "Cache-Control": "public, max-age=60",
-      },
-    });
-  }
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), {
+  //     headers: {
+  //       "Cache-Control": "public, max-age=60",
+  //     },
+  //   });
+  // }
 
   const [playerUnlockedAchievements, count] = await Promise.all([
     db.db
@@ -937,14 +937,14 @@ app.get("/:id/games", async (c) => {
 
   const cacheKey = `epic-profile:${id}:games:page:${pageNum}:limit:${limitNum}`;
 
-  const cached = await client.get(cacheKey);
-  if (cached) {
-    return c.json(JSON.parse(cached), {
-      headers: {
-        "Cache-Control": "public, max-age=60",
-      },
-    });
-  }
+  // const cached = await client.get(cacheKey);
+  // if (cached) {
+  //   return c.json(JSON.parse(cached), {
+  //     headers: {
+  //       "Cache-Control": "public, max-age=60",
+  //     },
+  //   });
+  // }
 
   try {
     // Check if user exists
