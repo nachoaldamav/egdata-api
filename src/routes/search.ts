@@ -168,13 +168,13 @@ function buildPriceQuery(query: SearchBody): PriceQuery {
   const priceQuery: PriceQuery = {};
 
   if (query.price) {
-    if (query.price.min) {
+    if (query.price.min !== undefined && query.price.min !== null) {
       priceQuery["price.discountPrice"] = {
         $gte: query.price.min,
       };
     }
 
-    if (query.price.max) {
+    if (query.price.max !== undefined && query.price.max !== null) {
       priceQuery["price.discountPrice"] = {
         ...priceQuery["price.discountPrice"],
         $lte: query.price.max,
