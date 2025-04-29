@@ -65,6 +65,154 @@ interface SearchBody {
   excludeBlockchain?: boolean;
 }
 
+interface MongoQuery {
+  $text?: {
+    $search: string;
+    $language: string;
+  };
+  offerType?: string;
+  "tags.id"?: { $all: string[] } | { $ne: string };
+  customAttributes?: {
+    $elemMatch: { id: { $in: string[] } };
+  };
+  categories?: { $all: string[] };
+  $or?: Array<{ "seller.name": string } | { "seller.id": string }>;
+  refundType?: string;
+  isCodeRedemptionOnly?: boolean;
+  developerDisplayName?: string;
+  publisherDisplayName?: string;
+  "keyImages.url"?: { $regex: RegExp };
+  [key: string]: any;
+}
+
+interface PriceQuery {
+  "price.discountPrice"?: {
+    $gte?: number;
+    $lte?: number;
+  };
+  "price.discount"?: { $gt: number };
+}
+
+function buildBaseQuery(query: SearchBody): MongoQuery {
+  const mongoQuery: MongoQuery = {};
+
+  if (query.title) {
+    mongoQuery.$text = {
+      $search: query.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .split(" ")
+        .map((q) => `"${q.trim()}"`)
+        .join(" | "),
+      $language: "en",
+    };
+  }
+
+  if (query.offerType) {
+    mongoQuery.offerType = query.offerType;
+  }
+
+  if (query.tags) {
+    mongoQuery["tags.id"] = { $all: query.tags };
+  }
+
+  if (query.customAttributes) {
+    mongoQuery.customAttributes = {
+      $elemMatch: { id: { $in: query.customAttributes } },
+    };
+  }
+
+  if (query.categories) {
+    mongoQuery.categories = { $all: query.categories };
+  }
+
+  if (query.seller) {
+    mongoQuery.$or = [
+      { "seller.name": query.seller },
+      { "seller.id": query.seller }
+    ];
+  }
+
+  if (query.refundType) {
+    mongoQuery.refundType = query.refundType;
+  }
+
+  if (query.isCodeRedemptionOnly !== undefined) {
+    mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
+  }
+
+  if (query.excludeBlockchain) {
+    if (query.tags) {
+      mongoQuery["tags.id"].$ne = "21739";
+    } else {
+      mongoQuery["tags.id"] = { $ne: "21739" };
+    }
+  }
+
+  if (query.developerDisplayName) {
+    mongoQuery.developerDisplayName = query.developerDisplayName;
+  }
+
+  if (query.publisherDisplayName) {
+    mongoQuery.publisherDisplayName = query.publisherDisplayName;
+  }
+
+  if (query.spt) {
+    mongoQuery["keyImages.url"] = { $regex: /spt/i };
+  }
+
+  return mongoQuery;
+}
+
+function buildPriceQuery(query: SearchBody): PriceQuery {
+  const priceQuery: PriceQuery = {};
+
+  if (query.price) {
+    if (query.price.min) {
+      priceQuery["price.discountPrice"] = {
+        $gte: query.price.min,
+      };
+    }
+
+    if (query.price.max) {
+      priceQuery["price.discountPrice"] = {
+        ...priceQuery["price.discountPrice"],
+        $lte: query.price.max,
+      };
+    }
+  }
+
+  if (query.onSale || ["discount", "discountPercent"].includes(query.sortBy || "")) {
+    priceQuery["price.discount"] = { $gt: 0 };
+  }
+
+  return priceQuery;
+}
+
+function buildSortParams(query: SearchBody, sort: string, dir: number): Record<string, 1 | -1 | { $meta: string }> {
+  let sortParams: Record<string, 1 | -1 | { $meta: string }> = {};
+
+  if (query.title) {
+    sortParams = {
+      score: { $meta: "textScore" },
+    };
+  }
+
+  if (!["upcoming", "priceAsc", "priceDesc", "price", "discount", "discountPercent"].includes(sort)) {
+    sortParams[sort] = dir;
+  } else if (sort === "upcoming") {
+    sortParams = {
+      releaseDate: 1,
+    };
+  } else {
+    sortParams = {
+      lastModifiedDate: dir,
+    };
+  }
+
+  return sortParams;
+}
+
 const app = new Hono();
 
 app.get("/", (c) => c.json("Hello, World!"));
@@ -77,7 +225,6 @@ app.post("/", async (c) => {
 
   const selectedCountry = country ?? cookieCountry ?? "US";
 
-  // Get the region for the selected country
   const region =
     Object.keys(regions).find((r) =>
       regions[r].countries.includes(selectedCountry)
@@ -131,109 +278,25 @@ app.post("/", async (c) => {
   }
 
   const limit = Math.min(query.limit || 10, 50);
-
   const page = Math.max(query.page || 1, 1);
 
   let sort = query.sortBy || "lastModifiedDate";
   const sortDir = query.sortDir || "desc";
   const dir = sortDir === "asc" ? 1 : -1;
 
-  const sortQuery = {
-    lastModifiedDate: dir,
-    releaseDate: dir,
-    effectiveDate: dir,
-    creationDate: dir,
-    viewableDate: dir,
-    pcReleaseDate: dir,
-  };
+  const mongoQuery = buildBaseQuery(query);
+  const priceQuery = buildPriceQuery(query);
 
-  const mongoQuery: Record<string, any> = {};
-  const priceQuery: Record<string, any> = {};
-
-  if (query.title) {
-    mongoQuery["$text"] = {
-      $search: query.title
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, "")
-        .split(" ")
-        .map((q) => `"${q.trim()}"`)
-        .join(" | "),
-      $language: "en",
-    };
-
-    // Force the sort to be 'lastModifiedDate' if the title is provided
-    sort = "lastModifiedDate";
-  }
-
-  if (query.offerType) {
-    mongoQuery.offerType = query.offerType;
-  }
-
-  /**
-   * tags provided by the user are tags.id, so we just need to check the tags array of the offers to find the offers that have the tags
-   */
-  if (query.tags) {
-    mongoQuery["tags.id"] = { $all: query.tags };
-  }
-
-  if (query.customAttributes) {
-    mongoQuery.customAttributes = {
-      $elemMatch: { id: { $in: query.customAttributes } },
-    };
-  }
-
-  if (query.categories) {
-    mongoQuery["categories"] = { $all: query.categories };
-  }
-
-  /**
-   * The seller is the ID of the seller, so we just need to check the seller.id field in the offers
-   */
-  if (query.seller) {
-    mongoQuery["seller.id"] = query.seller;
-  }
-
-  if (query.refundType) {
-    mongoQuery.refundType = query.refundType;
-  }
-
-  if (query.isCodeRedemptionOnly !== undefined) {
-    mongoQuery.isCodeRedemptionOnly = query.isCodeRedemptionOnly;
-  }
-
-  if (query.excludeBlockchain) {
-    if (query.tags) {
-      mongoQuery["tags.id"].$ne = "21739";
-    } else {
-      mongoQuery["tags.id"] = { $ne: "21739" };
-    }
-  }
-
-  if (query.developerDisplayName) {
-    mongoQuery.developerDisplayName = query.developerDisplayName;
-  }
-
-  if (query.publisherDisplayName) {
-    mongoQuery.publisherDisplayName = query.publisherDisplayName;
-  }
-
-  if (query.spt) {
-    // To know if a offer is SPT ('Self Publishing Tools'), we need to check if in `keyImages[n].url` there is a string that contains `spt`
-    mongoQuery["keyImages.url"] = { $regex: /spt/i };
-  }
-
+  // Add date-based filters
   if (["effectiveDate", "creationDate", "viewableDate"].includes(sort)) {
-    // If any of those sorts are used, we need to ignore the offers that are from after 2090 (mock date for unknown dates)
     mongoQuery[sort] = { $lt: new Date("2090-01-01") };
   }
 
   if (["releaseDate", "pcReleaseDate"].includes(sort)) {
-    // If the sort is releaseDate or pcReleaseDate, we need to ignore the offers that are from after the current date
     mongoQuery[sort] = { $lte: new Date() };
   }
 
   if (["upcoming"].includes(sort)) {
-    // If the sort is upcoming, we need to ignore the offers that are from before the current date
     mongoQuery["releaseDate"] = {
       $gte: new Date(),
     };
@@ -243,68 +306,10 @@ app.post("/", async (c) => {
     mongoQuery.lastModifiedDate = { $lt: new Date() };
   }
 
-  if (query.price) {
-    if (query.price.min) {
-      priceQuery["price.discountPrice"] = {
-        $gte: query.price.min,
-      };
-    }
-
-    if (query.price.max) {
-      priceQuery["price.discountPrice"] = {
-        ...priceQuery["price.discountPrice"],
-        $lte: query.price.max,
-      };
-    }
-  }
-
-  if (query.onSale || ["discount", "discountPercent"].includes(sort)) {
-    priceQuery["price.discount"] = { $gt: 0 };
-  }
-
-  const sortingParams = () => {
-    let sortParams = {};
-
-    if (query.title) {
-      sortParams = {
-        score: { $meta: "textScore" },
-      };
-    }
-
-    if (
-      ![
-        "upcoming",
-        "priceAsc",
-        "priceDesc",
-        "price",
-        "discount",
-        "discountPercent",
-      ].includes(sort)
-    ) {
-      // @ts-expect-error
-      sortParams[sort] = sortQuery[sort];
-    } else if (sort === "upcoming") {
-      sortParams = {
-        releaseDate: 1,
-      };
-    } else {
-      sortParams = {
-        lastModifiedDate: dir,
-      };
-    }
-
-    return sortParams;
-  };
-
   let offersPipeline: PipelineStage[] = [];
   let collection = "offers";
 
-  if (
-    ["priceAsc", "priceDesc", "price", "discount", "discountPercent"].includes(
-      sort
-    )
-  ) {
-    // If sorting by price, start with the pricing collection
+  if (["priceAsc", "priceDesc", "price", "discount", "discountPercent"].includes(sort)) {
     let priceSortOrder: 1 | -1 =
       sort === "priceAsc" || sort === "priceDesc"
         ? sort === "priceAsc"
@@ -325,7 +330,6 @@ app.post("/", async (c) => {
     };
 
     if (sort === "discountPercent") {
-      // Revert the order if sorting by discount percentage
       priceSortOrder = priceSortOrder * -1;
     }
 
@@ -342,7 +346,6 @@ app.post("/", async (c) => {
           [sortKey()]: priceSortOrder,
         },
       },
-      // Move the root content (all of it) to the price field
       {
         $addFields: {
           price: "$$ROOT",
@@ -388,7 +391,6 @@ app.post("/", async (c) => {
       },
     ];
   } else {
-    // If not sorting by price, use the original pipeline
     offersPipeline = [
       {
         $match: mongoQuery,
@@ -396,7 +398,7 @@ app.post("/", async (c) => {
       {
         $sort: {
           ...(query.title ? { score: { $meta: "textScore" } } : {}),
-          ...sortingParams(),
+          ...buildSortParams(query, sort, dir),
         },
       },
       {
@@ -441,12 +443,11 @@ app.post("/", async (c) => {
 
   const dbColl = db.db.collection(collection);
 
-  const aggregation = await dbColl.aggregate(offersPipeline);
+  const aggregation = dbColl.aggregate(offersPipeline);
 
   const offersData = await aggregation.toArray();
 
   const result = {
-    // If sortBy is 'price and it's using title, we sort the page by the price direction
     elements: offersData.sort((a, b) => {
       if (query.sortBy === "price" && query.title) {
         if (sortDir === "asc") {
@@ -720,7 +721,10 @@ app.get("/:id/count", async (c) => {
   }
 
   if (query.seller) {
-    mongoQuery["seller.id"] = query.seller;
+    mongoQuery["$or"] = [
+      { "seller.name": query.seller },
+      { "seller.id": query.seller }
+    ];
   }
 
   if (query.developerDisplayName) {
