@@ -837,4 +837,56 @@ app.get('/og', async (c) => {
   );
 });
 
+app.get('/mobile', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+
+  // Get the region for the selected country
+  const region = Object.keys(regions).find((r) =>
+    regions[r].countries.includes(selectedCountry)
+  );
+
+  if (!region) {
+    c.status(404);
+    return c.json({
+      message: 'Country not found',
+    });
+  }
+  
+  const freeGames = await db.db.collection<{
+    offerId: string;
+    startDate: Date;
+    endDate: Date;
+  }>('mobile-freebies').find({
+    startDate: { $lte: new Date() },
+    endDate: { $gte: new Date() },
+  }).toArray();
+
+  const result = await Promise.all(freeGames.map(async (game) => {
+    const offer = await Offer.findOne({
+      id: game.offerId,
+    });
+    
+    if (!offer) {
+      console.error(`Offer not found for game ${game.offerId}`);
+      return null;
+    }
+
+    const price = await PriceEngine.findOne({
+      offerId: game.offerId,
+      region,
+    });
+
+    return {
+      ...orderOffersObject(offer?.toObject()),
+      giveaway: game,
+      price: price ?? null,
+    };
+  }));
+
+  return c.json(result.filter((r) => r !== null), 200);
+});
+
 export default app;
