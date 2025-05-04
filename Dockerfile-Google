@@ -13,11 +13,11 @@ RUN pnpm install --prod --frozen-lockfile
 
 FROM base AS build
 RUN pnpm install --frozen-lockfile
-RUN pnpm run sea
+RUN pnpm run build
 
 FROM ubuntu:22.04
 WORKDIR /app
 COPY --from=build /app/egdata /app/egdata
 EXPOSE 4000
 
-CMD [ "./egdata" ]
+CMD [ "node", "dist/index.js" ]
