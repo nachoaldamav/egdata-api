@@ -670,7 +670,6 @@ app.get("/:id/count", async (c) => {
   const { id } = c.req.param();
 
   const queryKey = `q:${id}`;
-
   const cacheKey = `search:count:${id}:${region}:v0.5`;
 
   const cached = await client.get(cacheKey);
@@ -695,6 +694,7 @@ app.get("/:id/count", async (c) => {
   const mongoQuery: Record<string, any> = {};
   const priceQuery: Record<string, any> = {};
 
+  // Build queries as before
   if (query.title) {
     mongoQuery.title = { $regex: new RegExp(query.title, "i") };
   }
@@ -703,9 +703,6 @@ app.get("/:id/count", async (c) => {
     mongoQuery.offerType = query.offerType;
   }
 
-  /**
-   * The tags query should be "and", so we need to find the offers that have all the tags provided by the user
-   */
   if (query.tags) {
     mongoQuery["tags.id"] = { $all: query.tags };
   }
@@ -771,133 +768,8 @@ app.get("/:id/count", async (c) => {
   }
 
   try {
-    const [
-      tagCountsData,
-      offerTypeCountsData,
-      totalCountData,
-      developerData,
-      publisherData,
-      priceRangeData,
-    ] = await Promise.allSettled([
-      Offer.aggregate([
-        { $match: mongoQuery },
-        {
-          $lookup: {
-            from: "pricev2",
-            localField: "id",
-            foreignField: "offerId",
-            as: "priceEngine",
-            pipeline: [
-              {
-                $match: {
-                  region: "EURO",
-                  ...priceQuery,
-                },
-              },
-            ],
-          },
-        },
-        {
-          $addFields: {
-            price: { $arrayElemAt: ["$priceEngine", 0] },
-          },
-        },
-        {
-          $match: {
-            price: { $ne: null },
-          },
-        },
-        { $unwind: "$tags" },
-        { $group: { _id: "$tags.id", count: { $sum: 1 } } },
-      ]),
-      Offer.aggregate([
-        { $match: mongoQuery },
-        {
-          $lookup: {
-            from: "pricev2",
-            localField: "id",
-            foreignField: "offerId",
-            as: "priceEngine",
-            pipeline: [
-              {
-                $match: {
-                  region: "EURO",
-                  ...priceQuery,
-                },
-              },
-            ],
-          },
-        },
-        {
-          $addFields: {
-            price: { $arrayElemAt: ["$priceEngine", 0] },
-          },
-        },
-        {
-          $match: {
-            price: { $ne: null },
-          },
-        },
-        { $group: { _id: "$offerType", count: { $sum: 1 } } },
-      ]),
-      Offer.aggregate([
-        { $match: mongoQuery },
-        // Append the price query to the pipeline
-        {
-          $lookup: {
-            from: "pricev2",
-            localField: "id",
-            foreignField: "offerId",
-            as: "priceEngine",
-            pipeline: [
-              {
-                $match: {
-                  region: "EURO",
-                  ...priceQuery,
-                },
-              },
-            ],
-          },
-        },
-        {
-          $addFields: {
-            price: { $arrayElemAt: ["$priceEngine", 0] },
-          },
-        },
-        {
-          $match: {
-            price: { $ne: null },
-          },
-        },
-        {
-          $count: "total",
-        },
-      ]),
-      Offer.aggregate([
-        { $match: mongoQuery },
-        {
-          $unwind: "$developerDisplayName",
-        },
-        {
-          $group: {
-            _id: "$developerDisplayName",
-            count: { $sum: 1 },
-          },
-        },
-      ]),
-      Offer.aggregate([
-        { $match: mongoQuery },
-        {
-          $unwind: "$publisherDisplayName",
-        },
-        {
-          $group: {
-            _id: "$publisherDisplayName",
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { count: -1 } },
-      ]),
+    // Combine all aggregations into a single pipeline
+    const [mainAggregation] = await Promise.allSettled([
       Offer.aggregate([
         { $match: mongoQuery },
         {
@@ -910,46 +782,81 @@ app.get("/:id/count", async (c) => {
               {
                 $match: {
                   region: region,
+                  ...priceQuery,
                 },
               },
             ],
           },
         },
         {
-          $unwind: "$priceEngine",
-        },
-        {
-          $group: {
-            _id: null,
-            minPrice: { $min: "$priceEngine.price.discountPrice" },
-            maxPrice: { $max: "$priceEngine.price.discountPrice" },
-            currency: { $first: "$priceEngine.price.currencyCode" },
+          $addFields: {
+            price: { $arrayElemAt: ["$priceEngine", 0] },
           },
         },
-      ]),
+        {
+          $match: {
+            price: { $ne: null },
+          },
+        },
+        {
+          $facet: {
+            // Get total count
+            total: [{ $count: "total" }],
+            
+            // Get tag counts
+            tagCounts: [
+              { $unwind: "$tags" },
+              { $group: { _id: "$tags.id", count: { $sum: 1 } } }
+            ],
+            
+            // Get offer type counts
+            offerTypeCounts: [
+              { $group: { _id: "$offerType", count: { $sum: 1 } } }
+            ],
+            
+            // Get developer counts
+            developer: [
+              { $unwind: "$developerDisplayName" },
+              { $group: { _id: "$developerDisplayName", count: { $sum: 1 } } }
+            ],
+            
+            // Get publisher counts
+            publisher: [
+              { $unwind: "$publisherDisplayName" },
+              { $group: { _id: "$publisherDisplayName", count: { $sum: 1 } } },
+              { $sort: { count: -1 } }
+            ],
+            
+            // Get price range
+            priceRange: [
+              {
+                $group: {
+                  _id: null,
+                  minPrice: { $min: "$price.price.discountPrice" },
+                  maxPrice: { $max: "$price.price.discountPrice" },
+                  currency: { $first: "$price.price.currencyCode" }
+                }
+              }
+            ]
+          }
+        }
+      ])
     ]);
 
+    if (mainAggregation.status === "rejected") {
+      throw mainAggregation.reason;
+    }
+
     const result = {
-      tagCounts:
-        tagCountsData.status === "fulfilled" ? tagCountsData.value : [],
-      offerTypeCounts:
-        offerTypeCountsData.status === "fulfilled"
-          ? offerTypeCountsData.value
-          : [],
-      total:
-        totalCountData.status === "fulfilled"
-          ? totalCountData.value[0]?.total
-          : 0,
-      developer:
-        developerData.status === "fulfilled" ? developerData.value : [],
-      publisher:
-        publisherData.status === "fulfilled" ? publisherData.value : [],
-      priceRange:
-        priceRangeData.status === "fulfilled" && priceRangeData.value.length > 0
-          ? priceRangeData.value[0]
-          : { minPrice: null, maxPrice: null },
+      tagCounts: mainAggregation.value[0]?.tagCounts || [],
+      offerTypeCounts: mainAggregation.value[0]?.offerTypeCounts || [],
+      total: mainAggregation.value[0]?.total[0]?.total || 0,
+      developer: mainAggregation.value[0]?.developer || [],
+      publisher: mainAggregation.value[0]?.publisher || [],
+      priceRange: mainAggregation.value[0]?.priceRange[0] || { minPrice: null, maxPrice: null }
     };
 
+    // Cache the result for 24 hours
     await client.set(cacheKey, JSON.stringify(result), {
       EX: 86400,
     });
@@ -958,8 +865,9 @@ app.get("/:id/count", async (c) => {
       "Cache-Control": "public, max-age=60",
     });
   } catch (err) {
+    console.error("Error in count endpoint:", err);
     c.status(500);
-    c.json({ message: "Error while counting tags" });
+    return c.json({ message: "Error while counting results" });
   }
 });
 
