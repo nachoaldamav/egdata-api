@@ -4,8 +4,188 @@ import { Item } from '@egdata/core.schemas.items';
 import { Asset } from '@egdata/core.schemas.assets';
 import { type Filter, ObjectId, type Sort } from 'mongodb';
 import type { AnyObject } from 'mongoose';
+import { InstallManifest } from '../types/install-manifest.js';
 
 const app = new Hono();
+
+// Interface for the file batch upload request
+interface FileBatchUpload {
+  uploadId: string;
+  files: Array<{
+    fileName: string;
+    fileHash: string;
+    fileSize: number;
+    depth: number;
+    installTags?: string[];
+  }>;
+}
+
+// Endpoint to initiate manifest upload
+app.post('/upload/init', async (c) => {
+  const manifest = await c.req.json<InstallManifest>();
+  
+  // First check if the item exists and validate the app name
+  const item = await Item.findOne({
+    id: manifest.CatalogItemId,
+    namespace: manifest.CatalogNamespace,
+  });
+
+  if (!item) {
+    return c.json({ error: 'Item not found' }, 404);
+  }
+
+  // Check if the app name is valid for this item
+  const validAppNames = item.releaseInfo.map(r => r.appId);
+  if (!validAppNames.includes(manifest.AppName)) {
+    return c.json({ 
+      error: 'Invalid app name for this item',
+      validAppNames 
+    }, 400);
+  }
+  
+  // Check if build already exists
+  const existingBuild = await db.db.collection('builds').findOne({
+    appName: manifest.AppName,
+    buildId: manifest.AppVersionString
+  });
+
+  if (existingBuild) {
+    return c.json({ error: 'Build already exists' }, 409);
+  }
+
+  // Generate a unique upload ID
+  const uploadId = new ObjectId();
+
+  // Create a temporary upload record
+  await db.db.collection('upload_sessions').insertOne({
+    _id: uploadId,
+    itemId: manifest.CatalogItemId,
+    appName: manifest.AppName,
+    buildId: manifest.AppVersionString,
+    manifestHash: manifest.ManifestHash,
+    displayName: manifest.DisplayName,
+    installSize: manifest.InstallSize,
+    launchExecutable: manifest.LaunchExecutable,
+    installTags: manifest.InstallTags,
+    baseUrls: manifest.BaseURLs,
+    status: 'pending',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  return c.json({ uploadId: uploadId.toString() });
+});
+
+// Endpoint to upload file batches
+app.post('/upload/batch', async (c) => {
+  const body = await c.req.json<FileBatchUpload>();
+  
+  // Get the upload session
+  const session = await db.db.collection('upload_sessions').findOne({
+    _id: new ObjectId(body.uploadId)
+  });
+
+  if (!session) {
+    return c.json({ error: 'Upload session not found' }, 404);
+  }
+
+  if (session.status !== 'pending') {
+    return c.json({ error: 'Upload session is no longer active' }, 400);
+  }
+
+  // Insert the files
+  await db.db.collection('files').insertMany(
+    body.files.map(file => ({
+      ...file,
+      manifestHash: session.buildId,
+      uploadId: new ObjectId(body.uploadId)
+    }))
+  );
+
+  // Update the session
+  await db.db.collection('upload_sessions').updateOne(
+    { _id: new ObjectId(body.uploadId) },
+    {
+      $inc: { uploadedFiles: body.files.length },
+      $set: { updatedAt: new Date() }
+    }
+  );
+
+  // Check if all files have been uploaded
+  if (session.uploadedFiles + body.files.length >= session.totalFiles) {
+    // Create the build record
+    await db.db.collection('builds').insertOne({
+      appName: session.appName,
+      buildId: session.buildId,
+      itemId: session.itemId,
+      hash: session.buildId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Mark the session as completed
+    await db.db.collection('upload_sessions').updateOne(
+      { _id: new ObjectId(body.uploadId) },
+      { $set: { status: 'completed', updatedAt: new Date() } }
+    );
+  }
+
+  return c.json({ success: true });
+});
+
+// Endpoint to handle install manifest upload
+app.post('/upload/install-manifest', async (c) => {
+  const manifest = await c.req.json<InstallManifest>();
+  
+  // First check if the item exists and validate the app name
+  const item = await Item.findOne({
+    id: manifest.CatalogItemId,
+  });
+
+  if (!item) {
+    return c.json({ error: 'Item not found' }, 404);
+  }
+
+  // Check if the app name is valid for this item
+  const validAppNames = item.releaseInfo.map(r => r.appId);
+  if (!validAppNames.includes(manifest.AppName)) {
+    return c.json({ 
+      error: 'Invalid app name for this item',
+      validAppNames 
+    }, 400);
+  }
+  
+  // Check if build already exists
+  const existingBuild = await db.db.collection('builds').findOne({
+    appName: manifest.AppName,
+    buildId: manifest.AppVersionString
+  });
+
+  if (existingBuild) {
+    return c.json({ error: 'Build already exists' }, 409);
+  }
+
+  // Create the build record
+  const build = await db.db.collection('builds').insertOne({
+    appName: manifest.AppName,
+    buildId: manifest.AppVersionString,
+    itemId: manifest.CatalogItemId,
+    hash: manifest.ManifestHash,
+    displayName: manifest.DisplayName,
+    installSize: manifest.InstallSize,
+    installLocation: manifest.InstallLocation,
+    launchExecutable: manifest.LaunchExecutable,
+    installTags: manifest.InstallTags,
+    baseUrls: manifest.BaseURLs,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  return c.json({ 
+    success: true,
+    buildId: build.insertedId.toString()
+  });
+});
 
 app.get('/:id', async (c) => {
   const { id } = c.req.param();

@@ -245,15 +245,15 @@ app.get("/sitemap.xml", async (c) => {
           <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
         </url>
         ${sections
-          .map(
-            (section) => `
+              .map(
+                (section) => `
         <url>
           <loc>https://egdata.app/offers/${offer.id}/${section}</loc>
           <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
         </url>
         `
-          )
-          .join("")}
+              )
+              .join("")}
         `;
         });
 
@@ -564,9 +564,8 @@ app.get("/featured", async (c) => {
     200,
     {
       "Cache-Control": "public, max-age=60",
-      "Server-Timing": `db;dur=${
-        GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
-      }`,
+      "Server-Timing": `db;dur=${GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
+        }`,
     }
   );
 });
@@ -875,13 +874,18 @@ app.get("/changelist", async (ctx) => {
     });
   }
 
-  const changelist = await Changelog.find({}, undefined, {
-    limit,
-    skip,
-    sort: {
-      timestamp: -1,
+  const changelist = await Changelog.find(
+    {
+      "metadata.contextType": { $nin: ["file", "achievements"] },
     },
-  });
+    undefined,
+    {
+      limit,
+      skip,
+      sort: {
+        timestamp: -1,
+      },
+    });
 
   /**
    * Returns the affected offer, item, asset for each changelog
@@ -1228,8 +1232,7 @@ async function refreshSellersIndex() {
 
     totalSellers += sellers.length;
     console.log(
-      `Processing sellers ${
-        totalSellers - sellers.length + 1
+      `Processing sellers ${totalSellers - sellers.length + 1
       } to ${totalSellers}`
     );
 
