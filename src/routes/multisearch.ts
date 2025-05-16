@@ -10,7 +10,16 @@ app.get('/', (c) => {
 });
 
 app.get('/offers', async (c) => {
-  const { query } = c.req.query();
+  let { query } = c.req.query();
+
+  if (query?.includes('store.epicgames.com')) {
+    const isUrl = URL.canParse(query);
+    if (isUrl) {
+      const url = new URL(query);
+      const slug = url.pathname.split('/').pop();
+      query = slug || query;
+    }
+  }
 
   const search = await meiliSearchClient.index('offers').search(query, {
     sort: ['offerTypeRank:asc', 'lastModifiedDate:desc'],
