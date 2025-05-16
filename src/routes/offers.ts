@@ -1,37 +1,44 @@
 import { Hono } from "hono";
-import { regions } from "../utils/countries.js";
-import client from "../clients/redis.js";
+import { getCookie } from "hono/cookie";
+
+import { AchievementSet } from "@egdata/core.schemas.achievements";
+import { Asset, type AssetType } from "@egdata/core.schemas.assets";
+import { Bundles } from "@egdata/core.schemas.bundles";
+import { Changelog } from "@egdata/core.schemas.changelog";
+import { Collection, GamePosition } from "@egdata/core.schemas.collections";
+import { FreeGames } from "@egdata/core.schemas.free-games";
+import { Hltb } from "@egdata/core.schemas.hltb";
+import { Item } from "@egdata/core.schemas.items";
+import { Mappings } from "@egdata/core.schemas.mappings";
+import { Media } from "@egdata/core.schemas.media";
+import { Offer, type OfferType } from "@egdata/core.schemas.offers";
 import {
   PriceEngine,
   PriceEngineHistorical,
   type PriceEngineType as PriceType,
 } from "@egdata/core.schemas.price";
-import { getCookie } from "hono/cookie";
-import { AchievementSet } from "@egdata/core.schemas.achievements";
-import { Asset, type AssetType } from "@egdata/core.schemas.assets";
-import { Changelog } from "@egdata/core.schemas.changelog";
-import { Item } from "@egdata/core.schemas.items";
-import { Mappings } from "@egdata/core.schemas.mappings";
-import { Offer, type OfferType } from "@egdata/core.schemas.offers";
-import { attributesToObject } from "../utils/attributes-to-object.js";
-import { getGameFeatures } from "../utils/game-features.js";
-import { TagModel, Tags } from "@egdata/core.schemas.tags";
-import { orderOffersObject } from "../utils/order-offers-object.js";
-import { getImage } from "../utils/get-image.js";
-import { Media } from "@egdata/core.schemas.media";
-import { Collection, GamePosition } from "@egdata/core.schemas.collections";
-import { Sandbox } from "@egdata/core.schemas.sandboxes";
-import { FreeGames } from "@egdata/core.schemas.free-games";
-import { db } from "../db/index.js";
 import { Ratings } from "@egdata/core.schemas.ratings";
-import { type IReview, Review } from "../db/schemas/reviews.js";
-import { getProduct } from "../utils/get-product.js";
-import { verifyGameOwnership } from "../utils/verify-game-ownership.js";
-import { Hltb } from "@egdata/core.schemas.hltb";
-import { Bundles } from "@egdata/core.schemas.bundles";
+import { Sandbox } from "@egdata/core.schemas.sandboxes";
 import { OfferSubItems } from "@egdata/core.schemas.subitems";
-import { epic, epicInfo } from "./auth.js";
+import { TagModel, Tags } from "@egdata/core.schemas.tags";
+import { Queue } from "bullmq";
+
+import { db } from "../db/index.js";
+import { type IReview, Review } from "../db/schemas/reviews.js";
+import client, { ioredis } from "../clients/redis.js";
 import { ageRatingsCountries } from "../utils/age-ratings.js";
+import { attributesToObject } from "../utils/attributes-to-object.js";
+import { regions } from "../utils/countries.js";
+import { epic, epicInfo } from "./auth.js";
+import { getGameFeatures } from "../utils/game-features.js";
+import { getImage } from "../utils/get-image.js";
+import { getProduct } from "../utils/get-product.js";
+import { orderOffersObject } from "../utils/order-offers-object.js";
+import { verifyGameOwnership } from "../utils/verify-game-ownership.js";
+
+const regenOffersQueue = new Queue<{
+  slug: string;
+}>("regenOffersQueue", { connection: ioredis });
 
 const app = new Hono();
 
@@ -724,6 +731,14 @@ app.get("/latest-released", async (c) => {
   });
 });
 
+app.put("/regen/:slug", async (c) => {
+  const { slug } = c.req.param();
+
+  await regenOffersQueue.add(`regenOffer-${slug}`, { slug });
+
+  return c.json({ message: "Offer regen requested" }, 200);
+});
+
 app.get("/:id", async (c) => {
   const { id } = c.req.param();
 
@@ -786,9 +801,8 @@ app.get("/:id/price-history", async (c) => {
     Object.keys(regions).find((r) => regions[r].countries.includes(country));
 
   if (region) {
-    const cacheKey = `price-history:${id}:${region}:${
-      since ?? "unlimited"
-    }:v0.1`;
+    const cacheKey = `price-history:${id}:${region}:${since ?? "unlimited"
+      }:v0.1`;
     const cached = await client.get(cacheKey);
 
     if (cached) {
@@ -2029,9 +2043,9 @@ app.get("/:id/reviews", epicInfo, async (c) => {
 
   const userReview = currentUser
     ? await Review.findOne({
-        userId: currentUser,
-        id,
-      })
+      userId: currentUser,
+      id,
+    })
     : null;
 
   if (userReview) {
@@ -2132,9 +2146,9 @@ app.post("/:id/reviews", epic, async (c) => {
   const isOwned =
     session?.user?.email.split("@")[0] ?? epic?.account_id
       ? await verifyGameOwnership(
-          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
-          product._id as unknown as string
-        )
+        session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+        product._id as unknown as string
+      )
       : false;
 
   const review: IReview = {
@@ -2192,9 +2206,9 @@ app.patch("/:id/reviews", epic, async (c) => {
   const isOwned = ((session?.user?.email.split("@")[0] ??
     epic?.account_id) as string)
     ? await verifyGameOwnership(
-        (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
-        product._id as unknown as string
-      )
+      (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
+      product._id as unknown as string
+    )
     : false;
 
   const oldReview = await Review.findOne({
@@ -2394,9 +2408,9 @@ app.get("/:id/ownership", epic, async (c) => {
   const isOwned =
     session?.user?.email.split("@")[0] ?? epic?.account_id
       ? await verifyGameOwnership(
-          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
-          product._id as unknown as string
-        )
+        session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+        product._id as unknown as string
+      )
       : false;
 
   return c.json({
