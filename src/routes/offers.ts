@@ -36,9 +36,9 @@ import { getProduct } from "../utils/get-product.js";
 import { orderOffersObject } from "../utils/order-offers-object.js";
 import { verifyGameOwnership } from "../utils/verify-game-ownership.js";
 
-const regenOffersQueue = new Queue<{
-  slug: string;
-}>("regenOffersQueue", { connection: ioredis });
+type RegenOfferQueueType = { slug: string } | { id: string; namespace?: string };
+
+const regenOffersQueue = new Queue<RegenOfferQueueType>("regenOffersQueue", { connection: ioredis });
 
 const app = new Hono();
 
@@ -738,6 +738,14 @@ app.put("/regen/:slug", async (c) => {
 
   return c.json({ message: "Offer regen requested" }, 200);
 });
+
+app.put("/regen-by-id/:id", async (c) => {
+  const { id } = c.req.param();
+
+  await regenOffersQueue.add(`regenOffer-${id}`, { id });
+
+  return c.json({ message: "Offer regen requested" }, 200);
+})
 
 app.get("/:id", async (c) => {
   const { id } = c.req.param();
