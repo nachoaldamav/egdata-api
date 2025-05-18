@@ -747,6 +747,17 @@ app.put("/regen-by-id/:id", async (c) => {
   return c.json({ message: "Offer regen requested" }, 200);
 })
 
+app.post("/bulk-regen", async (c) => {
+  const { offers } = await c.req.json<{ offers: string[] }>();
+
+  await regenOffersQueue.addBulk(offers.map((o) => ({
+    name: `regenOffer-${o}`,
+    data: { id: o },
+  })));
+
+  return c.json({ message: "Offer regen requested" }, 200);
+});
+
 app.get("/:id", async (c) => {
   const { id } = c.req.param();
 
