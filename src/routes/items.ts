@@ -3,8 +3,6 @@ import { Item } from '@egdata/core.schemas.items';
 import { attributesToObject } from '../utils/attributes-to-object.js';
 import { Asset } from '@egdata/core.schemas.assets';
 import { db } from '../db/index.js';
-import { Changelog } from '@egdata/core.schemas.changelog';
-import { ObjectId } from 'mongodb';
 import client from '../clients/redis.js';
 
 const app = new Hono();
@@ -148,10 +146,8 @@ app.get("/:id/changelog", async (c) => {
     });
   }
 
-  const item = await Item.findOne({
-    id,
-  });
-
+  // First get the item to ensure it exists
+  const item = await Item.findOne({ id });
   if (!item) {
     c.status(404);
     return c.json({
@@ -159,120 +155,96 @@ app.get("/:id/changelog", async (c) => {
     });
   }
 
+  // Get assets for this item
+  const assets = await Asset.find({ itemId: id });
+  const assetIds = assets.map(a => a.artifactId);
 
-  const assets = await Asset.find({
-    itemId: item.id,
-  });
+  // Get builds for these assets
+  const builds = await db.db.collection("builds").find({
+    appName: { $in: assetIds }
+  }).toArray();
+  const buildIds = builds.map(b => b._id.toString());
 
-  const builds = await db.db
-    .collection<{
-      appName: string;
-      labelName: string;
-      buildVersion: string;
-      hash: string;
-      metadata: {
-        installationPoolId: string;
-      };
-      createdAt: {
-        $date: string;
-      };
-      updatedAt: {
-        $date: string;
-      };
-      technologies: Array<{
-        section: string;
-        technology: string;
-      }>;
-      downloadSizeBytes: number;
-      installedSizeBytes: number;
-    }>("builds")
-    .find({
-      appName: { $in: assets.map((a) => a.artifactId) },
-    })
-    .toArray();
+  const allIds = [id, ...assetIds, ...buildIds];
 
-  const allIds = [
-    id,
-    ...assets.map((a) => a.artifactId).concat(builds.map((b) => b._id.toString())),
-  ];
-
-  const changelist = await Changelog.find(
+  // Use aggregation pipeline for better performance
+  const changelog = await db.db.collection("changelogs_v2").aggregate([
     {
-      "metadata.contextId": { $in: allIds },
+      $match: {
+        "metadata.contextId": { $in: allIds }
+      }
     },
-    undefined,
     {
-      sort: {
-        timestamp: -1,
-      },
-      limit,
-      skip,
+      $sort: { timestamp: -1 }
+    },
+    {
+      $skip: skip
+    },
+    {
+      $limit: limit
+    },
+    {
+      $lookup: {
+        from: "items",
+        let: { contextId: "$metadata.contextId" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$id", "$$contextId"] } } }
+        ],
+        as: "itemDoc"
+      }
+    },
+    {
+      $lookup: {
+        from: "assets",
+        let: { contextId: "$metadata.contextId" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$artifactId", "$$contextId"] } } }
+        ],
+        as: "assetDoc"
+      }
+    },
+    {
+      $lookup: {
+        from: "builds",
+        let: { contextId: "$metadata.contextId" },
+        pipeline: [
+          { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$contextId"] } } }
+        ],
+        as: "buildDoc"
+      }
+    },
+    {
+      $addFields: {
+        document: {
+          $switch: {
+            branches: [
+              { case: { $eq: ["$metadata.contextType", "item"] }, then: { $arrayElemAt: ["$itemDoc", 0] } },
+              { case: { $eq: ["$metadata.contextType", "asset"] }, then: { $arrayElemAt: ["$assetDoc", 0] } },
+              { case: { $eq: ["$metadata.contextType", "build"] }, then: { $arrayElemAt: ["$buildDoc", 0] } }
+            ],
+            default: null
+          }
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 1,
+        metadata: 1,
+        timestamp: 1,
+        document: 1
+      }
     }
-  );
+  ]).toArray();
 
-  const changelistWithDocuments = await Promise.all(
-    changelist.map(async (changelist) => {
-      if (changelist.metadata.contextType === "item") {
-        return {
-          ...changelist.toJSON(),
-          document: await Item.findOne({ id: changelist.metadata.contextId }).exec(),
-        };
-      }
-
-      if (changelist.metadata.contextType === "asset") {
-        return {
-          ...changelist.toJSON(),
-          document: await Asset.findOne({ id: changelist.metadata.contextId }).exec(),
-        };
-      }
-
-      if (changelist.metadata.contextType === "build") {
-        return {
-          ...changelist.toJSON(),
-          document: await db.db
-            .collection<{
-              appName: string;
-              labelName: string;
-              buildVersion: string;
-              hash: string;
-              metadata: {
-                installationPoolId: string;
-              };
-              createdAt: {
-                $date: string;
-              };
-              updatedAt: {
-                $date: string;
-              };
-              technologies: Array<{
-                section: string;
-                technology: string;
-              }>;
-              downloadSizeBytes: number;
-              installedSizeBytes: number;
-            }>("builds")
-            .findOne({ _id: new ObjectId(changelist.metadata.contextId) }),
-        };
-      }
-
-      return {
-        ...changelist.toJSON(),
-      };
-    })
-  );
-
-  if (!changelistWithDocuments) {
-    c.status(404);
-    return c.json({
-      message: "Changelist not found",
-    });
-  }
-
-  await client.set(cacheKey, JSON.stringify(changelistWithDocuments), {
+  // Cache the results
+  await client.set(cacheKey, JSON.stringify(changelog), {
     EX: 60,
   });
 
-  return c.json(changelistWithDocuments);
+  return c.json(changelog, 200, {
+    "Cache-Control": "public, max-age=60",
+  });
 });
 
 export default app;

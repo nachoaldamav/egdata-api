@@ -1314,13 +1314,6 @@ app.get("/:id/changelog", async (c) => {
     ],
   });
 
-  if (!offer) {
-    c.status(404);
-    return c.json({
-      message: "Offer not found",
-    });
-  }
-
   const assets = await Asset.find({
     itemId: { $in: items.map((i) => i.id) },
   });
@@ -1330,67 +1323,84 @@ app.get("/:id/changelog", async (c) => {
     ...items.map((i) => i.id).concat(assets.map((a) => a.artifactId)),
   ];
 
-  const changelist = await Changelog.find(
+  // Use aggregation pipeline for better performance
+  const changelog = await db.db.collection("changelogs_v2").aggregate([
     {
-      "metadata.contextId": { $in: allIds },
+      $match: {
+        "metadata.contextId": { $in: allIds }
+      }
     },
-    undefined,
     {
-      sort: {
-        timestamp: -1,
-      },
-      limit,
-      skip,
+      $sort: { timestamp: -1 }
+    },
+    {
+      $skip: skip
+    },
+    {
+      $limit: limit
+    },
+    {
+      $lookup: {
+        from: "offers",
+        let: { contextId: "$metadata.contextId" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$id", "$$contextId"] } } }
+        ],
+        as: "offerDoc"
+      }
+    },
+    {
+      $lookup: {
+        from: "items",
+        let: { contextId: "$metadata.contextId" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$id", "$$contextId"] } } }
+        ],
+        as: "itemDoc"
+      }
+    },
+    {
+      $lookup: {
+        from: "assets",
+        let: { contextId: "$metadata.contextId" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$artifactId", "$$contextId"] } } }
+        ],
+        as: "assetDoc"
+      }
+    },
+    {
+      $addFields: {
+        document: {
+          $switch: {
+            branches: [
+              { case: { $eq: ["$metadata.contextType", "offer"] }, then: { $arrayElemAt: ["$offerDoc", 0] } },
+              { case: { $eq: ["$metadata.contextType", "item"] }, then: { $arrayElemAt: ["$itemDoc", 0] } },
+              { case: { $eq: ["$metadata.contextType", "asset"] }, then: { $arrayElemAt: ["$assetDoc", 0] } }
+            ],
+            default: null
+          }
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 1,
+        metadata: 1,
+        timestamp: 1,
+        document: 1
+      }
     }
-  );
+  ]).toArray();
 
-  const changelistWithDocuments = await Promise.all(
-    changelist.map(async (changelist) => {
-      if (changelist.metadata.contextType === "offer") {
-        return {
-          ...changelist.toJSON(),
-          document: await Offer.findOne({
-            id: changelist.metadata.contextId,
-          }).exec(),
-        };
-      }
-
-      if (changelist.metadata.contextType === "item") {
-        return {
-          ...changelist.toJSON(),
-          document: await Item.findOne({
-            id: changelist.metadata.contextId,
-          }).exec(),
-        };
-      }
-
-      if (changelist.metadata.contextType === "asset") {
-        return {
-          ...changelist.toJSON(),
-          document: await Asset.findOne({
-            id: changelist.metadata.contextId,
-          }).exec(),
-        };
-      }
-
-      return {
-        ...changelist.toJSON(),
-      };
-    })
-  );
-
-  if (!changelistWithDocuments) {
-    c.status(404);
-    return c.json({
-      message: "Changelist not found",
-    });
-  }
-
-  await client.set(cacheKey, JSON.stringify(changelistWithDocuments), {
+  // Cache the results
+  await client.set(cacheKey, JSON.stringify(changelog), {
     EX: 60,
   });
 
-  return c.json(changelistWithDocuments);
+  return c.json(changelog, 200, {
+    "Cache-Control": "public, max-age=60",
+  });
 });
 
 /**
