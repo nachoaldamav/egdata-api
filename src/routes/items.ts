@@ -255,9 +255,12 @@ app.get("/:id/offer", async (c) => {
   const cacheKey = `offer:item:${id}`;
   const cached = await client.get(cacheKey);
 
+  // Cache for 1 hour
+  const CACHE_TTL = 60 * 60;
+
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
-      "Cache-Control": "public, max-age=60",
+      "Cache-Control": `public, max-age=${CACHE_TTL}`,
     });
   }
 
@@ -277,11 +280,11 @@ app.get("/:id/offer", async (c) => {
   if (offers.length === 1) {
     // Cache the result
     await client.set(cacheKey, JSON.stringify(offers[0]), {
-      EX: 60,
+      EX: CACHE_TTL,
     });
 
     return c.json(offers[0], 200, {
-      "Cache-Control": "public, max-age=60",
+      "Cache-Control": `public, max-age=${CACHE_TTL}`,
     });
   }
 
@@ -291,11 +294,11 @@ app.get("/:id/offer", async (c) => {
     if (offer) {
       // Cache the result
       await client.set(cacheKey, JSON.stringify(offer), {
-        EX: 60,
+        EX: CACHE_TTL,
       });
 
       return c.json(offer, 200, {
-        "Cache-Control": "public, max-age=60",
+        "Cache-Control": `public, max-age=${CACHE_TTL}`,
       });
     }
   }
