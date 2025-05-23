@@ -275,6 +275,11 @@ app.get("/:id/offer", async (c) => {
   }
 
   if (offers.length === 1) {
+    // Cache the result
+    await client.set(cacheKey, JSON.stringify(offers[0]), {
+      EX: 60,
+    });
+
     return c.json(offers[0], 200, {
       "Cache-Control": "public, max-age=60",
     });
@@ -284,6 +289,11 @@ app.get("/:id/offer", async (c) => {
     // Return the first one that is not `prePurchase = true`
     const offer = offers.find((o) => !o.prePurchase);
     if (offer) {
+      // Cache the result
+      await client.set(cacheKey, JSON.stringify(offer), {
+        EX: 60,
+      });
+
       return c.json(offer, 200, {
         "Cache-Control": "public, max-age=60",
       });
