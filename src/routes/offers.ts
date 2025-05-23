@@ -781,7 +781,7 @@ app.post("/slugs", async (c) => {
       },
       { prePurchase: { $ne: true } }, // Exclude pre-purchase offers
     ],
-  }).select("id productSlug urlSlug offerMappings customAttributes prePurchase");
+  }).select("id productSlug urlSlug offerMappings customAttributes prePurchase namespace");
 
   const result = slugs.map((originalSlug) => {
     const offer = offers.find((o) => {
@@ -807,6 +807,7 @@ app.post("/slugs", async (c) => {
     return {
       slug: originalSlug,
       id: offer ? offer.id : null,
+      namespace: offer ? offer.namespace : null,
     };
   });
 
