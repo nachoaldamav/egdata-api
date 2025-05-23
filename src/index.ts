@@ -47,6 +47,7 @@ import jwt from "jsonwebtoken";
 import { readFileSync } from "node:fs";
 import chalk from "chalk";
 import { rateLimiter } from "hono-rate-limiter";
+import { OpenAPIV3 } from "openapi-types";
 
 config();
 
@@ -132,6 +133,53 @@ app.get("/", (c) => {
       })
       .map((x) => `${x.method} ${x.path}`),
   });
+});
+
+app.get("/open-api.json", async (c) => {
+  const endpoints = inspectRoutes(app).filter(
+    (x) => !x.isMiddleware && x.name === "[handler]"
+  );
+
+  const paths = endpoints.reduce((acc, endpoint) => {
+    if (!acc[endpoint.path]) {
+      acc[endpoint.path] = {};
+    }
+    acc[endpoint.path][endpoint.method.toLowerCase()] = {
+      summary: `Endpoint for ${endpoint.method} ${endpoint.path}`,
+      responses: {
+        "200": {
+          description: "Successful response",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object"
+              }
+            }
+          }
+        }
+      }
+    };
+    return acc;
+  }, {} as Record<string, any>);
+
+  const result: OpenAPIV3.Document = {
+    openapi: "3.0.0",
+    info: {
+      title: "egdata.app API",
+      version: "0.0.1-alpha",
+    },
+    servers: [
+      {
+        url: "https://api.egdata.app",
+      },
+      {
+        url: "https://api-gcp.egdata.app",
+      },
+    ],
+    paths,
+  }
+
+  return c.json(result);
 });
 
 app.get("/doc", async (c) => {
