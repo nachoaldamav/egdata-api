@@ -4,6 +4,8 @@ import { attributesToObject } from '../utils/attributes-to-object.js';
 import { Asset } from '@egdata/core.schemas.assets';
 import { db } from '../db/index.js';
 import client from '../clients/redis.js';
+import { Offer } from '@egdata/core.schemas.offers';
+import { OfferSubItems } from '@egdata/core.schemas.subitems';
 
 const app = new Hono();
 
@@ -245,6 +247,50 @@ app.get("/:id/changelog", async (c) => {
   return c.json(changelog, 200, {
     "Cache-Control": "public, max-age=60",
   });
+});
+
+app.get("/:id/offer", async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `offer:item:${id}`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
+  const subItems = await OfferSubItems.find({
+    'subItems.id': id,
+  });
+
+  const offers = await Offer.find({
+    id: { $in: subItems.map((s) => s._id) },
+    offerType: "BASE_GAME"
+  });
+
+  if (offers.length === 0) {
+    return c.json({ error: "No offer found" }, 404);
+  }
+
+  if (offers.length === 1) {
+    return c.json(offers[0], 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
+  if (offers.length > 1) {
+    // Return the first one that is not `prePurchase = true`
+    const offer = offers.find((o) => !o.prePurchase);
+    if (offer) {
+      return c.json(offer, 200, {
+        "Cache-Control": "public, max-age=60",
+      });
+    }
+  }
+
+  return c.json({ error: "No offer found" }, 404);
 });
 
 export default app;
