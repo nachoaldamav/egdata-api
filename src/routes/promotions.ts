@@ -60,9 +60,8 @@ app.get('/:id', async (c) => {
   const sortBy = (c.req.query('sortBy') ?? 'lastModifiedDate') as SortBy;
   const sortDir = (c.req.query('sortDir') ?? 'desc') as 'asc' | 'desc';
 
-  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:${
-    query ?? 'no-query'
-  }:v0.1`;
+  const cacheKey = `promotion:${id}:${region}:${page}:${limit}:${sortBy}:${sortDir}:${query ?? 'no-query'
+    }:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -106,14 +105,14 @@ app.get('/:id', async (c) => {
           pipeline: [
             ...(query
               ? [
-                  {
-                    $match: {
-                      title: {
-                        $regex: new RegExp(query, 'i'),
-                      },
+                {
+                  $match: {
+                    title: {
+                      $regex: new RegExp(query, 'i'),
                     },
                   },
-                ]
+                },
+              ]
               : []),
           ],
         },
@@ -159,10 +158,10 @@ app.get('/:id', async (c) => {
           tags: { $elemMatch: { id } },
           ...(query
             ? {
-                title: {
-                  $regex: new RegExp(query, 'i'),
-                },
-              }
+              title: {
+                $regex: new RegExp(query, 'i'),
+              },
+            }
             : {}),
         },
       },
@@ -221,19 +220,17 @@ app.get('/:id', async (c) => {
       tags: { $elemMatch: { id } },
       ...(query
         ? {
-            $text: {
-              $search: query,
-              $caseSensitive: false,
-              $diacriticSensitive: false,
-            },
-          }
+          $text: {
+            $search: query,
+            $caseSensitive: false,
+            $diacriticSensitive: false,
+          },
+        }
         : {}),
     }),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     'Cache-Control': 'public, max-age=60',
@@ -285,9 +282,7 @@ app.get('/:id/cover', async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(baseGame), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(baseGame), 'EX', 3600);
 
   return c.json(baseGame, 200, {
     'Cache-Control': 'public, max-age=60',

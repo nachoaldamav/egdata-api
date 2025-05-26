@@ -163,9 +163,7 @@ app.get("/me", async (c) => {
     creationDate: dbProfile?.creationDate,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
 
   return c.json(result, {
     headers: {
@@ -312,9 +310,7 @@ app.get("/:id", async (c) => {
         reviews: reviewsCount,
       };
 
-      await client.set(cacheKey, JSON.stringify(result), {
-        EX: 60,
-      });
+      await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
 
       return c.json(result, {
         headers: {
@@ -338,9 +334,7 @@ app.get("/:id", async (c) => {
       reviews: reviewsCount,
     };
 
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 3600,
-    });
+    await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
     return c.json(result, {
       headers: {
@@ -508,9 +502,7 @@ app.get("/:id/rare-achievements", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(selectedAchievements), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(selectedAchievements), 'EX', 3600);
 
   return c.json(selectedAchievements, {
     headers: {
@@ -596,9 +588,7 @@ app.get("/:id/rare-achievements/:sandboxId", async (c) => {
 
   const selectedAchievements = sortedAchievements.slice(0, 3);
 
-  await client.set(cacheKey, JSON.stringify(selectedAchievements), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(selectedAchievements), 'EX', 3600);
 
   return c.json(selectedAchievements, {
     headers: {
@@ -782,9 +772,7 @@ app.get("/:id/achievements", async (c) => {
     page,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, {
     headers: {
@@ -903,9 +891,7 @@ app.get("/:id/information", async (c) => {
       creationDate: dbProfile?.creationDate,
     };
 
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 60,
-    });
+    await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
 
     return c.json(result, {
       headers: {
@@ -1050,9 +1036,7 @@ app.get("/:id/games", async (c) => {
       },
     };
 
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 60,
-    });
+    await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
 
     return c.json(result, {
       headers: {
@@ -1170,9 +1154,7 @@ app.get("/:id/random-game", async (c) => {
     // Construct the result object
     const result = offer;
 
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 360,
-    });
+    await client.set(cacheKey, JSON.stringify(result), 'EX', 360);
 
     return c.json(result, {
       headers: {

@@ -104,9 +104,7 @@ app.get("/", async (c) => {
     total: await Offer.countDocuments(),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -240,9 +238,7 @@ app.get("/events/:id", async (c) => {
     }),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -351,9 +347,7 @@ app.get("/upcoming", async (c) => {
     }),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 360,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 360);
 
   return c.json(result, 200, {
     "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -449,9 +443,7 @@ app.get("/top-wishlisted", async (c) => {
         position: { $gt: 0 },
       }),
     };
-    await client.set(cacheKey, JSON.stringify(response), {
-      EX: 3600,
-    });
+    await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
     return c.json(response, 200, {
       "Cache-Control": "public, max-age=60",
       "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -507,9 +499,7 @@ app.get("/top-sellers", async (c) => {
         position: { $gt: 0 },
       }),
     };
-    await client.set(cacheKey, JSON.stringify(response), {
-      EX: 3600,
-    });
+    await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
     return c.json(response, 200, {
       "Cache-Control": "public, max-age=60",
       "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -576,9 +566,7 @@ app.get("/featured-discounts", async (c) => {
     .filter((o) => o.title)
     .slice(0, 20);
   // Save the result in cache, set the expiration to the first sale ending date
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
   });
@@ -650,9 +638,7 @@ app.get("/latest-achievements", async (c) => {
     }
   }
   result = result.slice(0, 20);
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
   });
@@ -723,9 +709,7 @@ app.get("/latest-released", async (c) => {
       offerType: { $in: ["BASE_GAME"] },
     }),
   };
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
   });
@@ -867,10 +851,7 @@ app.get("/:id", async (c) => {
     customAttributes: attributesToObject(offer.customAttributes as any),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    // 1 day
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
 
   return c.json(result, 200, {
     "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -913,9 +894,7 @@ app.get("/:id/price-history", async (c) => {
       return c.json({});
     }
 
-    await client.set(cacheKey, JSON.stringify(prices), {
-      EX: 3600,
-    });
+    await client.set(cacheKey, JSON.stringify(prices), 'EX', 3600);
 
     return c.json(prices, 200, {
       "Cache-Control": "public, max-age=60",
@@ -955,9 +934,7 @@ app.get("/:id/price-history", async (c) => {
     return c.json({});
   }
 
-  await client.set(cacheKey, JSON.stringify(pricesByRegion), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(pricesByRegion), 'EX', 3600);
 
   return c.json(pricesByRegion, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1063,9 +1040,7 @@ app.get("/:id/assets", async (c) => {
 
   const result = assets.map((a) => a.toObject());
 
-  await client.set(cacheKey, JSON.stringify(assets), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(assets), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1162,9 +1137,7 @@ app.get("/:id/price", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(price), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(price), 'EX', 3600);
 
   return c.json(price, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1242,9 +1215,7 @@ app.get("/:id/regional-price", async (c) => {
       minPrice: Math.min(...price.map((p) => p.price.discountPrice ?? 0)),
     };
 
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 3600,
-    });
+    await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
     return c.json(result, 200, {
       "Cache-Control": "public, max-age=60",
@@ -1329,9 +1300,7 @@ app.get("/:id/regional-price", async (c) => {
     >
   );
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1463,9 +1432,7 @@ app.get("/:id/changelog", async (c) => {
   ]).toArray();
 
   // Cache the results
-  await client.set(cacheKey, JSON.stringify(changelog), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(changelog), 'EX', 60);
 
   return c.json(changelog, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1567,9 +1534,7 @@ app.get("/:id/changelog/stats", async (c) => {
     return acc;
   }, {} as Record<string, number>);
 
-  await client.set(cacheKey, JSON.stringify(changeFields), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(changeFields), 'EX', 3600);
 
   return c.json({
     dailyChanges,
@@ -1623,9 +1588,7 @@ app.get("/:id/achievements", async (c) => {
     return c.json([]);
   }
 
-  await client.set(cacheKey, JSON.stringify(achievements), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(achievements), 'EX', 3600);
 
   return c.json(achievements, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1688,9 +1651,7 @@ app.get("/:id/related", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(related), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(related), 'EX', 60);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1721,10 +1682,7 @@ app.get("/:id/mappings", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(mappings), {
-    // 1 day
-    EX: 86400,
-  });
+  await client.set(cacheKey, JSON.stringify(mappings), 'EX', 86400);
 
   return c.json(mappings, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1755,10 +1713,7 @@ app.get("/:id/media", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(media), {
-    // 1 day
-    EX: 86400,
-  });
+  await client.set(cacheKey, JSON.stringify(media), 'EX', 86400);
 
   return c.json(media, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1839,9 +1794,7 @@ app.get("/:id/suggestions", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1921,9 +1874,7 @@ app.get("/:id/age-rating", async (c) => {
     );
   }
 
-  await client.set(cacheKey, JSON.stringify(ageRatings), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(ageRatings), 'EX', 3600);
 
   return c.json(ageRatings, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1955,9 +1906,7 @@ app.get("/:id/giveaways", async (c) => {
     }
   );
 
-  await client.set(cacheKey, JSON.stringify(giveaways), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(giveaways), 'EX', 3600);
 
   return c.json(giveaways, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2020,9 +1969,7 @@ app.get("/:id/ratings", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(ratings), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(ratings), 'EX', 3600);
 
   return c.json(ratings, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2051,9 +1998,7 @@ app.get("/:id/tops", async (c) => {
     return acc;
   }, {} as Record<string, number>);
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2099,9 +2044,7 @@ app.get("/:id/polls", async (c) => {
     })
     .toArray();
 
-  await client.set(cacheKey, JSON.stringify(polls[0]), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(polls[0]), 'EX', 3600);
 
   return c.json(polls[0], 200, {
     "Cache-Control": "public, max-age=60",
@@ -2451,9 +2394,7 @@ app.get("/:id/reviews-summary", async (c) => {
     totalReviews,
   };
 
-  await client.set(cacheKey, JSON.stringify(summary), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(summary), 'EX', 3600);
 
   return c.json(summary, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2561,9 +2502,7 @@ app.get("/:id/hltb", async (c) => {
     );
   }
 
-  await client.set(cacheKey, JSON.stringify(hltb), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(hltb), 'EX', 3600);
 
   return c.json(hltb, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2650,9 +2589,7 @@ app.get("/:id/collection", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2834,9 +2771,7 @@ app.get("/:id/bundle", async (c) => {
     bundlePrice: mainPrice,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2903,9 +2838,7 @@ app.get("/:id/in-bundle", async (c) => {
     })
   );
 
-  await client.set(cacheKey, JSON.stringify(bundles), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(bundles), 'EX', 3600);
 
   return c.json(bundles, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2960,9 +2893,7 @@ app.get("/:id/has-prepurchase", async (c) => {
   });
 
   if (!prePurchaseOffer) {
-    await client.set(cacheKey, JSON.stringify(false), {
-      EX: 3600,
-    });
+    await client.set(cacheKey, JSON.stringify(false), 'EX', 3600);
     return c.json(
       {
         hasPrepurchase: false,
@@ -2987,9 +2918,7 @@ app.get("/:id/has-prepurchase", async (c) => {
     },
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -3056,9 +2985,7 @@ app.get("/:id/has-regular", async (c) => {
   });
 
   if (!prePurchaseOffer) {
-    await client.set(cacheKey, JSON.stringify(true), {
-      EX: 3600,
-    });
+    await client.set(cacheKey, JSON.stringify(true), 'EX', 3600);
     return c.json(
       {
         isPrepurchase: false,
@@ -3083,9 +3010,7 @@ app.get("/:id/has-regular", async (c) => {
     },
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",

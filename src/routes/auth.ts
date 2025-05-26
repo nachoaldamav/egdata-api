@@ -87,9 +87,9 @@ export const epic = createMiddleware<EpicAuthMiddleware>(async (c, next) => {
   try {
     const decoded = jwt.decode(epicAuth) as
       | ({
-          sub: string;
-          appid: string;
-        } & jwt.JwtHeader & { header: { kid: string } })
+        sub: string;
+        appid: string;
+      } & jwt.JwtHeader & { header: { kid: string } })
       | null;
 
     if (!decoded || !decoded.sub || !decoded.appid) {
@@ -155,9 +155,9 @@ export const epicInfo = createMiddleware<EpicAuthMiddleware>(
     try {
       const decoded = jwt.decode(epicAuth) as
         | ({
-            sub: string;
-            appid: string;
-          } & jwt.JwtHeader & { header: { kid: string } })
+          sub: string;
+          appid: string;
+        } & jwt.JwtHeader & { header: { kid: string } })
         | null;
 
       if (!decoded || !decoded.sub || !decoded.appid) {
@@ -1103,9 +1103,7 @@ app.post("/v2/save-state", async (c) => {
   // Generate a random code
   const code = randomUUID().replaceAll("-", "").toUpperCase();
 
-  await client.set(`state-code:${code}`, "true", {
-    EX: 600,
-  });
+  await client.set(`state-code:${code}`, "true", 'EX', 3600);
 
   return c.json({
     state: code,

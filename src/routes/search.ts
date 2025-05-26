@@ -17,37 +17,37 @@ import type { Filter } from "meilisearch";
 interface SearchBody {
   title?: string;
   offerType?:
-    | "IN_GAME_PURCHASE"
-    | "BASE_GAME"
-    | "EXPERIENCE"
-    | "UNLOCKABLE"
-    | "ADD_ON"
-    | "Bundle"
-    | "CONSUMABLE"
-    | "WALLET"
-    | "OTHERS"
-    | "DEMO"
-    | "DLC"
-    | "VIRTUAL_CURRENCY"
-    | "BUNDLE"
-    | "DIGITAL_EXTRA"
-    | "EDITION";
+  | "IN_GAME_PURCHASE"
+  | "BASE_GAME"
+  | "EXPERIENCE"
+  | "UNLOCKABLE"
+  | "ADD_ON"
+  | "Bundle"
+  | "CONSUMABLE"
+  | "WALLET"
+  | "OTHERS"
+  | "DEMO"
+  | "DLC"
+  | "VIRTUAL_CURRENCY"
+  | "BUNDLE"
+  | "DIGITAL_EXTRA"
+  | "EDITION";
   tags?: string[];
   customAttributes?: string[];
   seller?: string;
   sortBy?:
-    | "releaseDate"
-    | "lastModifiedDate"
-    | "effectiveDate"
-    | "creationDate"
-    | "viewableDate"
-    | "pcReleaseDate"
-    | "upcoming"
-    | "priceAsc"
-    | "priceDesc"
-    | "price"
-    | "discount"
-    | "discountPercent";
+  | "releaseDate"
+  | "lastModifiedDate"
+  | "effectiveDate"
+  | "creationDate"
+  | "viewableDate"
+  | "pcReleaseDate"
+  | "upcoming"
+  | "priceAsc"
+  | "priceDesc"
+  | "price"
+  | "discount"
+  | "discountPercent";
   sortDir?: "asc" | "desc";
   limit?: number;
   page?: number;
@@ -463,9 +463,7 @@ app.post("/", async (c) => {
     query: queryId,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -802,31 +800,31 @@ app.get("/:id/count", async (c) => {
           $facet: {
             // Get total count
             total: [{ $count: "total" }],
-            
+
             // Get tag counts
             tagCounts: [
               { $unwind: "$tags" },
               { $group: { _id: "$tags.id", count: { $sum: 1 } } }
             ],
-            
+
             // Get offer type counts
             offerTypeCounts: [
               { $group: { _id: "$offerType", count: { $sum: 1 } } }
             ],
-            
+
             // Get developer counts
             developer: [
               { $unwind: "$developerDisplayName" },
               { $group: { _id: "$developerDisplayName", count: { $sum: 1 } } }
             ],
-            
+
             // Get publisher counts
             publisher: [
               { $unwind: "$publisherDisplayName" },
               { $group: { _id: "$publisherDisplayName", count: { $sum: 1 } } },
               { $sort: { count: -1 } }
             ],
-            
+
             // Get price range
             priceRange: [
               {
@@ -857,9 +855,7 @@ app.get("/:id/count", async (c) => {
     };
 
     // Cache the result for 24 hours
-    await client.set(cacheKey, JSON.stringify(result), {
-      EX: 86400,
-    });
+    await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
     return c.json(result, 200, {
       "Cache-Control": "public, max-age=60",

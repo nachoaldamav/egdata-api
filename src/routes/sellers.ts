@@ -77,6 +77,8 @@ app.get('/:id', async (c) => {
     };
   });
 
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+
   return c.json(result);
 });
 
@@ -163,9 +165,7 @@ app.get('/:id/cover', async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result);
 });
@@ -222,9 +222,7 @@ app.get('/:id/stats', async (c) => {
     seller,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result);
 });

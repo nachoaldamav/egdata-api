@@ -159,9 +159,7 @@ app.get('/history', async (c) => {
     })
   );
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     'Cache-Control': 'private, max-age=0',
@@ -381,9 +379,7 @@ app.get('/search', async (c) => {
     total: result.estimatedTotalHits,
   };
 
-  await client.set(cacheKey, JSON.stringify(response), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 60);
 
   return c.json(response, 200, {
     'Server-Timing': `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -497,9 +493,7 @@ app.get('/stats', async (c) => {
     sellers: Object.keys(singleSellers).length,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 30,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     'Cache-Control': 'private, max-age=0',

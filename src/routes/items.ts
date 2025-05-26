@@ -240,9 +240,7 @@ app.get("/:id/changelog", async (c) => {
   ]).toArray();
 
   // Cache the results
-  await client.set(cacheKey, JSON.stringify(changelog), {
-    EX: 60,
-  });
+  await client.set(cacheKey, JSON.stringify(changelog), 'EX', 3600);
 
   return c.json(changelog, 200, {
     "Cache-Control": "public, max-age=60",
@@ -279,9 +277,7 @@ app.get("/:id/offer", async (c) => {
 
   if (offers.length === 1) {
     // Cache the result
-    await client.set(cacheKey, JSON.stringify(offers[0]), {
-      EX: CACHE_TTL,
-    });
+    await client.set(cacheKey, JSON.stringify(offers[0]), 'EX', 3600);
 
     return c.json(offers[0], 200, {
       "Cache-Control": `public, max-age=${CACHE_TTL}`,
@@ -293,9 +289,7 @@ app.get("/:id/offer", async (c) => {
     const offer = offers.find((o) => !o.prePurchase);
     if (offer) {
       // Cache the result
-      await client.set(cacheKey, JSON.stringify(offer), {
-        EX: CACHE_TTL,
-      });
+      await client.set(cacheKey, JSON.stringify(offer), 'EX', 3600);
 
       return c.json(offer, 200, {
         "Cache-Control": `public, max-age=${CACHE_TTL}`,

@@ -146,9 +146,7 @@ app.get("/:slug", async (c) => {
     updatedAt: collection.updatedAt.toISOString(),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -280,9 +278,7 @@ app.get("/:slug/:week", async (c) => {
     end,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",

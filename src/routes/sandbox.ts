@@ -63,12 +63,11 @@ app.get("/sitemap.xml", async (c) => {
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${Array.from(
-    { length: Math.ceil(count / limit) },
-    (_, i) =>
-      `<sitemap><loc>https://eu.api.egdata.app/sandboxes/sitemap.xml?page=${
-        i + 1
-      }</loc></sitemap>`
-  ).join("")}
+      { length: Math.ceil(count / limit) },
+      (_, i) =>
+        `<sitemap><loc>https://eu.api.egdata.app/sandboxes/sitemap.xml?page=${i + 1
+        }</loc></sitemap>`
+    ).join("")}
 </sitemapindex>`;
 
     return c.text(sitemap, 200, {
@@ -102,15 +101,15 @@ app.get("/sitemap.xml", async (c) => {
             <lastmod>${(sandbox.updated as Date).toISOString()}</lastmod>
             </url>
             ${sections
-              .map(
-                (section) => `
+            .map(
+              (section) => `
             <url>
               <loc>${url}${section}</loc>
               <lastmod>${(sandbox.updated as Date).toISOString()}</lastmod>
             </url>
             `
-              )
-              .join("\n")}
+            )
+            .join("\n")}
             `;
       })
       .join("\n")}
@@ -281,9 +280,7 @@ app.get("/:sandboxId/assets", async (ctx) => {
     }
   }
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return ctx.json(result);
 });
@@ -380,9 +377,7 @@ app.get("/:sandboxId/base-game", async (c) => {
     price: price ?? null,
   };
 
-  await client.set(cacheKey, JSON.stringify(offer), {
-    EX: 3600,
-  });
+  await client.set(cacheKey, JSON.stringify(offer), 'EX', 3600);
 
   return c.json(offer);
 });
@@ -534,9 +529,7 @@ app.get("/:sandboxId/changelog", async (c) => {
     offset: skip,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), {
-    EX: 600,
-  });
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
 
   return c.json(result);
 });
