@@ -883,4 +883,48 @@ app.get('/mobile', async (c) => {
   return c.json(result.filter((r) => r !== null), 200);
 });
 
+app.get('/sellers', async (c) => {
+  const sellers = await db.db.collection('freegames').aggregate(
+    [
+      {
+        $group: {
+          _id: '$id',
+          doc: { $first: '$$ROOT' }
+        }
+      },
+      { $replaceRoot: { newRoot: '$doc' } },
+      {
+        $lookup: {
+          from: 'offers',
+          localField: 'id',
+          foreignField: 'id',
+          as: 'offer'
+        }
+      },
+      { $unwind: '$offer' },
+      {
+        $group: {
+          _id: {
+            sellerId: '$offer.seller.id',
+            sellerName: '$offer.seller.name'
+          },
+          totalSingleGames: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          sellerId: '$_id.sellerId',
+          sellerName: '$_id.sellerName',
+          totalSingleGames: 1
+        }
+      },
+      { $sort: { totalSingleGames: -1 } }
+    ],
+    { maxTimeMS: 60000, allowDiskUse: true }
+  ).toArray();
+
+  return c.json(sellers, 200);
+});
+
 export default app;
