@@ -141,6 +141,9 @@ app.get("/:sandboxId", async (c) => {
 
 app.get("/:sandboxId/items", async (ctx) => {
   const { sandboxId } = ctx.req.param();
+  const page = Number.parseInt(ctx.req.query("page") || "1", 10);
+  const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
+  const skip = (page - 1) * limit;
 
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
@@ -155,25 +158,40 @@ app.get("/:sandboxId/items", async (ctx) => {
     });
   }
 
-  const items = await Item.find(
-    {
-      namespace: sandboxId,
-    },
-    undefined,
-    {
-      sort: {
-        lastModified: -1,
+  const [items, count] = await Promise.all([
+    Item.find(
+      {
+        namespace: sandboxId,
       },
-    }
-  );
+      undefined,
+      {
+        sort: {
+          lastModified: -1,
+        },
+        skip,
+        limit,
+      }
+    ),
+    Item.countDocuments({
+      namespace: sandboxId,
+    }),
+  ]);
 
-  return ctx.json(items, 200, {
+  return ctx.json({
+    elements: items,
+    page,
+    limit,
+    count,
+  }, 200, {
     "Cache-Control": "public, max-age=60",
   });
 });
 
 app.get("/:sandboxId/offers", async (ctx) => {
   const { sandboxId } = ctx.req.param();
+  const page = Number.parseInt(ctx.req.query("page") || "1", 10);
+  const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
+  const skip = (page - 1) * limit;
 
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
@@ -188,25 +206,40 @@ app.get("/:sandboxId/offers", async (ctx) => {
     });
   }
 
-  const offers = await Offer.find(
-    {
-      namespace: sandboxId,
-    },
-    undefined,
-    {
-      sort: {
-        lastModified: -1,
+  const [offers, count] = await Promise.all([
+    Offer.find(
+      {
+        namespace: sandboxId,
       },
-    }
-  );
+      undefined,
+      {
+        sort: {
+          lastModified: -1,
+        },
+        skip,
+        limit,
+      }
+    ),
+    Offer.countDocuments({
+      namespace: sandboxId,
+    }),
+  ]);
 
-  return ctx.json(offers);
+  return ctx.json({
+    elements: offers,
+    page,
+    limit,
+    count,
+  });
 });
 
 app.get("/:sandboxId/assets", async (ctx) => {
   const { sandboxId } = ctx.req.param();
+  const page = Number.parseInt(ctx.req.query("page") || "1", 10);
+  const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
+  const skip = (page - 1) * limit;
 
-  const cacheKey = `${sandboxId}-assets`;
+  const cacheKey = `${sandboxId}-assets-${page}-${limit}`;
 
   const cached = await client.get(cacheKey);
 
@@ -227,7 +260,7 @@ app.get("/:sandboxId/assets", async (ctx) => {
     });
   }
 
-  const [assets, items] = await Promise.all([
+  const [assets, items, count] = await Promise.all([
     Asset.find(
       {
         namespace: sandboxId,
@@ -237,6 +270,8 @@ app.get("/:sandboxId/assets", async (ctx) => {
         sort: {
           lastModified: -1,
         },
+        skip,
+        limit,
       }
     ),
     Item.find(
@@ -250,6 +285,9 @@ app.get("/:sandboxId/assets", async (ctx) => {
         title: 1,
       }
     ),
+    Asset.countDocuments({
+      namespace: sandboxId,
+    }),
   ]);
 
   const result = assets.map((a) => {
@@ -274,15 +312,23 @@ app.get("/:sandboxId/assets", async (ctx) => {
             platform,
             _id: new ObjectId(),
             title: item.title,
+            __v: 0,
           });
         }
       }
     }
   }
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  const response = {
+    elements: result,
+    page,
+    limit,
+    count,
+  };
 
-  return ctx.json(result);
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+
+  return ctx.json(response);
 });
 
 app.get("/:sandboxId/base-game", async (c) => {
@@ -536,6 +582,9 @@ app.get("/:sandboxId/changelog", async (c) => {
 
 app.get("/:sandboxId/builds", async (c) => {
   const { sandboxId } = c.req.param();
+  const page = Number.parseInt(c.req.query("page") || "1", 10);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10", 10), 100);
+  const skip = (page - 1) * limit;
 
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
@@ -554,16 +603,32 @@ app.get("/:sandboxId/builds", async (c) => {
     namespace: sandboxId,
   });
 
-  const builds = await db.db
-    .collection("builds")
-    .find({
-      appName: {
-        $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
-      },
-    })
-    .toArray();
+  const [builds, count] = await Promise.all([
+    db.db
+      .collection("builds")
+      .find({
+        appName: {
+          $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+        },
+      })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.db
+      .collection("builds")
+      .countDocuments({
+        appName: {
+          $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+        },
+      }),
+  ]);
 
-  return c.json(builds);
+  return c.json({
+    elements: builds,
+    page,
+    limit,
+    count,
+  });
 });
 
 app.get("/:sandboxId/stats", async (c) => {
