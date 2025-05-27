@@ -63,6 +63,7 @@ interface SearchBody {
   publisherDisplayName?: string;
   spt?: boolean;
   excludeBlockchain?: boolean;
+  pastGiveaways?: boolean;
 }
 
 interface MongoQuery {
@@ -143,7 +144,7 @@ function buildBaseQuery(query: SearchBody): MongoQuery {
 
   if (query.excludeBlockchain) {
     if (query.tags) {
-      mongoQuery["tags.id"].$ne = "21739";
+      mongoQuery["tags.id"] = { $all: query.tags, $ne: "21739" };
     } else {
       mongoQuery["tags.id"] = { $ne: "21739" };
     }
@@ -372,6 +373,21 @@ app.post("/", async (c) => {
       {
         $match: mongoQuery,
       },
+      ...(query.pastGiveaways ? [
+        {
+          $lookup: {
+            from: "freegames",
+            localField: "id",
+            foreignField: "id",
+            as: "freegame"
+          }
+        },
+        {
+          $match: {
+            freegame: { $ne: [] }
+          }
+        }
+      ] : []),
       {
         $skip: (page - 1) * limit,
       },
@@ -387,6 +403,7 @@ app.post("/", async (c) => {
           country: 0,
           offerId: 0,
           updatedAt: 0,
+          freegame: 0
         },
       },
     ];
@@ -427,9 +444,25 @@ app.post("/", async (c) => {
           price: { $ne: null },
         },
       },
+      ...(query.pastGiveaways ? [
+        {
+          $lookup: {
+            from: "freegames",
+            localField: "id",
+            foreignField: "id",
+            as: "freegame"
+          }
+        },
+        {
+          $match: {
+            freegame: { $ne: [] }
+          }
+        }
+      ] : []),
       {
         $project: {
           priceEngine: 0,
+          freegame: 0
         },
       },
       {
@@ -796,6 +829,21 @@ app.get("/:id/count", async (c) => {
             price: { $ne: null },
           },
         },
+        ...(query.pastGiveaways ? [
+          {
+            $lookup: {
+              from: "freegames",
+              localField: "id",
+              foreignField: "id",
+              as: "freegame"
+            }
+          },
+          {
+            $match: {
+              freegame: { $ne: [] }
+            }
+          }
+        ] : []),
         {
           $facet: {
             // Get total count
