@@ -239,7 +239,7 @@ app.get("/:sandboxId/assets", async (ctx) => {
   const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
   const skip = (page - 1) * limit;
 
-  const cacheKey = `${sandboxId}-assets-${page}-${limit}`;
+  const cacheKey = `${sandboxId}-assets-${page}-${limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
@@ -260,7 +260,21 @@ app.get("/:sandboxId/assets", async (ctx) => {
     });
   }
 
-  const [assets, items, count] = await Promise.all([
+  // First get all items to find missing assets
+  const items = await Item.find(
+    {
+      namespace: sandboxId,
+    },
+    {
+      id: 1,
+      namespace: 1,
+      releaseInfo: 1,
+      title: 1,
+    }
+  );
+
+  // Get all assets for this namespace
+  const [assets, totalCount] = await Promise.all([
     Asset.find(
       {
         namespace: sandboxId,
@@ -268,21 +282,8 @@ app.get("/:sandboxId/assets", async (ctx) => {
       undefined,
       {
         sort: {
-          lastModified: -1,
-        },
-        skip,
-        limit,
-      }
-    ),
-    Item.find(
-      {
-        namespace: sandboxId,
-      },
-      {
-        id: 1,
-        namespace: 1,
-        releaseInfo: 1,
-        title: 1,
+          updatedAt: -1,
+        }
       }
     ),
     Asset.countDocuments({
@@ -290,20 +291,16 @@ app.get("/:sandboxId/assets", async (ctx) => {
     }),
   ]);
 
-  const result = assets.map((a) => {
-    const item = items.find((i) => i.id === a.itemId);
-    return {
-      ...a.toObject(),
-      title: item?.title,
-    };
-  });
+  // Create a map of all assets by artifactId for quick lookup
+  const assetsMap = new Map(assets.map(a => [a.artifactId, a]));
 
-  // Some assets are not found because they are protected or hidden, but we know they exist, so we add them to the result with 0 sizes
+  // Add missing assets for items that have releaseInfo but no corresponding asset
+  const allAssets = [...assets];
   for (const item of items) {
     for (const releaseInfo of item.releaseInfo) {
-      if (!assets.find((a) => a.artifactId === releaseInfo.appId)) {
+      if (!assetsMap.has(releaseInfo.appId as string)) {
         for (const platform of releaseInfo.platform) {
-          result.push({
+          allAssets.push({
             artifactId: releaseInfo.appId as string,
             downloadSizeBytes: 0,
             installedSizeBytes: 0,
@@ -313,17 +310,31 @@ app.get("/:sandboxId/assets", async (ctx) => {
             _id: new ObjectId(),
             title: item.title,
             __v: 0,
-          });
+            updatedAt: new Date(0),
+          } as any);
         }
       }
     }
   }
 
+  // Sort all assets by updatedAt
+  allAssets.sort((a, b) => {
+    const dateA = a.updatedAt || new Date(0);
+    const dateB = b.updatedAt || new Date(0);
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  // Get total count including virtual assets
+  const totalAssetCount = allAssets.length;
+
+  // Apply pagination to the combined results
+  const paginatedAssets = allAssets.slice(skip, skip + limit);
+
   const response = {
-    elements: result,
+    elements: paginatedAssets,
     page,
     limit,
-    count,
+    count: totalAssetCount,
   };
 
   await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
@@ -599,18 +610,25 @@ app.get("/:sandboxId/builds", async (c) => {
     });
   }
 
+  // First get all items to get the appIds
   const items = await Item.find({
     namespace: sandboxId,
+  }, {
+    releaseInfo: 1,
   });
 
+  const appIds = items.flatMap((i) => i.releaseInfo.map((r) => r.appId));
+
+  // Get all builds for these appIds
   const [builds, count] = await Promise.all([
     db.db
       .collection("builds")
       .find({
         appName: {
-          $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+          $in: appIds,
         },
       })
+      .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
       .toArray(),
@@ -618,7 +636,7 @@ app.get("/:sandboxId/builds", async (c) => {
       .collection("builds")
       .countDocuments({
         appName: {
-          $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+          $in: appIds,
         },
       }),
   ]);
