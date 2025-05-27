@@ -817,8 +817,9 @@ app.post("/exists", async (c) => {
   const existingOffers = await Offer.find({
     id: { $in: offers }
   });
-  const nonExistingOffers = offers.filter((offer) => !existingOffers.some((o) => o.id === offer));
-  return c.json({ existingOffers, nonExistingOffers }, 200);
+  const existingIds = existingOffers.map(o => o.id);
+  const nonExistingOffers = offers.filter((offer) => !existingIds.includes(offer));
+  return c.json({ existingOffers: existingIds, nonExistingOffers }, 200);
 });
 
 app.get("/:id", async (c) => {
