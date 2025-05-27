@@ -24,6 +24,15 @@ app.get("/", async (ctx) => {
   );
   const skip = (page - 1) * limit;
 
+  const cacheKey = `sandboxes-list:${page}:${limit}:v0.1`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return ctx.json(JSON.parse(cached), 200, {
+      "Server-Timing": `cache;dur=${Date.now() - start}`,
+    });
+  }
+
   const sandboxes = await Namespace.find(
     {},
     {
@@ -38,18 +47,18 @@ app.get("/", async (ctx) => {
 
   const count = await Namespace.countDocuments();
 
-  return ctx.json(
-    {
-      elements: sandboxes,
-      page,
-      limit,
-      count,
-    },
-    200,
-    {
-      "Server-Timing": `db;dur=${Date.now() - start}`,
-    }
-  );
+  const response = {
+    elements: sandboxes,
+    page,
+    limit,
+    count,
+  };
+
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+
+  return ctx.json(response, 200, {
+    "Server-Timing": `db;dur=${Date.now() - start}`,
+  });
 });
 
 app.get("/sitemap.xml", async (c) => {
@@ -122,6 +131,12 @@ app.get("/sitemap.xml", async (c) => {
 
 app.get("/:sandboxId", async (c) => {
   const { sandboxId } = c.req.param();
+  const cacheKey = `sandbox:${sandboxId}:v0.1`;
+
+  const cached = await client.get(cacheKey);
+  if (cached) {
+    return c.json(JSON.parse(cached));
+  }
 
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
@@ -130,12 +145,12 @@ app.get("/:sandboxId", async (c) => {
 
   if (!sandbox) {
     c.status(404);
-
     return c.json({
       message: "Sandbox not found",
     });
   }
 
+  await client.set(cacheKey, JSON.stringify(sandbox), 'EX', 3600);
   return c.json(sandbox);
 });
 
@@ -145,6 +160,15 @@ app.get("/:sandboxId/items", async (ctx) => {
   const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
   const skip = (page - 1) * limit;
 
+  const cacheKey = `sandbox:${sandboxId}:items:${page}:${limit}:v0.1`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return ctx.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
@@ -152,7 +176,6 @@ app.get("/:sandboxId/items", async (ctx) => {
 
   if (!sandbox) {
     ctx.status(404);
-
     return ctx.json({
       message: "Sandbox not found",
     });
@@ -177,12 +200,16 @@ app.get("/:sandboxId/items", async (ctx) => {
     }),
   ]);
 
-  return ctx.json({
+  const response = {
     elements: items,
     page,
     limit,
     count,
-  }, 200, {
+  };
+
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+
+  return ctx.json(response, 200, {
     "Cache-Control": "public, max-age=60",
   });
 });
@@ -193,6 +220,13 @@ app.get("/:sandboxId/offers", async (ctx) => {
   const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
   const skip = (page - 1) * limit;
 
+  const cacheKey = `sandbox:${sandboxId}:offers:${page}:${limit}:v0.1`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return ctx.json(JSON.parse(cached));
+  }
+
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
@@ -200,7 +234,6 @@ app.get("/:sandboxId/offers", async (ctx) => {
 
   if (!sandbox) {
     ctx.status(404);
-
     return ctx.json({
       message: "Sandbox not found",
     });
@@ -225,12 +258,16 @@ app.get("/:sandboxId/offers", async (ctx) => {
     }),
   ]);
 
-  return ctx.json({
+  const response = {
     elements: offers,
     page,
     limit,
     count,
-  });
+  };
+
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+
+  return ctx.json(response);
 });
 
 app.get("/:sandboxId/assets", async (ctx) => {
@@ -361,6 +398,15 @@ app.get("/:sandboxId/base-game", async (c) => {
     });
   }
 
+  const cacheKey = `base-game:${sandboxId}:${region}:v0.1`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
@@ -371,16 +417,6 @@ app.get("/:sandboxId/base-game", async (c) => {
 
     return c.json({
       message: "Sandbox not found",
-    });
-  }
-
-  const cacheKey = `base-game:${sandboxId}:${region}:v0.1`;
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      "Cache-Control": "public, max-age=60",
     });
   }
 
@@ -410,10 +446,12 @@ app.get("/:sandboxId/base-game", async (c) => {
       });
 
       if (executableGame) {
-        return c.json({
+        const response = {
           ...executableGame.toObject(),
           isItem: true,
-        });
+        };
+        await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+        return c.json(response);
       }
 
       c.status(404);
@@ -429,18 +467,24 @@ app.get("/:sandboxId/base-game", async (c) => {
     region,
   });
 
-  const offer = {
+  const response = {
     ...orderOffersObject(baseGame),
     price: price ?? null,
   };
 
-  await client.set(cacheKey, JSON.stringify(offer), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
 
-  return c.json(offer);
+  return c.json(response);
 });
 
 app.get("/:sandboxId/achievements", async (c) => {
   const { sandboxId } = c.req.param();
+  const cacheKey = `sandbox:${sandboxId}:achievements:v0.1`;
+
+  const cached = await client.get(cacheKey);
+  if (cached) {
+    return c.json(JSON.parse(cached));
+  }
 
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
@@ -449,7 +493,6 @@ app.get("/:sandboxId/achievements", async (c) => {
 
   if (!sandbox) {
     c.status(404);
-
     return c.json({
       message: "Sandbox not found",
     });
@@ -458,6 +501,8 @@ app.get("/:sandboxId/achievements", async (c) => {
   const achievements = await AchievementSet.find({
     sandboxId: sandboxId,
   });
+
+  await client.set(cacheKey, JSON.stringify(achievements), 'EX', 3600);
 
   return c.json(achievements);
 });
@@ -469,8 +514,7 @@ app.get("/:sandboxId/changelog", async (c) => {
 
   const skip = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
 
-  const cacheKey = `changelog:${sandboxId}:${skip}:${limit}`;
-
+  const cacheKey = `changelog:${sandboxId}:${skip}:${limit}:v0.1`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -486,7 +530,6 @@ app.get("/:sandboxId/changelog", async (c) => {
 
   if (!sandbox) {
     c.status(404);
-
     return c.json({
       message: "Sandbox not found",
     });
@@ -597,6 +640,13 @@ app.get("/:sandboxId/builds", async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query("limit") || "10", 10), 100);
   const skip = (page - 1) * limit;
 
+  const cacheKey = `sandbox:${sandboxId}:builds:${page}:${limit}:v0.1`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached));
+  }
+
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
     _id: sandboxId,
@@ -604,7 +654,6 @@ app.get("/:sandboxId/builds", async (c) => {
 
   if (!sandbox) {
     c.status(404);
-
     return c.json({
       message: "Sandbox not found",
     });
@@ -641,16 +690,26 @@ app.get("/:sandboxId/builds", async (c) => {
       }),
   ]);
 
-  return c.json({
+  const response = {
     elements: builds,
     page,
     limit,
     count,
-  });
+  };
+
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+
+  return c.json(response);
 });
 
 app.get("/:sandboxId/stats", async (c) => {
   const { sandboxId } = c.req.param();
+  const cacheKey = `sandbox:${sandboxId}:stats:v0.1`;
+
+  const cached = await client.get(cacheKey);
+  if (cached) {
+    return c.json(JSON.parse(cached));
+  }
 
   const sandbox = await db.db.collection("sandboxes").findOne({
     // @ts-ignore
@@ -659,13 +718,12 @@ app.get("/:sandboxId/stats", async (c) => {
 
   if (!sandbox) {
     c.status(404);
-
     return c.json({
       message: "Sandbox not found",
     });
   }
 
-  const [offers, items, achievements] = await Promise.all([
+  const [offers, items, achievements, assets] = await Promise.all([
     Offer.countDocuments({
       namespace: sandboxId,
     }),
@@ -675,12 +733,25 @@ app.get("/:sandboxId/stats", async (c) => {
     AchievementSet.find({
       sandboxId,
     }),
-  ]);
-
-  const [assets, builds] = await Promise.all([
-    Asset.countDocuments({
+    Asset.find({
       namespace: sandboxId,
     }),
+  ]);
+
+  // Create a map of all assets by artifactId for quick lookup
+  const assetsMap = new Map(assets.map(a => [a.artifactId, a]));
+
+  // Count virtual assets (those that exist in releaseInfo but don't have a corresponding asset)
+  let virtualAssetsCount = 0;
+  for (const item of items) {
+    for (const releaseInfo of item.releaseInfo) {
+      if (!assetsMap.has(releaseInfo.appId as string)) {
+        virtualAssetsCount += releaseInfo.platform.length;
+      }
+    }
+  }
+
+  const [builds] = await Promise.all([
     db.db
       .collection("builds")
       .find({
@@ -691,13 +762,17 @@ app.get("/:sandboxId/stats", async (c) => {
       .toArray(),
   ]);
 
-  return c.json({
+  const response = {
     offers,
     items: items.length,
-    assets,
+    assets: assets.length + virtualAssetsCount,
     builds: builds.length,
     achievements: achievements.flatMap((a) => a.achievements).length,
-  });
+  };
+
+  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+
+  return c.json(response);
 });
 
 export default app;
