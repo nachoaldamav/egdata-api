@@ -811,6 +811,16 @@ app.post("/slugs", async (c) => {
   });
 });
 
+app.post("/exists", async (c) => {
+  const { offers } = await c.req.json<{ offers: string[] }>();
+  // Return 2 arrays, the offers IDs that already exist and the ones that don't
+  const existingOffers = await Offer.find({
+    id: { $in: offers }
+  });
+  const nonExistingOffers = offers.filter((offer) => !existingOffers.some((o) => o.id === offer));
+  return c.json({ existingOffers, nonExistingOffers }, 200);
+});
+
 app.get("/:id", async (c) => {
   const { id } = c.req.param();
 
