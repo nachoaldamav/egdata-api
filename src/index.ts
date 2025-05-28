@@ -247,71 +247,92 @@ Allow: /sandboxes/sitemap.xml?*
 });
 
 app.get("/sitemap.xml", async (c) => {
-  const cacheKey = "sitemap";
+  const cacheKey = "sitemap-index";
   const cacheTimeInSec = 3600 * 24; // 1 day
   const cacheStaleTimeInSec = cacheTimeInSec * 7; // 7 days
-  const cached = await client.get(cacheKey);
-  let siteMap = "";
+  const cached = false;
+  const { page } = c.req.query();
+  const limit = 1000;
 
-  const sections = [
-    "items",
-    "achievements",
-    "related",
-    "metadata",
-    "changelog",
-    "media",
-  ];
+  if (!page) {
+    // Show the sitemap index, which contains the other sitemaps for all pages
+    let siteMapIndex = "";
 
-  if (cached) {
-    siteMap = cached;
-  } else {
-    siteMap = `<?xml version="1.0" encoding="UTF-8"?>
-  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+    if (cached) {
+      siteMapIndex = cached;
+    } else {
+      const count = await Offer.countDocuments();
+      siteMapIndex = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${Array.from(
+        { length: Math.ceil(count / limit) },
+        (_, i) =>
+          `<sitemap><loc>https://api.egdata.app/sitemap.xml?page=${i + 1}</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`
+      ).join("")}
+</sitemapindex>`;
 
-    const pageSize = 1000;
-    let page = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      const offers = await Offer.find(
-        {},
-        { id: 1, lastModifiedDate: 1 },
-        {
-          limit: pageSize,
-          skip: page * pageSize,
-          sort: { lastModifiedDate: -1 },
-        }
-      );
-
-      hasMore = offers.length === pageSize;
-
-      if (0 < offers.length) {
-        offers.forEach((offer) => {
-          siteMap += `
-        <url>
-          <loc>https://egdata.app/offers/${offer.id}</loc>
-          <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
-        </url>
-        ${sections
-              .map(
-                (section) => `
-        <url>
-          <loc>https://egdata.app/offers/${offer.id}/${section}</loc>
-          <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
-        </url>
-        `
-              )
-              .join("")}
-        `;
-        });
-
-        page++;
-      }
+      await client.set(cacheKey, siteMapIndex, 'EX', cacheTimeInSec);
     }
 
-    siteMap += "</urlset>";
+    return c.text(siteMapIndex, 200, {
+      "Content-Type": "application/xml",
+      "Cache-Control": `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
+    });
+  }
 
-    await client.set(cacheKey, siteMap, 'EX', cacheTimeInSec);
+  // Generate individual sitemap page
+  const cacheKeyPage = `sitemap-page-${page}`;
+  const cachedPage = await client.get(cacheKeyPage);
+  let siteMap = "";
+
+  if (cachedPage) {
+    siteMap = cachedPage;
+  } else {
+    const sections = [
+      "price",
+      "items",
+      "achievements",
+      "related",
+      "metadata",
+      "changelog",
+      "media",
+    ];
+
+    const offers = await Offer.find(
+      {},
+      { id: 1, lastModifiedDate: 1 },
+      {
+        limit,
+        skip: (Number.parseInt(page, 10) - 1) * limit,
+        sort: { lastModifiedDate: -1 },
+      }
+    );
+
+    siteMap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${offers
+        .map((offer) => {
+          const url = `https://egdata.app/offers/${offer.id}`;
+          return `<url>
+        <loc>${url}</loc>
+        <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
+      </url>
+      ${sections
+              .map(
+                (section) => `
+      <url>
+        <loc>${url}/${section}</loc>
+        <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
+      </url>
+      `
+              )
+              .join("\n")}
+      `;
+        })
+        .join("\n")}
+</urlset>`;
+
+    await client.set(cacheKeyPage, siteMap, 'EX', cacheTimeInSec);
   }
 
   return c.text(siteMap, 200, {
