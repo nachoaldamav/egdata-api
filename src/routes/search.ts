@@ -83,6 +83,7 @@ interface MongoQuery {
   developerDisplayName?: string;
   publisherDisplayName?: string;
   "keyImages.url"?: { $regex: RegExp };
+  namespace?: { $ne: string };
   [key: string]: any;
 }
 
@@ -96,6 +97,9 @@ interface PriceQuery {
 
 function buildBaseQuery(query: SearchBody): MongoQuery {
   const mongoQuery: MongoQuery = {};
+
+  // Always exclude 'ue' namespace
+  mongoQuery.namespace = { $ne: "ue" };
 
   if (query.title) {
     mongoQuery.$text = {
@@ -724,6 +728,9 @@ app.get("/:id/count", async (c) => {
 
   const mongoQuery: Record<string, any> = {};
   const priceQuery: Record<string, any> = {};
+
+  // Always exclude 'ue' namespace
+  mongoQuery.namespace = { $ne: "ue" };
 
   // Build queries as before
   if (query.title) {

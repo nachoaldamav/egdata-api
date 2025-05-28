@@ -23,6 +23,7 @@ app.get('/offers', async (c) => {
 
   const search = await meiliSearchClient.index('offers').search(query, {
     sort: ['offerTypeRank:asc', 'lastModifiedDate:desc'],
+    filter: ['namespace != "ue"']
   });
 
   return c.json({
@@ -39,9 +40,14 @@ app.get('/offers', async (c) => {
 app.get('/items', async (c) => {
   const { query, type: entitlementType } = c.req.query();
 
+  const filters = ['namespace != "ue"'];
+  if (entitlementType) {
+    filters.push(`entitlementType = ${entitlementType}`);
+  }
+
   const search = await meiliSearchClient.index('items').search(query, {
     sort: ['lastModifiedDate:desc'],
-    filter: entitlementType ? [`entitlementType = ${entitlementType}`] : [],
+    filter: filters
   });
 
   return c.json({
