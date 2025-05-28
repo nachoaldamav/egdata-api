@@ -33,6 +33,99 @@ app.get('/', async (c) => {
   });
 });
 
+app.get("/sitemap.xml", async (c) => {
+  const cacheKey = "items-sitemap-index";
+  const cacheTimeInSec = 3600 * 24; // 1 day
+  const cacheStaleTimeInSec = cacheTimeInSec * 7; // 7 days
+  const cached = false;
+  const { page } = c.req.query();
+  const limit = 1000;
+
+  if (!page) {
+    // Show the sitemap index, which contains the other sitemaps for all pages
+    let siteMapIndex = "";
+
+    if (cached) {
+      siteMapIndex = cached;
+    } else {
+      const count = await Item.countDocuments();
+      siteMapIndex = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${Array.from(
+        { length: Math.ceil(count / limit) },
+        (_, i) =>
+          `<sitemap><loc>https://api.egdata.app/items/sitemap.xml?page=${i + 1}</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`
+      ).join("")}
+</sitemapindex>`;
+
+      await client.set(cacheKey, siteMapIndex, 'EX', cacheTimeInSec);
+    }
+
+    return c.text(siteMapIndex, 200, {
+      "Content-Type": "application/xml",
+      "Cache-Control": `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
+    });
+  }
+
+  // Generate individual sitemap page
+  const cacheKeyPage = `items-sitemap-page-${page}`;
+  const cachedPage = await client.get(cacheKeyPage);
+  let siteMap = "";
+
+  if (cachedPage) {
+    siteMap = cachedPage;
+  } else {
+    const sections = [
+      "assets",
+      "builds",
+      "images",
+      "changelog",
+    ];
+
+    const items = await Item.find(
+      {},
+      { id: 1, lastModifiedDate: 1 },
+      {
+        limit,
+        skip: (Number.parseInt(page, 10) - 1) * limit,
+        sort: { lastModifiedDate: -1 },
+      }
+    );
+
+    siteMap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${items
+        .map((item) => {
+          const url = `https://egdata.app/items/${item.id}`;
+          return `<url>
+        <loc>${url}</loc>
+        <lastmod>${(item.lastModifiedDate as Date).toISOString()}</lastmod>
+      </url>
+      ${sections
+              .map(
+                (section) => `
+      <url>
+        <loc>${url}/${section}</loc>
+        <lastmod>${(item.lastModifiedDate as Date).toISOString()}</lastmod>
+      </url>
+      `
+              )
+              .join("\n")}
+      `;
+        })
+        .join("\n")}
+</urlset>`;
+
+    await client.set(cacheKeyPage, siteMap, 'EX', cacheTimeInSec);
+  }
+
+  return c.text(siteMap, 200, {
+    "Content-Type": "application/xml",
+    "Cache-Control": `max-age=${cacheTimeInSec}, stale-while-revalidate=${cacheStaleTimeInSec}`,
+  });
+});
+
+
 type BulkBody = { items: string[] };
 
 app.post('/bulk', async (c) => {
