@@ -539,49 +539,6 @@ app.get("/:sandboxId/achievements", async (c) => {
   return c.json(achievements);
 });
 
-type PipelineArgs = {
-  sandboxId: string;
-  skip: number;
-  limit: number;
-};
-
-// ──────────────────────────────────────────────────────────────────────────────
-//  Single‑pipeline aggregation
-// ──────────────────────────────────────────────────────────────────────────────
-function fullPipeline({ sandboxId, skip, limit }: PipelineArgs) {
-  return [
-    // Get changelog entries for offers
-    {
-      $lookup: {
-        from: "offers",
-        pipeline: [
-          { $match: { namespace: sandboxId } },
-          { $project: { _id: 0, id: 1 } },
-        ],
-        as: "offers",
-      },
-    },
-    { $unwind: "$offers" },
-    { $replaceRoot: { newRoot: "$offers" } },
-    {
-      $lookup: {
-        from: "changelogs_v2",
-        let: { id: "$id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$metadata.contextId", "$$id"] },
-            },
-          },
-        ],
-        as: "changes",
-      },
-    },
-    { $unwind: "$changes" },
-    { $replaceRoot: { newRoot: "$changes" } },
-  ];
-}
-
 app.get("/:sandboxId/changelog", async (c) => {
   const { sandboxId } = c.req.param();
   const limit = Number(c.req.query("limit") ?? "30");

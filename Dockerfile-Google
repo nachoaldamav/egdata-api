@@ -20,4 +20,4 @@ WORKDIR /app
 COPY --from=build /app /app
 EXPOSE 4000
 
-CMD [ "bun", "dist/index.js" ]
+CMD [ "node", "dist/index.js" ]
