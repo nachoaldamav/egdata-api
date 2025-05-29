@@ -1707,10 +1707,16 @@ app.get("/:id/related", async (c) => {
     });
   }
 
-  const related = await Offer.find({
-    namespace: offer.namespace,
-    id: { $ne: offer.id },
-  });
+  const related = await Offer.find(
+    {
+      namespace: offer.namespace,
+      id: { $ne: offer.id },
+    },
+    undefined,
+    {
+      limit: 25,
+    }
+  );
 
   const prices = await PriceEngine.find({
     offerId: { $in: related.map((o) => o.id) },
