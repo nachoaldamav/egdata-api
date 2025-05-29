@@ -33,4 +33,4 @@ COPY --from=build /app /app
 EXPOSE 4000
 EXPOSE 9229
 
-CMD ["node", "--inspect=0.0.0.0:9229", "dist/index.js"]
+CMD ["node", "dist/index.js"]
