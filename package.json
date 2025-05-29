@@ -41,6 +41,7 @@
     "consola": "^3.4.2",
     "dotenv": "16.4.5",
     "graphql-request": "^7.1.0",
+    "heapdump": "^0.3.15",
     "hono": "4.7.8",
     "hono-rate-limiter": "^0.4.2",
     "ioredis": "^5.6.1",
@@ -62,6 +63,7 @@
     "@rslib/core": "^0.1.4",
     "@trigger.dev/build": "^3.3.17",
     "@types/bun": "^1.2.11",
+    "@types/heapdump": "^0.3.4",
     "@types/jsonwebtoken": "9.0.3",
     "@types/jwk-to-pem": "^2.0.3",
     "@types/node": "20.14.11",
@@ -72,5 +74,10 @@
   },
   "trigger.dev": {
     "endpointId": "egdata-api"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "heapdump"
+    ]
   }
 }
