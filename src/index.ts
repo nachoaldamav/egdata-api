@@ -48,6 +48,7 @@ import { readFileSync } from "node:fs";
 import chalk from "chalk";
 import { rateLimiter } from "hono-rate-limiter";
 import { OpenAPIV3 } from "openapi-types";
+import { consola } from "./utils/logger.js";
 
 config();
 
@@ -85,6 +86,16 @@ app.use(
 );
 
 app.use("/*", etag());
+
+app.use("/*", (c, next) => {
+  const memoryUsage = process.memoryUsage();
+  consola.debug(
+    `[${c.req.method}] ${c.req.path} - Memory Usage: ${
+      memoryUsage.heapUsed / 1024 / 1024
+    }MB`
+  );
+  return next();
+});
 
 app.use(
   rateLimiter({
@@ -152,12 +163,12 @@ app.get("/open-api.json", async (c) => {
           content: {
             "application/json": {
               schema: {
-                type: "object"
-              }
-            }
-          }
-        }
-      }
+                type: "object",
+              },
+            },
+          },
+        },
+      },
     };
     return acc;
   }, {} as Record<string, any>);
@@ -177,7 +188,7 @@ app.get("/open-api.json", async (c) => {
       },
     ],
     paths,
-  }
+  };
 
   return c.json(result);
 });
@@ -268,13 +279,15 @@ app.get("/sitemap.xml", async (c) => {
       siteMapIndex = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${Array.from(
-        { length: Math.ceil(count / limit) },
-        (_, i) =>
-          `<sitemap><loc>https://api.egdata.app/sitemap.xml?page=${i + 1}</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`
-      ).join("")}
+    { length: Math.ceil(count / limit) },
+    (_, i) =>
+      `<sitemap><loc>https://api.egdata.app/sitemap.xml?page=${
+        i + 1
+      }</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`
+  ).join("")}
 </sitemapindex>`;
 
-      await client.set(cacheKey, siteMapIndex, 'EX', cacheTimeInSec);
+      await client.set(cacheKey, siteMapIndex, "EX", cacheTimeInSec);
     }
 
     return c.text(siteMapIndex, 200, {
@@ -314,28 +327,28 @@ app.get("/sitemap.xml", async (c) => {
     siteMap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${offers
-        .map((offer) => {
-          const url = `https://egdata.app/offers/${offer.id}`;
-          return `<url>
+    .map((offer) => {
+      const url = `https://egdata.app/offers/${offer.id}`;
+      return `<url>
         <loc>${url}</loc>
         <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       ${sections
-              .map(
-                (section) => `
+        .map(
+          (section) => `
       <url>
         <loc>${url}/${section}</loc>
         <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       `
-              )
-              .join("\n")}
-      `;
-        })
+        )
         .join("\n")}
+      `;
+    })
+    .join("\n")}
 </urlset>`;
 
-    await client.set(cacheKeyPage, siteMap, 'EX', cacheTimeInSec);
+    await client.set(cacheKeyPage, siteMap, "EX", cacheTimeInSec);
   }
 
   return c.text(siteMap, 200, {
@@ -388,7 +401,7 @@ app.get("/promotions-sitemap.xml", async (c) => {
 
     siteMap += "</urlset>";
 
-    await client.set(cacheKey, siteMap, 'EX', cacheTimeInSec);
+    await client.set(cacheKey, siteMap, "EX", cacheTimeInSec);
   }
 
   return c.text(siteMap, 200, {
@@ -493,7 +506,7 @@ app.get("/items-from-offer/:id", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(res), 'EX', 604800);
+  await client.set(cacheKey, JSON.stringify(res), "EX", 604800);
 
   return c.json(res, 200, {
     "Cache-Control": "public, max-age=60",
@@ -558,7 +571,7 @@ app.get("/latest-games", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -596,7 +609,7 @@ app.get("/featured", async (c) => {
     featuredGames = JSON.parse(cached);
   } else {
     featuredGames = await getFeaturedGames();
-    await client.set(cacheKey, JSON.stringify(featuredGames), 'EX', 86400);
+    await client.set(cacheKey, JSON.stringify(featuredGames), "EX", 86400);
   }
 
   const GET_FEATURED_GAMES_END = new Date();
@@ -616,15 +629,16 @@ app.get("/featured", async (c) => {
 
   const result = offers.map((o) => orderOffersObject(o));
 
-  await client.set(responseCacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(responseCacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(
     offers.map((o) => orderOffersObject(o)),
     200,
     {
       "Cache-Control": "public, max-age=60",
-      "Server-Timing": `db;dur=${GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
-        }`,
+      "Server-Timing": `db;dur=${
+        GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
+      }`,
     }
   );
 });
@@ -705,7 +719,7 @@ app.get("/autocomplete", async (c) => {
   };
 
   if (response.elements.length > 0) {
-    await client.set(cacheKey, JSON.stringify(response), 'EX', 60);
+    await client.set(cacheKey, JSON.stringify(response), "EX", 60);
   }
 
   return c.json(response, 200, {
@@ -812,7 +826,7 @@ app.get("/sales", async (c) => {
     total: count,
   };
 
-  await client.set(cacheKey, JSON.stringify(res), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(res), "EX", 60);
 
   return c.json(res, 200, {
     "Cache-Control": "public, max-age=0",
@@ -940,7 +954,8 @@ app.get("/changelist", async (ctx) => {
       sort: {
         timestamp: -1,
       },
-    });
+    }
+  );
 
   /**
    * Returns the affected offer, item, asset for each changelog
@@ -995,7 +1010,7 @@ app.get("/changelist", async (ctx) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
   return ctx.json(result, 200, {
     "Server-Timing": `db;dur=${Date.now() - start}`,
@@ -1077,7 +1092,7 @@ app.get("/stats", async (c) => {
     itemsYear,
   };
 
-  await client.set(cacheKey, JSON.stringify(res), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(res), "EX", 3600);
 
   return c.json(res, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1283,7 +1298,8 @@ async function refreshSellersIndex() {
 
     totalSellers += sellers.length;
     console.log(
-      `Processing sellers ${totalSellers - sellers.length + 1
+      `Processing sellers ${
+        totalSellers - sellers.length + 1
       } to ${totalSellers}`
     );
 
@@ -1441,7 +1457,7 @@ app.get("/active-sales", async (c) => {
     })
   );
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1635,13 +1651,15 @@ app.get("/items-sitemap.xml", async (c) => {
       siteMapIndex = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${Array.from(
-        { length: Math.ceil(count / limit) },
-        (_, i) =>
-          `<sitemap><loc>https://api.egdata.app/items-sitemap.xml?page=${i + 1}</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`
-      ).join("")}
+    { length: Math.ceil(count / limit) },
+    (_, i) =>
+      `<sitemap><loc>https://api.egdata.app/items-sitemap.xml?page=${
+        i + 1
+      }</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`
+  ).join("")}
 </sitemapindex>`;
 
-      await client.set(cacheKey, siteMapIndex, 'EX', cacheTimeInSec);
+      await client.set(cacheKey, siteMapIndex, "EX", cacheTimeInSec);
     }
 
     return c.text(siteMapIndex, 200, {
@@ -1681,28 +1699,28 @@ app.get("/items-sitemap.xml", async (c) => {
     siteMap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${items
-        .map((item) => {
-          const url = `https://egdata.app/items/${item.id}`;
-          return `<url>
+    .map((item) => {
+      const url = `https://egdata.app/items/${item.id}`;
+      return `<url>
         <loc>${url}</loc>
         <lastmod>${(item.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       ${sections
-              .map(
-                (section) => `
+        .map(
+          (section) => `
       <url>
         <loc>${url}/${section}</loc>
         <lastmod>${(item.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       `
-              )
-              .join("\n")}
-      `;
-        })
+        )
         .join("\n")}
+      `;
+    })
+    .join("\n")}
 </urlset>`;
 
-    await client.set(cacheKeyPage, siteMap, 'EX', cacheTimeInSec);
+    await client.set(cacheKeyPage, siteMap, "EX", cacheTimeInSec);
   }
 
   return c.text(siteMap, 200, {

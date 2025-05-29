@@ -12,6 +12,7 @@ import { getCookie } from "hono/cookie";
 import { orderOffersObject } from "../utils/order-offers-object.js";
 import { Changelog } from "@egdata/core.schemas.changelog";
 import { ObjectId } from "mongodb";
+import { consola } from "../utils/logger.js";
 
 const app = new Hono();
 
@@ -54,7 +55,7 @@ app.get("/", async (ctx) => {
     count,
   };
 
-  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
   return ctx.json(response, 200, {
     "Server-Timing": `db;dur=${Date.now() - start}`,
@@ -72,11 +73,12 @@ app.get("/sitemap.xml", async (c) => {
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${Array.from(
-      { length: Math.ceil(count / limit) },
-      (_, i) =>
-        `<sitemap><loc>https://api.egdata.app/sandboxes/sitemap.xml?page=${i + 1
-        }</loc></sitemap>`
-    ).join("")}
+    { length: Math.ceil(count / limit) },
+    (_, i) =>
+      `<sitemap><loc>https://api.egdata.app/sandboxes/sitemap.xml?page=${
+        i + 1
+      }</loc></sitemap>`
+  ).join("")}
 </sitemapindex>`;
 
     return c.text(sitemap, 200, {
@@ -110,15 +112,15 @@ app.get("/sitemap.xml", async (c) => {
             <lastmod>${(sandbox.updated as Date).toISOString()}</lastmod>
             </url>
             ${sections
-            .map(
-              (section) => `
+              .map(
+                (section) => `
             <url>
               <loc>${url}${section}</loc>
               <lastmod>${(sandbox.updated as Date).toISOString()}</lastmod>
             </url>
             `
-            )
-            .join("\n")}
+              )
+              .join("\n")}
             `;
       })
       .join("\n")}
@@ -150,14 +152,17 @@ app.get("/:sandboxId", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(sandbox), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(sandbox), "EX", 3600);
   return c.json(sandbox);
 });
 
 app.get("/:sandboxId/items", async (ctx) => {
   const { sandboxId } = ctx.req.param();
   const page = Number.parseInt(ctx.req.query("page") || "1", 10);
-  const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
+  const limit = Math.min(
+    Number.parseInt(ctx.req.query("limit") || "10", 10),
+    100
+  );
   const skip = (page - 1) * limit;
 
   const cacheKey = `sandbox:${sandboxId}:items:${page}:${limit}:v0.1`;
@@ -207,7 +212,7 @@ app.get("/:sandboxId/items", async (ctx) => {
     count,
   };
 
-  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
   return ctx.json(response, 200, {
     "Cache-Control": "public, max-age=60",
@@ -217,7 +222,10 @@ app.get("/:sandboxId/items", async (ctx) => {
 app.get("/:sandboxId/offers", async (ctx) => {
   const { sandboxId } = ctx.req.param();
   const page = Number.parseInt(ctx.req.query("page") || "1", 10);
-  const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
+  const limit = Math.min(
+    Number.parseInt(ctx.req.query("limit") || "10", 10),
+    100
+  );
   const skip = (page - 1) * limit;
 
   const cacheKey = `sandbox:${sandboxId}:offers:${page}:${limit}:v0.1`;
@@ -265,7 +273,7 @@ app.get("/:sandboxId/offers", async (ctx) => {
     count,
   };
 
-  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
   return ctx.json(response);
 });
@@ -273,7 +281,10 @@ app.get("/:sandboxId/offers", async (ctx) => {
 app.get("/:sandboxId/assets", async (ctx) => {
   const { sandboxId } = ctx.req.param();
   const page = Number.parseInt(ctx.req.query("page") || "1", 10);
-  const limit = Math.min(Number.parseInt(ctx.req.query("limit") || "10", 10), 100);
+  const limit = Math.min(
+    Number.parseInt(ctx.req.query("limit") || "10", 10),
+    100
+  );
   const skip = (page - 1) * limit;
 
   const cacheKey = `${sandboxId}-assets-${page}-${limit}:v0.1`;
@@ -284,99 +295,120 @@ app.get("/:sandboxId/assets", async (ctx) => {
     return ctx.json(JSON.parse(cached));
   }
 
-  const sandbox = await db.db.collection("sandboxes").findOne({
-    // @ts-ignore
-    _id: sandboxId,
-  });
+  let items: any[] = [];
+  let assets: any[] = [];
+  let allAssets: any[] = [];
+  let paginatedAssets: any[] = [];
 
-  if (!sandbox) {
-    ctx.status(404);
-
-    return ctx.json({
-      message: "Sandbox not found",
+  try {
+    const sandbox = await db.db.collection("sandboxes").findOne({
+      // @ts-ignore
+      _id: sandboxId,
     });
-  }
 
-  // First get all items to find missing assets
-  const items = await Item.find(
-    {
-      namespace: sandboxId,
-    },
-    {
-      id: 1,
-      namespace: 1,
-      releaseInfo: 1,
-      title: 1,
+    if (!sandbox) {
+      ctx.status(404);
+      return ctx.json({
+        message: "Sandbox not found",
+      });
     }
-  );
 
-  // Get all assets for this namespace
-  const [assets, totalCount] = await Promise.all([
-    Asset.find(
+    // First get all items to find missing assets
+    items = await Item.find(
       {
         namespace: sandboxId,
       },
-      undefined,
       {
-        sort: {
-          updatedAt: -1,
-        }
+        id: 1,
+        namespace: 1,
+        releaseInfo: 1,
+        title: 1,
       }
-    ),
-    Asset.countDocuments({
-      namespace: sandboxId,
-    }),
-  ]);
+    ).lean();
 
-  // Create a map of all assets by artifactId for quick lookup
-  const assetsMap = new Map(assets.map(a => [a.artifactId, a]));
+    // Get all assets for this namespace
+    const [assetsResult, totalCount] = await Promise.all([
+      Asset.find(
+        {
+          namespace: sandboxId,
+        },
+        undefined,
+        {
+          sort: {
+            updatedAt: -1,
+          },
+        }
+      ).lean(),
+      Asset.countDocuments({
+        namespace: sandboxId,
+      }),
+    ]);
 
-  // Add missing assets for items that have releaseInfo but no corresponding asset
-  const allAssets = [...assets];
-  for (const item of items) {
-    for (const releaseInfo of item.releaseInfo) {
-      if (!assetsMap.has(releaseInfo.appId as string)) {
-        for (const platform of releaseInfo.platform) {
-          allAssets.push({
-            artifactId: releaseInfo.appId as string,
-            downloadSizeBytes: 0,
-            installedSizeBytes: 0,
-            itemId: item.id,
-            namespace: item.namespace,
-            platform,
-            _id: new ObjectId(),
-            title: item.title,
-            __v: 0,
-            updatedAt: new Date(0),
-          } as any);
+    assets = assetsResult;
+
+    // Create a map of all assets by artifactId for quick lookup
+    const assetsMap = new Map(assets.map((a) => [a.artifactId, a]));
+
+    // Add missing assets for items that have releaseInfo but no corresponding asset
+    allAssets = [...assets];
+    for (const item of items) {
+      for (const releaseInfo of item.releaseInfo) {
+        if (!assetsMap.has(releaseInfo.appId as string)) {
+          for (const platform of releaseInfo.platform) {
+            allAssets.push({
+              artifactId: releaseInfo.appId as string,
+              downloadSizeBytes: 0,
+              installedSizeBytes: 0,
+              itemId: item.id,
+              namespace: item.namespace,
+              platform,
+              _id: new ObjectId(),
+              title: item.title,
+              __v: 0,
+              updatedAt: new Date(0),
+            });
+          }
         }
       }
     }
+
+    // Sort all assets by updatedAt
+    allAssets.sort((a, b) => {
+      const dateA = (a.updatedAt as Date) || new Date(0);
+      const dateB = (b.updatedAt as Date) || new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    // Get total count including virtual assets
+    const totalAssetCount = allAssets.length;
+
+    // Apply pagination to the combined results
+    paginatedAssets = allAssets.slice(skip, skip + limit);
+
+    const response = {
+      elements: paginatedAssets,
+      page,
+      limit,
+      count: totalAssetCount,
+    };
+
+    // Set cache with a shorter TTL
+    await client.set(cacheKey, JSON.stringify(response), "EX", 300); // 5 minutes instead of 1 hour
+
+    return ctx.json(response);
+  } catch (error) {
+    console.error("Error in assets endpoint:", error);
+    ctx.status(500);
+    return ctx.json({
+      message: "Internal server error",
+    });
+  } finally {
+    // Force garbage collection of large objects
+    items = [];
+    assets = [];
+    allAssets = [];
+    paginatedAssets = [];
   }
-
-  // Sort all assets by updatedAt
-  allAssets.sort((a, b) => {
-    const dateA = a.updatedAt || new Date(0);
-    const dateB = b.updatedAt || new Date(0);
-    return dateB.getTime() - dateA.getTime();
-  });
-
-  // Get total count including virtual assets
-  const totalAssetCount = allAssets.length;
-
-  // Apply pagination to the combined results
-  const paginatedAssets = allAssets.slice(skip, skip + limit);
-
-  const response = {
-    elements: paginatedAssets,
-    page,
-    limit,
-    count: totalAssetCount,
-  };
-
-  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
-
-  return ctx.json(response);
 });
 
 app.get("/:sandboxId/base-game", async (c) => {
@@ -450,7 +482,7 @@ app.get("/:sandboxId/base-game", async (c) => {
           ...executableGame.toObject(),
           isItem: true,
         };
-        await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+        await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
         return c.json(response);
       }
 
@@ -472,7 +504,7 @@ app.get("/:sandboxId/base-game", async (c) => {
     price: price ?? null,
   };
 
-  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
   return c.json(response);
 });
@@ -502,142 +534,107 @@ app.get("/:sandboxId/achievements", async (c) => {
     sandboxId: sandboxId,
   });
 
-  await client.set(cacheKey, JSON.stringify(achievements), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(achievements), "EX", 3600);
 
   return c.json(achievements);
 });
 
+type PipelineArgs = {
+  sandboxId: string;
+  skip: number;
+  limit: number;
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Single‑pipeline aggregation
+// ──────────────────────────────────────────────────────────────────────────────
+function fullPipeline({ sandboxId, skip, limit }: PipelineArgs) {
+  return [
+    // Get changelog entries for offers
+    {
+      $lookup: {
+        from: "offers",
+        pipeline: [
+          { $match: { namespace: sandboxId } },
+          { $project: { _id: 0, id: 1 } },
+        ],
+        as: "offers",
+      },
+    },
+    { $unwind: "$offers" },
+    { $replaceRoot: { newRoot: "$offers" } },
+    {
+      $lookup: {
+        from: "changelogs_v2",
+        let: { id: "$id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$metadata.contextId", "$$id"] },
+            },
+          },
+        ],
+        as: "changes",
+      },
+    },
+    { $unwind: "$changes" },
+    { $replaceRoot: { newRoot: "$changes" } },
+  ];
+}
+
 app.get("/:sandboxId/changelog", async (c) => {
   const { sandboxId } = c.req.param();
-  const limit = c.req.query("limit") || "30";
-  const page = c.req.query("page") || "1";
+  const limit = Number(c.req.query("limit") ?? "30");
+  const page = Number(c.req.query("page") ?? "1");
+  const skip = (page - 1) * limit;
+  const cacheKey = `changelog:${sandboxId}:${skip}:${limit}:v0.2`;
 
-  const skip = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
-
-  const cacheKey = `changelog:${sandboxId}:${skip}:${limit}:v0.1`;
   const cached = await client.get(cacheKey);
-
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       "Cache-Control": "public, max-age=60",
     });
   }
 
-  const sandbox = await db.db.collection("sandboxes").findOne({
-    // @ts-ignore
-    _id: sandboxId,
-  });
+  const start = performance.now();
+  try {
+    // Get changelog entries for the sandbox itself
+    const [changes, totalCount] = await Promise.all([
+      db.db
+        .collection("changelogs_v2")
+        .find({ "metadata.contextId": sandboxId })
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+      db.db
+        .collection("changelogs_v2")
+        .countDocuments({ "metadata.contextId": sandboxId }),
+    ]);
 
-  if (!sandbox) {
-    c.status(404);
-    return c.json({
-      message: "Sandbox not found",
-    });
+    const result = {
+      hits: changes,
+      estimatedTotalHits: totalCount,
+      limit,
+      offset: skip,
+    };
+
+    await client.set(cacheKey, JSON.stringify(result), "EX", 300);
+    consola.log(`changelog ${sandboxId} in ${performance.now() - start} ms`);
+    return c.json(result);
+  } catch (err) {
+    console.error("Error in changelog endpoint:", err);
+    return c.json({ message: "Internal server error" }, 500);
   }
-
-  const [offers, items, assets] = await Promise.all([
-    Offer.find({
-      namespace: sandboxId,
-    }),
-    Item.find({
-      namespace: sandboxId,
-    }),
-    Asset.find({
-      namespace: sandboxId,
-    }),
-  ]);
-
-  const builds = await db.db
-    .collection("builds")
-    .find({
-      appName: {
-        $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
-      },
-    })
-    .toArray();
-
-  const [offersIds, itemsIds, assetsIds, buildsIds] = await Promise.all([
-    offers.map((o) => o.id),
-    items.map((i) => i.id),
-    assets.map((a) => a.artifactId),
-    builds.map((b) => b._id),
-  ]);
-
-  const changelist = await Changelog.find(
-    {
-      "metadata.contextId": {
-        $in: [...offersIds, ...itemsIds, ...assetsIds, ...buildsIds, sandboxId],
-      },
-    },
-    undefined,
-    {
-      sort: {
-        timestamp: -1,
-      },
-      limit: Number.parseInt(limit, 10),
-      skip,
-    }
-  );
-
-  const count = await Changelog.countDocuments({
-    "metadata.contextId": {
-      $in: [...offersIds, ...itemsIds, ...assetsIds, ...buildsIds, sandboxId],
-    },
-  });
-
-  const result = {
-    hits: await Promise.all(
-      changelist
-        .map((c) => c.toJSON())
-        .map(async (c) => {
-          const type = c.metadata.contextType;
-          const id = c.metadata.contextId;
-
-          if (type === "offer") {
-            c.document = await Offer.findOne({ id });
-          }
-
-          if (type === "item") {
-            c.document = await Item.findOne({
-              id,
-            });
-          }
-
-          if (type === "asset") {
-            const asset = await Asset.findOne({
-              artifactId: id,
-            });
-
-            c.document = await Item.findOne({
-              id: asset?.itemId,
-            });
-          }
-
-          if (type === "build") {
-            const build = await db.db.collection("builds").findOne({
-              _id: new ObjectId(id),
-            });
-
-            c.document = build;
-          }
-
-          return c;
-        })
-    ),
-    estimatedTotalHits: count,
-    limit: Number.parseInt(limit, 10),
-    offset: skip,
-  };
-
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
-
-  return c.json(result);
 });
 
 app.get("/:sandboxId/builds", async (c) => {
   const { sandboxId } = c.req.param();
   const page = Number.parseInt(c.req.query("page") || "1", 10);
-  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10", 10), 100);
+  const limit = Math.min(
+    Number.parseInt(c.req.query("limit") || "10", 10),
+    100
+  );
   const skip = (page - 1) * limit;
 
   const cacheKey = `sandbox:${sandboxId}:builds:${page}:${limit}:v0.1`;
@@ -660,11 +657,14 @@ app.get("/:sandboxId/builds", async (c) => {
   }
 
   // First get all items to get the appIds
-  const items = await Item.find({
-    namespace: sandboxId,
-  }, {
-    releaseInfo: 1,
-  });
+  const items = await Item.find(
+    {
+      namespace: sandboxId,
+    },
+    {
+      releaseInfo: 1,
+    }
+  );
 
   const appIds = items.flatMap((i) => i.releaseInfo.map((r) => r.appId));
 
@@ -681,13 +681,11 @@ app.get("/:sandboxId/builds", async (c) => {
       .skip(skip)
       .limit(limit)
       .toArray(),
-    db.db
-      .collection("builds")
-      .countDocuments({
-        appName: {
-          $in: appIds,
-        },
-      }),
+    db.db.collection("builds").countDocuments({
+      appName: {
+        $in: appIds,
+      },
+    }),
   ]);
 
   const response = {
@@ -697,7 +695,7 @@ app.get("/:sandboxId/builds", async (c) => {
     count,
   };
 
-  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
   return c.json(response);
 });
@@ -739,7 +737,7 @@ app.get("/:sandboxId/stats", async (c) => {
   ]);
 
   // Create a map of all assets by artifactId for quick lookup
-  const assetsMap = new Map(assets.map(a => [a.artifactId, a]));
+  const assetsMap = new Map(assets.map((a) => [a.artifactId, a]));
 
   // Count virtual assets (those that exist in releaseInfo but don't have a corresponding asset)
   let virtualAssetsCount = 0;
@@ -770,7 +768,7 @@ app.get("/:sandboxId/stats", async (c) => {
     achievements: achievements.flatMap((a) => a.achievements).length,
   };
 
-  await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
   return c.json(response);
 });
