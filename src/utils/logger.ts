@@ -5,5 +5,5 @@ export const consola = createConsola({
     colors: true,
     dateTime: true,
   },
-  level: LogLevels.debug,
+  level: LogLevels.info,
 });

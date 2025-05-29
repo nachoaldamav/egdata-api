@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 
 import { AchievementSet } from "@egdata/core.schemas.achievements";
-import { Asset, type AssetType } from "@egdata/core.schemas.assets";
+import { Asset } from "@egdata/core.schemas.assets";
 import { Bundles } from "@egdata/core.schemas.bundles";
 import { Changelog } from "@egdata/core.schemas.changelog";
 import { Collection, GamePosition } from "@egdata/core.schemas.collections";
@@ -35,12 +35,52 @@ import { getImage } from "../utils/get-image.js";
 import { getProduct } from "../utils/get-product.js";
 import { orderOffersObject } from "../utils/order-offers-object.js";
 import { verifyGameOwnership } from "../utils/verify-game-ownership.js";
+import consola from "consola";
 
-type RegenOfferQueueType = { slug: string } | { id: string; namespace?: string };
+type RegenOfferQueueType =
+  | { slug: string }
+  | { id: string; namespace?: string };
 
-const regenOffersQueue = new Queue<RegenOfferQueueType>("regenOffersQueue", { connection: ioredis });
+const regenOffersQueue = new Queue<RegenOfferQueueType>("regenOffersQueue", {
+  connection: ioredis,
+});
 
 const app = new Hono();
+
+// Add memory tracking middleware
+app.use("*", async (c, next) => {
+  const startMemory = process.memoryUsage();
+  const start = new Date();
+
+  await next();
+
+  const endMemory = process.memoryUsage();
+  const end = new Date();
+
+  // Calculate memory differences
+  const memoryDiff = {
+    rss: endMemory.rss - startMemory.rss,
+    heapTotal: endMemory.heapTotal - startMemory.heapTotal,
+    heapUsed: endMemory.heapUsed - startMemory.heapUsed,
+    external: endMemory.external - startMemory.external,
+    arrayBuffers: endMemory.arrayBuffers - startMemory.arrayBuffers,
+    responseTime: end.getTime() - start.getTime(),
+  };
+
+  consola.info({
+    request: `[${c.req.method}] ${c.req.path}`,
+    memory: {
+      rss: `${(memoryDiff.rss / 1024 / 1024).toFixed(2)}MB`,
+      heapTotal: `${(memoryDiff.heapTotal / 1024 / 1024).toFixed(2)}MB`,
+      heapUsed: `${(memoryDiff.heapUsed / 1024 / 1024).toFixed(2)}MB`,
+      external: `${(memoryDiff.external / 1024 / 1024).toFixed(2)}MB`,
+      arrayBuffers: `${(memoryDiff.arrayBuffers / 1024 / 1024).toFixed(2)}MB`,
+    },
+    performance: {
+      responseTime: `${(memoryDiff.responseTime / 1000).toFixed(2)}s`,
+    },
+  });
+});
 
 app.get("/", async (c) => {
   const start = new Date();
@@ -104,7 +144,7 @@ app.get("/", async (c) => {
     total: await Offer.countDocuments(),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -238,7 +278,7 @@ app.get("/events/:id", async (c) => {
     }),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -347,7 +387,7 @@ app.get("/upcoming", async (c) => {
     }),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 360);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 360);
 
   return c.json(result, 200, {
     "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -443,7 +483,7 @@ app.get("/top-wishlisted", async (c) => {
         position: { $gt: 0 },
       }),
     };
-    await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+    await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
     return c.json(response, 200, {
       "Cache-Control": "public, max-age=60",
       "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -499,7 +539,7 @@ app.get("/top-sellers", async (c) => {
         position: { $gt: 0 },
       }),
     };
-    await client.set(cacheKey, JSON.stringify(response), 'EX', 3600);
+    await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
     return c.json(response, 200, {
       "Cache-Control": "public, max-age=60",
       "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -566,7 +606,7 @@ app.get("/featured-discounts", async (c) => {
     .filter((o) => o.title)
     .slice(0, 20);
   // Save the result in cache, set the expiration to the first sale ending date
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
   });
@@ -638,7 +678,7 @@ app.get("/latest-achievements", async (c) => {
     }
   }
   result = result.slice(0, 20);
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
   });
@@ -709,7 +749,7 @@ app.get("/latest-released", async (c) => {
       offerType: { $in: ["BASE_GAME"] },
     }),
   };
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 60);
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
   });
@@ -729,15 +769,17 @@ app.put("/regen-by-id/:id", async (c) => {
   await regenOffersQueue.add(`regenOffer-${id}`, { id });
 
   return c.json({ message: "Offer regen requested" }, 200);
-})
+});
 
 app.post("/bulk-regen", async (c) => {
   const { offers } = await c.req.json<{ offers: string[] }>();
 
-  await regenOffersQueue.addBulk(offers.map((o) => ({
-    name: `regenOffer-${o}`,
-    data: { id: o },
-  })));
+  await regenOffersQueue.addBulk(
+    offers.map((o) => ({
+      name: `regenOffer-${o}`,
+      data: { id: o },
+    }))
+  );
 
   return c.json({ message: "Offer regen requested" }, 200);
 });
@@ -748,7 +790,8 @@ app.post("/slugs", async (c) => {
   if (!slugs || !Array.isArray(slugs) || slugs.length === 0) {
     c.status(400);
     return c.json({
-      message: "Missing or invalid slugs parameter. Expecting an array of strings.",
+      message:
+        "Missing or invalid slugs parameter. Expecting an array of strings.",
     });
   }
 
@@ -764,7 +807,10 @@ app.post("/slugs", async (c) => {
           { "offerMappings.pageSlug": { $in: expandedSlugs } },
           {
             customAttributes: {
-              $elemMatch: { key: "com.epicgames.app.productSlug", value: { $in: expandedSlugs } },
+              $elemMatch: {
+                key: "com.epicgames.app.productSlug",
+                value: { $in: expandedSlugs },
+              },
             },
           },
           {
@@ -776,24 +822,29 @@ app.post("/slugs", async (c) => {
       },
       { prePurchase: { $ne: true } }, // Exclude pre-purchase offers
     ],
-  }).select("id productSlug urlSlug offerMappings customAttributes prePurchase namespace");
+  }).select(
+    "id productSlug urlSlug offerMappings customAttributes prePurchase namespace"
+  );
 
   const result = slugs.map((originalSlug) => {
     const offer = offers.find((o) => {
-      const checkSlug = (s: string | undefined) => s === originalSlug || s === `${originalSlug}/home`;
+      const checkSlug = (s: string | undefined) =>
+        s === originalSlug || s === `${originalSlug}/home`;
 
       if (checkSlug(o.productSlug)) return true;
       if (checkSlug(o.urlSlug)) return true;
       if (o.offerMappings?.some((m: any) => checkSlug(m.pageSlug))) return true;
       if (
-        o.customAttributes?.some((attr: any) =>
-          attr.key === "com.epicgames.app.productSlug" && checkSlug(attr.value)
+        o.customAttributes?.some(
+          (attr: any) =>
+            attr.key === "com.epicgames.app.productSlug" &&
+            checkSlug(attr.value)
         )
       )
         return true;
       if (
-        o.customAttributes?.some((attr: any) =>
-          attr.key === "slug" && checkSlug(attr.value)
+        o.customAttributes?.some(
+          (attr: any) => attr.key === "slug" && checkSlug(attr.value)
         )
       )
         return true;
@@ -818,8 +869,10 @@ app.post("/exists", async (c) => {
     { id: { $in: offers } },
     { id: 1, _id: 0 }
   );
-  const existingIds = existingOffers.map(o => o.id);
-  const nonExistingOffers = offers.filter((offer) => !existingIds.includes(offer));
+  const existingIds = existingOffers.map((o) => o.id);
+  const nonExistingOffers = offers.filter(
+    (offer) => !existingIds.includes(offer)
+  );
   return c.json({ existingOffers: existingIds, nonExistingOffers }, 200);
 });
 
@@ -863,7 +916,7 @@ app.get("/:id", async (c) => {
     customAttributes: attributesToObject(offer.customAttributes as any),
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
   return c.json(result, 200, {
     "Server-Timing": `db;dur=${new Date().getTime() - start.getTime()}`,
@@ -882,8 +935,9 @@ app.get("/:id/price-history", async (c) => {
     Object.keys(regions).find((r) => regions[r].countries.includes(country));
 
   if (region) {
-    const cacheKey = `price-history:${id}:${region}:${since ?? "unlimited"
-      }:v0.1`;
+    const cacheKey = `price-history:${id}:${region}:${
+      since ?? "unlimited"
+    }:v0.1`;
     const cached = await client.get(cacheKey);
 
     if (cached) {
@@ -906,7 +960,7 @@ app.get("/:id/price-history", async (c) => {
       return c.json({});
     }
 
-    await client.set(cacheKey, JSON.stringify(prices), 'EX', 3600);
+    await client.set(cacheKey, JSON.stringify(prices), "EX", 3600);
 
     return c.json(prices, 200, {
       "Cache-Control": "public, max-age=60",
@@ -946,7 +1000,7 @@ app.get("/:id/price-history", async (c) => {
     return c.json({});
   }
 
-  await client.set(cacheKey, JSON.stringify(pricesByRegion), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(pricesByRegion), "EX", 3600);
 
   return c.json(pricesByRegion, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1052,7 +1106,7 @@ app.get("/:id/assets", async (c) => {
 
   const result = assets.map((a) => a.toObject());
 
-  await client.set(cacheKey, JSON.stringify(assets), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(assets), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1149,7 +1203,7 @@ app.get("/:id/price", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(price), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(price), "EX", 3600);
 
   return c.json(price, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1227,7 +1281,7 @@ app.get("/:id/regional-price", async (c) => {
       minPrice: Math.min(...price.map((p) => p.price.discountPrice ?? 0)),
     };
 
-    await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+    await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
     return c.json(result, 200, {
       "Cache-Control": "public, max-age=60",
@@ -1312,7 +1366,7 @@ app.get("/:id/regional-price", async (c) => {
     >
   );
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1374,77 +1428,85 @@ app.get("/:id/changelog", async (c) => {
   ];
 
   // Use aggregation pipeline for better performance
-  const changelog = await db.db.collection("changelogs_v2").aggregate([
-    {
-      $match: {
-        "metadata.contextId": { $in: allIds }
-      }
-    },
-    {
-      $sort: { timestamp: -1 }
-    },
-    {
-      $skip: skip
-    },
-    {
-      $limit: limit
-    },
-    {
-      $lookup: {
-        from: "offers",
-        let: { contextId: "$metadata.contextId" },
-        pipeline: [
-          { $match: { $expr: { $eq: ["$id", "$$contextId"] } } }
-        ],
-        as: "offerDoc"
-      }
-    },
-    {
-      $lookup: {
-        from: "items",
-        let: { contextId: "$metadata.contextId" },
-        pipeline: [
-          { $match: { $expr: { $eq: ["$id", "$$contextId"] } } }
-        ],
-        as: "itemDoc"
-      }
-    },
-    {
-      $lookup: {
-        from: "assets",
-        let: { contextId: "$metadata.contextId" },
-        pipeline: [
-          { $match: { $expr: { $eq: ["$artifactId", "$$contextId"] } } }
-        ],
-        as: "assetDoc"
-      }
-    },
-    {
-      $addFields: {
-        document: {
-          $switch: {
-            branches: [
-              { case: { $eq: ["$metadata.contextType", "offer"] }, then: { $arrayElemAt: ["$offerDoc", 0] } },
-              { case: { $eq: ["$metadata.contextType", "item"] }, then: { $arrayElemAt: ["$itemDoc", 0] } },
-              { case: { $eq: ["$metadata.contextType", "asset"] }, then: { $arrayElemAt: ["$assetDoc", 0] } }
-            ],
-            default: null
-          }
-        }
-      }
-    },
-    {
-      $project: {
-        _id: 1,
-        metadata: 1,
-        timestamp: 1,
-        document: 1
-      }
-    }
-  ]).toArray();
+  const changelog = await db.db
+    .collection("changelogs_v2")
+    .aggregate([
+      {
+        $match: {
+          "metadata.contextId": { $in: allIds },
+        },
+      },
+      {
+        $sort: { timestamp: -1 },
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+      {
+        $lookup: {
+          from: "offers",
+          let: { contextId: "$metadata.contextId" },
+          pipeline: [{ $match: { $expr: { $eq: ["$id", "$$contextId"] } } }],
+          as: "offerDoc",
+        },
+      },
+      {
+        $lookup: {
+          from: "items",
+          let: { contextId: "$metadata.contextId" },
+          pipeline: [{ $match: { $expr: { $eq: ["$id", "$$contextId"] } } }],
+          as: "itemDoc",
+        },
+      },
+      {
+        $lookup: {
+          from: "assets",
+          let: { contextId: "$metadata.contextId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$artifactId", "$$contextId"] } } },
+          ],
+          as: "assetDoc",
+        },
+      },
+      {
+        $addFields: {
+          document: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: ["$metadata.contextType", "offer"] },
+                  then: { $arrayElemAt: ["$offerDoc", 0] },
+                },
+                {
+                  case: { $eq: ["$metadata.contextType", "item"] },
+                  then: { $arrayElemAt: ["$itemDoc", 0] },
+                },
+                {
+                  case: { $eq: ["$metadata.contextType", "asset"] },
+                  then: { $arrayElemAt: ["$assetDoc", 0] },
+                },
+              ],
+              default: null,
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          metadata: 1,
+          timestamp: 1,
+          document: 1,
+        },
+      },
+    ])
+    .toArray();
 
   // Cache the results
-  await client.set(cacheKey, JSON.stringify(changelog), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(changelog), "EX", 60);
 
   return c.json(changelog, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1546,7 +1608,7 @@ app.get("/:id/changelog/stats", async (c) => {
     return acc;
   }, {} as Record<string, number>);
 
-  await client.set(cacheKey, JSON.stringify(changeFields), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(changeFields), "EX", 3600);
 
   return c.json({
     dailyChanges,
@@ -1600,7 +1662,7 @@ app.get("/:id/achievements", async (c) => {
     return c.json([]);
   }
 
-  await client.set(cacheKey, JSON.stringify(achievements), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(achievements), "EX", 3600);
 
   return c.json(achievements, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1663,7 +1725,7 @@ app.get("/:id/related", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(related), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(related), "EX", 60);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1694,7 +1756,7 @@ app.get("/:id/mappings", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(mappings), 'EX', 86400);
+  await client.set(cacheKey, JSON.stringify(mappings), "EX", 86400);
 
   return c.json(mappings, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1725,7 +1787,7 @@ app.get("/:id/media", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(media), 'EX', 86400);
+  await client.set(cacheKey, JSON.stringify(media), "EX", 86400);
 
   return c.json(media, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1806,7 +1868,7 @@ app.get("/:id/suggestions", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1886,7 +1948,7 @@ app.get("/:id/age-rating", async (c) => {
     );
   }
 
-  await client.set(cacheKey, JSON.stringify(ageRatings), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(ageRatings), "EX", 3600);
 
   return c.json(ageRatings, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1918,7 +1980,7 @@ app.get("/:id/giveaways", async (c) => {
     }
   );
 
-  await client.set(cacheKey, JSON.stringify(giveaways), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(giveaways), "EX", 3600);
 
   return c.json(giveaways, 200, {
     "Cache-Control": "public, max-age=60",
@@ -1981,7 +2043,7 @@ app.get("/:id/ratings", async (c) => {
     });
   }
 
-  await client.set(cacheKey, JSON.stringify(ratings), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(ratings), "EX", 3600);
 
   return c.json(ratings, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2010,7 +2072,7 @@ app.get("/:id/tops", async (c) => {
     return acc;
   }, {} as Record<string, number>);
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2056,7 +2118,7 @@ app.get("/:id/polls", async (c) => {
     })
     .toArray();
 
-  await client.set(cacheKey, JSON.stringify(polls[0]), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(polls[0]), "EX", 3600);
 
   return c.json(polls[0], 200, {
     "Cache-Control": "public, max-age=60",
@@ -2096,9 +2158,9 @@ app.get("/:id/reviews", epicInfo, async (c) => {
 
   const userReview = currentUser
     ? await Review.findOne({
-      userId: currentUser,
-      id,
-    })
+        userId: currentUser,
+        id,
+      })
     : null;
 
   if (userReview) {
@@ -2199,9 +2261,9 @@ app.post("/:id/reviews", epic, async (c) => {
   const isOwned =
     session?.user?.email.split("@")[0] ?? epic?.account_id
       ? await verifyGameOwnership(
-        session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
-        product._id as unknown as string
-      )
+          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+          product._id as unknown as string
+        )
       : false;
 
   const review: IReview = {
@@ -2259,9 +2321,9 @@ app.patch("/:id/reviews", epic, async (c) => {
   const isOwned = ((session?.user?.email.split("@")[0] ??
     epic?.account_id) as string)
     ? await verifyGameOwnership(
-      (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
-      product._id as unknown as string
-    )
+        (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
+        product._id as unknown as string
+      )
     : false;
 
   const oldReview = await Review.findOne({
@@ -2406,7 +2468,7 @@ app.get("/:id/reviews-summary", async (c) => {
     totalReviews,
   };
 
-  await client.set(cacheKey, JSON.stringify(summary), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(summary), "EX", 3600);
 
   return c.json(summary, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2459,9 +2521,9 @@ app.get("/:id/ownership", epic, async (c) => {
   const isOwned =
     session?.user?.email.split("@")[0] ?? epic?.account_id
       ? await verifyGameOwnership(
-        session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
-        product._id as unknown as string
-      )
+          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+          product._id as unknown as string
+        )
       : false;
 
   return c.json({
@@ -2514,7 +2576,7 @@ app.get("/:id/hltb", async (c) => {
     );
   }
 
-  await client.set(cacheKey, JSON.stringify(hltb), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(hltb), "EX", 3600);
 
   return c.json(hltb, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2601,7 +2663,7 @@ app.get("/:id/collection", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2783,7 +2845,7 @@ app.get("/:id/bundle", async (c) => {
     bundlePrice: mainPrice,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2850,7 +2912,7 @@ app.get("/:id/in-bundle", async (c) => {
     })
   );
 
-  await client.set(cacheKey, JSON.stringify(bundles), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(bundles), "EX", 3600);
 
   return c.json(bundles, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2905,7 +2967,7 @@ app.get("/:id/has-prepurchase", async (c) => {
   });
 
   if (!prePurchaseOffer) {
-    await client.set(cacheKey, JSON.stringify(false), 'EX', 3600);
+    await client.set(cacheKey, JSON.stringify(false), "EX", 3600);
     return c.json(
       {
         hasPrepurchase: false,
@@ -2930,7 +2992,7 @@ app.get("/:id/has-prepurchase", async (c) => {
     },
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
@@ -2997,7 +3059,7 @@ app.get("/:id/has-regular", async (c) => {
   });
 
   if (!prePurchaseOffer) {
-    await client.set(cacheKey, JSON.stringify(true), 'EX', 3600);
+    await client.set(cacheKey, JSON.stringify(true), "EX", 3600);
     return c.json(
       {
         isPrepurchase: false,
@@ -3022,7 +3084,7 @@ app.get("/:id/has-regular", async (c) => {
     },
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",

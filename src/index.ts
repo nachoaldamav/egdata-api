@@ -48,8 +48,6 @@ import { readFileSync } from "node:fs";
 import chalk from "chalk";
 import { rateLimiter } from "hono-rate-limiter";
 import { OpenAPIV3 } from "openapi-types";
-import heapdump from "heapdump";
-import fs from "fs";
 import { consola } from "./utils/logger.js";
 
 config();
@@ -115,47 +113,6 @@ app.use(
     },
   })
 );
-
-app.get("/__debug/heap", async (c) => {
-  const password = process.env.JWT_SECRET;
-
-  const auth = c.req.header("Authorization");
-  if (auth !== `Bearer ${password}`) {
-    return c.text("Unauthorized", 401);
-  }
-
-  const filename = `/tmp/heap-${Date.now()}.heapsnapshot`;
-
-  return new Promise((resolve) => {
-    heapdump.writeSnapshot(filename, (err, snapshotPath) => {
-      if (err) {
-        console.error("Heapdump error:", err);
-        resolve(c.text("Failed", 500));
-        return;
-      }
-      console.log("Heap snapshot written to", snapshotPath);
-
-      if (!snapshotPath) {
-        resolve(c.text("Failed to create snapshot", 500));
-        return;
-      }
-
-      // Read the file and return it with proper headers
-      const fileBuffer = fs.readFileSync(snapshotPath);
-      const uint8Array = new Uint8Array(
-        fileBuffer.buffer,
-        fileBuffer.byteOffset,
-        fileBuffer.byteLength
-      );
-      resolve(
-        c.body(uint8Array, 200, {
-          "Content-Type": "application/octet-stream",
-          "Content-Disposition": `attachment; filename="heap-${Date.now()}.heapsnapshot"`,
-        })
-      );
-    });
-  });
-});
 
 app.get(
   "/ui",
