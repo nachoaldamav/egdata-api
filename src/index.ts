@@ -65,6 +65,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:4000",
   "https://user-reviews-pr.egdata.app/",
   "https://egdata-370475041422.us-central1.run.app",
+  "https://store.epicgames.com",
 ];
 
 const app = new Hono();
