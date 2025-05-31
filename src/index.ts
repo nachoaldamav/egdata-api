@@ -1019,6 +1019,75 @@ app.get("/changelist", async (ctx) => {
   });
 });
 
+app.get("/changelist/:id", async (ctx) => {
+  const start = Date.now();
+  const { id } = ctx.req.param();
+
+  const cacheKey = `changelist:${id}`;
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return ctx.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
+  const change = await Changelog.findById(id);
+
+  if (!change) {
+    return ctx.json({ message: "Change not found" }, 404);
+  }
+
+  let element = null;
+  switch (change.metadata.contextType) {
+    case "offer":
+      element = await Offer.findOne(
+        { id: change.metadata.contextId },
+        {
+          id: 1,
+          title: 1,
+          keyImages: 1,
+          offerType: 1,
+        }
+      );
+      break;
+    case "item":
+      element = await Item.findOne(
+        { id: change.metadata.contextId },
+        {
+          id: 1,
+          title: 1,
+          keyImages: 1,
+        }
+      );
+      break;
+    case "asset":
+      element = await Asset.findOne(
+        { id: change.metadata.contextId },
+        {
+          id: 1,
+          artifactId: 1,
+        }
+      );
+      break;
+  }
+
+  const result = {
+    ...change.toObject(),
+    metadata: {
+      ...change.toObject().metadata,
+      context: element?.toObject(),
+    },
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
+
+  return ctx.json(result, 200, {
+    "Server-Timing": `db;dur=${Date.now() - start}`,
+    "Cache-Control": "public, max-age=60",
+  });
+});
+
 app.get("/stats", async (c) => {
   const cacheKey = "stats:v0.3";
 
