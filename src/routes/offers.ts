@@ -3379,4 +3379,71 @@ app.get("/:id/assets", async (c) => {
   return c.json(assets);
 });
 
+app.get("/:id/builds", async (c) => {
+  const { id } = c.req.param();
+
+  const cacheKey = `offer:builds:${id}`;
+
+  // 1 day
+  const cacheTTL = 86400;
+
+  const cached = await client.get(cacheKey);
+
+  if (cached) {
+    return c.json(JSON.parse(cached), 200, {
+      "Cache-Control": `public, max-age=${cacheTTL}`,
+    });
+  }
+
+  const offer = await Offer.findOne({ id });
+
+  if (!offer) {
+    return c.json({ error: "Offer not found" }, 404);
+  }
+
+  const itemsSpecified = offer.items.map((item) => item.id);
+
+  const subItems = await OfferSubItems.find({
+    _id: id,
+  });
+
+  const items = await Item.find({
+    $or: [
+      {
+        id: {
+          $in: [
+            ...itemsSpecified,
+            ...subItems.flatMap((i) => i.subItems.map((s) => s.id)),
+          ],
+        },
+      },
+      { linkedOffers: id },
+    ],
+  });
+
+  const assets = await Asset.find({
+    itemId: { $in: items.map((i) => i.id) },
+  });
+
+  const builds = await db.db
+    .collection<{
+      appName: string;
+      labelName: string;
+      buildVersion: string;
+      hash: string;
+    }>("builds")
+    .find({
+      appName: { $in: assets.map((a) => a.artifactId) },
+    })
+    .sort({ updatedAt: -1 })
+    .limit(50)
+    .toArray();
+
+  await client.set(cacheKey, JSON.stringify(builds), "EX", 3600);
+
+  return c.json(builds, 200, {
+    "Cache-Control": `public, max-age=${cacheTTL}`,
+  });
+});
+
 export default app;
