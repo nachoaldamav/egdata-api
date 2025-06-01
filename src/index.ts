@@ -1048,6 +1048,7 @@ app.get("/changelist/:id", async (ctx) => {
           title: 1,
           keyImages: 1,
           offerType: 1,
+          namespace: 1,
         }
       );
       break;
@@ -1058,6 +1059,7 @@ app.get("/changelist/:id", async (ctx) => {
           id: 1,
           title: 1,
           keyImages: 1,
+          namespace: 1,
         }
       );
       break;
@@ -1067,6 +1069,7 @@ app.get("/changelist/:id", async (ctx) => {
         {
           id: 1,
           artifactId: 1,
+          namespace: 1,
         }
       );
       break;
