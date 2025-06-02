@@ -565,48 +565,75 @@ app.get("/featured-discounts", async (c) => {
       message: "Country not found",
     });
   }
-  const cacheKey = `featured-discounts:${region}:v0.1`;
+
+  const cacheKey = `featured-discounts:${region}:v0.2`;
   const cached = await client.get(cacheKey);
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       "Cache-Control": "public, max-age=60",
     });
   }
-  const featuredOffers = await GamePosition.find({}).sort({ position: 1 });
-  const offersIds = featuredOffers.flatMap((o) => o.offerId);
+
+  // First get the featured offers IDs with their positions
+  const featuredOffers = await GamePosition.find({
+    position: { $gt: 0 },
+  })
+    .sort({ position: 1 })
+    .limit(50) // Limit early to reduce data processing
+    .lean();
+
+  if (!featuredOffers.length) {
+    return c.json([], 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
+  const offerIds = featuredOffers.map((o) => o.offerId);
+
+  // Get offers and prices in parallel
   const [offers, prices] = await Promise.all([
     Offer.find({
-      id: { $in: offersIds },
-      offerType: {
-        $in: ["BASE_GAME", "DLC"],
-      },
-    }),
-    PriceEngine.find(
-      {
-        offerId: { $in: offersIds },
-        region,
-        "price.discount": { $gt: 0 },
-      },
-      undefined,
-      {
-        sort: {
-          updatedAt: -1,
-        },
-      }
-    ),
+      id: { $in: offerIds },
+      offerType: { $in: ["BASE_GAME", "DLC"] },
+    }).lean(),
+    PriceEngine.find({
+      offerId: { $in: offerIds },
+      region,
+      "price.discount": { $gt: 0 },
+    })
+      .sort({ updatedAt: -1 })
+      .lean(),
   ]);
-  const result = prices
-    .map((p) => {
-      const offer = offers.find((o) => o.id === p.offerId);
+
+  // Create a map of prices for quick lookup
+  const priceMap = new Map(prices.map((p) => [p.offerId, p]));
+
+  // Create a map of positions for quick lookup
+  const positionMap = new Map(
+    featuredOffers.map((p) => [p.offerId, p.position])
+  );
+
+  // Combine the data and sort by position
+  const result = offers
+    .map((offer) => {
+      const price = priceMap.get(offer.id);
+      const position = positionMap.get(offer.id);
+
+      if (!price || position === undefined) return null;
+
       return {
-        ...offer?.toObject(),
-        price: p,
+        ...offer,
+        price,
+        position,
       };
     })
-    .filter((o) => o.title)
+    .filter((o): o is NonNullable<typeof o> => o !== null)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
     .slice(0, 20);
-  // Save the result in cache, set the expiration to the first sale ending date
+
+  // Save the result in cache
   await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
+
   return c.json(result, 200, {
     "Cache-Control": "public, max-age=60",
   });
