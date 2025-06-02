@@ -546,7 +546,7 @@ app.get("/:sandboxId/changelog", async (c) => {
   const skip = (page - 1) * limit;
   const cacheKey = `changelog:${sandboxId}:${page}:${limit}`;
 
-  const cached = false; // await client.get(cacheKey);
+  const cached = await client.get(cacheKey);
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       "Cache-Control": "public, max-age=60",
@@ -625,8 +625,6 @@ app.get("/:sandboxId/changelog", async (c) => {
       ...assets.map((a) => a.artifactId),
       ...builds.map((b) => b._id.toString()),
     ];
-
-    console.log(allIds);
 
     // Use aggregation pipeline for better performance
     const changelog = await db.db
