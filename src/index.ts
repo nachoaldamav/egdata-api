@@ -654,11 +654,11 @@ app.get("/autocomplete", async (c) => {
     });
   }
 
-  const limit = Math.min(Number.parseInt(c.req.query("limit") || "5"), 5);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 10);
 
   const cacheKey = `autocomplete:${Buffer.from(query).toString(
     "base64"
-  )}:${limit}`;
+  )}:${limit}:v0.1`;
 
   const cached = await client.get(cacheKey);
 
