@@ -541,12 +541,12 @@ app.get("/:sandboxId/achievements", async (c) => {
 
 app.get("/:sandboxId/changelog", async (c) => {
   const { sandboxId } = c.req.param();
-  const limit = Number(c.req.query("limit") ?? "30");
-  const page = Number(c.req.query("page") ?? "1");
+  const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 50);
+  const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
-  const cacheKey = `changelog:${sandboxId}:${skip}:${limit}:v0.2`;
+  const cacheKey = `changelog:${sandboxId}:${page}:${limit}`;
 
-  const cached = await client.get(cacheKey);
+  const cached = false; // await client.get(cacheKey);
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
       "Cache-Control": "public, max-age=60",
@@ -555,30 +555,205 @@ app.get("/:sandboxId/changelog", async (c) => {
 
   const start = performance.now();
   try {
-    // Get changelog entries for the sandbox itself
-    const [changes, totalCount] = await Promise.all([
-      db.db
-        .collection("changelogs_v2")
-        .find({ "metadata.contextId": sandboxId })
-        .sort({ timestamp: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray(),
-      db.db
-        .collection("changelogs_v2")
-        .countDocuments({ "metadata.contextId": sandboxId }),
-    ]);
+    // Get the sandbox
+    const sandbox = await db.db.collection("sandboxes").findOne({
+      // @ts-expect-error
+      _id: sandboxId,
+    });
 
-    const result = {
-      hits: changes,
-      estimatedTotalHits: totalCount,
-      limit,
-      offset: skip,
-    };
+    if (!sandbox) {
+      return c.json({ error: "Sandbox not found" }, 404);
+    }
 
-    await client.set(cacheKey, JSON.stringify(result), "EX", 300);
+    // Get all offers with the same namespace
+    const offers = await db.db
+      .collection("offers")
+      .find({
+        namespace: sandboxId,
+      })
+      .sort({ lastModifiedDate: -1 })
+      .limit(100)
+      .toArray();
+
+    // Get all items from the offers
+    const items = await Item.find(
+      {
+        $or: [
+          {
+            id: {
+              $in: offers.flatMap((o) =>
+                o.items.map((i: { id: string }) => i.id)
+              ),
+            },
+          },
+          { namespace: sandboxId },
+        ],
+      },
+      {
+        id: 1,
+        namespace: 1,
+        releaseInfo: 1,
+      },
+      {
+        lean: true,
+        sort: {
+          lastModifiedDate: -1,
+        },
+        limit: 100,
+      }
+    );
+
+    // Get all assets from the items
+    const assets = await Asset.find({
+      itemId: { $in: items.map((i) => i.id) },
+    });
+
+    // Get all builds from item releaseInfo appIds
+    const builds = await db.db
+      .collection("builds")
+      .find({
+        appName: {
+          $in: items.flatMap((i) => i.releaseInfo.map((r) => r.appId)),
+        },
+      })
+      .toArray();
+
+    const allIds = [
+      sandboxId,
+      ...offers.map((o) => o.id),
+      ...items.map((i: { id: string }) => i.id),
+      ...assets.map((a) => a.artifactId),
+      ...builds.map((b) => b._id.toString()),
+    ];
+
+    console.log(allIds);
+
+    // Use aggregation pipeline for better performance
+    const changelog = await db.db
+      .collection("changelogs_v2")
+      .aggregate([
+        {
+          $match: {
+            "metadata.contextId": { $in: allIds },
+          },
+        },
+        {
+          $sort: { timestamp: -1 },
+        },
+        {
+          $skip: skip,
+        },
+        {
+          $limit: limit,
+        },
+        {
+          $lookup: {
+            from: "offers",
+            let: { contextId: "$metadata.contextId" },
+            pipeline: [{ $match: { $expr: { $eq: ["$id", "$$contextId"] } } }],
+            as: "offerDoc",
+          },
+        },
+        {
+          $lookup: {
+            from: "items",
+            let: { contextId: "$metadata.contextId" },
+            pipeline: [{ $match: { $expr: { $eq: ["$id", "$$contextId"] } } }],
+            as: "itemDoc",
+          },
+        },
+        {
+          $lookup: {
+            from: "assets",
+            let: { contextId: "$metadata.contextId" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$artifactId", "$$contextId"] } } },
+            ],
+            as: "assetDoc",
+          },
+        },
+        {
+          $lookup: {
+            from: "builds",
+            let: { contextId: "$metadata.contextId" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ["$_id", "$$contextId"] },
+                },
+              },
+            ],
+            as: "buildDoc",
+          },
+        },
+        {
+          $addFields: {
+            document: {
+              $switch: {
+                branches: [
+                  {
+                    case: { $eq: ["$metadata.contextType", "offer"] },
+                    then: { $arrayElemAt: ["$offerDoc", 0] },
+                  },
+                  {
+                    case: { $eq: ["$metadata.contextType", "item"] },
+                    then: { $arrayElemAt: ["$itemDoc", 0] },
+                  },
+                  {
+                    case: { $eq: ["$metadata.contextType", "asset"] },
+                    then: { $arrayElemAt: ["$assetDoc", 0] },
+                  },
+                  {
+                    case: { $eq: ["$metadata.contextType", "build"] },
+                    then: { $arrayElemAt: ["$buildDoc", 0] },
+                  },
+                ],
+                default: null,
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            metadata: 1,
+            timestamp: 1,
+            document: 1,
+          },
+        },
+      ])
+      .toArray();
+
+    const estimatedTotalHits = await db.db
+      .collection("changelogs_v2")
+      .countDocuments({ "metadata.contextId": { $in: allIds } });
+
+    // Cache the results
+    await client.set(
+      cacheKey,
+      JSON.stringify({
+        hits: changelog,
+        estimatedTotalHits,
+        limit,
+        offset: skip,
+      }),
+      "EX",
+      60
+    );
+
     consola.log(`changelog ${sandboxId} in ${performance.now() - start} ms`);
-    return c.json(result);
+    return c.json(
+      {
+        hits: changelog,
+        estimatedTotalHits,
+        limit,
+        offset: skip,
+      },
+      200,
+      {
+        "Cache-Control": "public, max-age=60",
+      }
+    );
   } catch (err) {
     console.error("Error in changelog endpoint:", err);
     return c.json({ message: "Internal server error" }, 500);
