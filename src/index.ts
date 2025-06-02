@@ -685,12 +685,7 @@ app.get("/autocomplete", async (c) => {
         $language: "en",
       },
     },
-    {
-      title: 1,
-      id: 1,
-      namespace: 1,
-      keyImages: 1,
-    },
+    undefined,
     {
       limit,
       collation: { locale: "en", strength: 1 },
