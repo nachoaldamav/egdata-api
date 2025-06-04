@@ -26,7 +26,7 @@ import OffersRoute from "./routes/offers.js";
 import PromotionsRoute from "./routes/promotions.js";
 import FreeGamesRoute from "./routes/free-games.js";
 import MultisearchRoute from "./routes/multisearch.js";
-import AuthRoute, { type LauncherAuthTokens } from "./routes/auth.js";
+import AuthRoute, { epic, type LauncherAuthTokens } from "./routes/auth.js";
 import AccountsRoute from "./routes/accounts.js";
 import UsersRoute from "./routes/users.js";
 import CollectionsRoute from "./routes/collections.js";
@@ -1532,7 +1532,13 @@ app.get("/active-sales", async (c) => {
   });
 });
 
-app.post("/donate/key/:code", async (c) => {
+app.post("/donate/key/:code", epic, async (c) => {
+  const session = c.var.session;
+
+  if (!session) {
+    return c.json({ error: "Missing session" }, 401);
+  }
+
   const { code } = c.req.param();
 
   console.log("Received donation code", code);
@@ -1543,65 +1549,7 @@ app.post("/donate/key/:code", async (c) => {
 
   console.log("Verifying code");
 
-  const authorization = getCookie(c, "EGDATA_AUTH");
-
-  if (!authorization) {
-    console.error("Missing authorization header");
-    return c.json({ error: "Missing authorization header" }, 401);
-  }
-
-  const token = authorization.replace("Bearer ", "");
-
-  if (!token) {
-    console.error("Missing token");
-    return c.json({ error: "Missing token" }, 401);
-  }
-
-  const certificate = process.env.JWT_PUBLIC_KEY;
-
-  if (!certificate) {
-    console.error("Missing JWT_PUBLIC_KEY env variable");
-    return c.json({ error: "Missing JWT_PUBLIC_KEY env variable" }, 401);
-  }
-
-  const egdataJWT = jwt.verify(token, readFileSync(certificate, "utf-8"), {
-    algorithms: ["RS256"],
-  }) as {
-    access_token: string;
-    refresh_token: string;
-    expires_at: string;
-    refresh_expires_at: string;
-    jti: string | undefined;
-  };
-
-  if (!egdataJWT || !egdataJWT.access_token || !egdataJWT.jti) {
-    console.error("Invalid JWT");
-    return c.json({ error: "Invalid JWT" }, 401);
-  }
-
-  // Inspect the token from "decoded.access_token" and save it to the database
-  const decoded = jwt.decode(egdataJWT.access_token as string) as {
-    sub: string;
-    iss: string;
-    dn: string;
-    nonce: string;
-    pfpid: string;
-    sec: number;
-    aud: string;
-    t: string;
-    scope: string;
-    appid: string;
-    exp: number;
-    iat: number;
-    jti: string;
-  };
-
-  if (!decoded || !decoded.sub || !decoded.iss) {
-    console.error("Invalid JWT");
-    return c.json({ error: "Invalid JWT" }, 401);
-  }
-
-  const id = decoded.sub;
+  const id = session.user?.email.split("@")[0] ?? c.var.epic?.account_id;
 
   // Check if the code is already in the DB
   const existingDonation = await db.db.collection("key-codes").findOne({
