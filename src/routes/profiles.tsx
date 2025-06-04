@@ -914,8 +914,6 @@ app.get("/:id/information", async (c) => {
       donations: donations.flatMap((d) => d.details),
     };
 
-    consola.info("Result", result);
-
     return c.json(result, {
       headers: {
         "Cache-Control": "no-cache",
