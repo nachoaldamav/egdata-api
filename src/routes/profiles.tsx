@@ -6,11 +6,8 @@ import { db } from "../db/index.js";
 import { Sandbox } from "@egdata/core.schemas.sandboxes";
 import { Offer } from "@egdata/core.schemas.offers";
 import { AchievementSet } from "@egdata/core.schemas.achievements";
-import type { WithId } from "mongodb";
-import type { AnyObject } from "mongoose";
 import { auth } from "../utils/auth.js";
 import { Queue } from "bullmq";
-import consola from "consola";
 
 export interface PlayerProductAchievements {
   _id: Id;
@@ -75,6 +72,17 @@ type SingleAchievement = {
     totalProductXP: number;
   };
 };
+
+type RegenOfferQueueType = {
+  accountId: string;
+};
+
+const refreshAchievementsQueue = new Queue<RegenOfferQueueType>(
+  "refreshAchievementsQueue",
+  {
+    connection: ioredis,
+  }
+);
 
 const app = new Hono();
 
@@ -1191,17 +1199,6 @@ app.get("/:id/random-game", async (c) => {
   }
 });
 
-type RegenOfferQueueType = {
-  accountId: string;
-};
-
-const refreshAchievementsQueue = new Queue<RegenOfferQueueType>(
-  "refreshAchievementsQueue",
-  {
-    connection: ioredis,
-  }
-);
-
 app.put("/:id/refresh", async (c) => {
   const { id } = c.req.param();
 
@@ -1212,9 +1209,19 @@ app.put("/:id/refresh", async (c) => {
     });
   }
 
-  await refreshAchievementsQueue.add("refreshAchievements", {
-    accountId: id,
-  });
+  await refreshAchievementsQueue.add(
+    `refresh-achievements:${id}`,
+    {
+      accountId: id,
+    },
+    {
+      deduplication: {
+        id: `refresh-achievements:${id}`,
+        // 2 minutes
+        ttl: 2 * 60 * 1000,
+      },
+    }
+  );
 
   return c.json({
     message: "Refresh achievements job added",
