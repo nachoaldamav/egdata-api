@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { epicStoreClient } from "../clients/epic.js";
-import client from "../clients/redis.js";
+import client, { ioredis } from "../clients/redis.js";
 import type { AchievementsSummary } from "../types/get-user-achievements.js";
 import { db } from "../db/index.js";
 import { Sandbox } from "@egdata/core.schemas.sandboxes";
@@ -9,6 +9,8 @@ import { AchievementSet } from "@egdata/core.schemas.achievements";
 import type { WithId } from "mongodb";
 import type { AnyObject } from "mongoose";
 import { auth } from "../utils/auth.js";
+import { Queue } from "bullmq";
+import consola from "consola";
 
 export interface PlayerProductAchievements {
   _id: Id;
@@ -820,9 +822,17 @@ app.get("/:id/information", async (c) => {
     }
 
     // Fetch user profile from the database (no caching)
-    const dbProfile = await db.db.collection("epic").findOne({
-      accountId: id,
-    });
+    const [dbProfile, donations] = await Promise.all([
+      db.db.collection("epic").findOne({
+        accountId: id,
+      }),
+      db.db
+        .collection("key-codes")
+        .find({
+          accountId: id,
+        })
+        .toArray(),
+    ]);
 
     if (dbProfile && !dbProfile.creationDate) {
       dbProfile.creationDate = new Date();
@@ -901,7 +911,10 @@ app.get("/:id/information", async (c) => {
       },
       linkedAccounts: dbProfile?.linkedAccounts,
       creationDate: dbProfile?.creationDate,
+      donations: donations.flatMap((d) => d.details),
     };
+
+    consola.info("Result", result);
 
     return c.json(result, {
       headers: {
@@ -1178,6 +1191,36 @@ app.get("/:id/random-game", async (c) => {
       message: "Failed to fetch offer",
     });
   }
+});
+
+type RegenOfferQueueType = {
+  accountId: string;
+};
+
+const refreshAchievementsQueue = new Queue<RegenOfferQueueType>(
+  "refreshAchievementsQueue",
+  {
+    connection: ioredis,
+  }
+);
+
+app.put("/:id/refresh", async (c) => {
+  const { id } = c.req.param();
+
+  if (!id) {
+    c.status(400);
+    return c.json({
+      message: "Missing id parameter",
+    });
+  }
+
+  await refreshAchievementsQueue.add("refreshAchievements", {
+    accountId: id,
+  });
+
+  return c.json({
+    message: "Refresh achievements job added",
+  });
 });
 
 export default app;

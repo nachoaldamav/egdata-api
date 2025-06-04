@@ -1612,6 +1612,21 @@ app.post("/donate/key/:code", epic, async (c) => {
   return c.json({ message: "ok", id: parsedResponse.offerId });
 });
 
+app.get("/donate/key/:code", async (c) => {
+  // Return the information from the redeemed code
+  const { code } = c.req.param();
+
+  const codeInfo = await db.db.collection("key-codes").findOne({
+    code,
+  });
+
+  if (!codeInfo) {
+    return c.json({ error: "Code not found" }, 404);
+  }
+
+  return c.json(codeInfo.details);
+});
+
 app.route("/sandboxes", SandboxRoute);
 
 app.route("/search", SearchRoute);
