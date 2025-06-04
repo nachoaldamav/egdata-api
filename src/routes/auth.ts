@@ -11,6 +11,8 @@ import { randomUUID } from "node:crypto";
 import client from "../clients/redis.js";
 import { auth } from "../utils/auth.js";
 import consola from "consola";
+import { Routes } from "discord-api-types/v10";
+import { discord } from "../clients/discord.js";
 
 interface EpicProfileResponse {
   accountId: string;
@@ -1225,6 +1227,20 @@ app.get("/discord/callback", epic, async (c) => {
     }
   );
 
+  const isDonor = await db.db.collection("key-codes").findOne({
+    accountId: session.user.email.split("@")[0],
+  });
+
+  if (isDonor) {
+    const roleId = "1379892703793512599";
+    const guildId = "561598657879605269";
+
+    await discord
+      .put(Routes.guildMemberRole(guildId, userData.id, roleId))
+      .catch((err) => {
+        consola.error("Failed to add role to user", err);
+      });
+  }
   // Revoke token
   const revoke = await fetch(
     "https://discord.com/api/v10/oauth2/token/revoke",
