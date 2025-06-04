@@ -10,6 +10,7 @@ import { telegramBotService } from "../clients/telegram.js";
 import { randomUUID } from "node:crypto";
 import client from "../clients/redis.js";
 import { auth } from "../utils/auth.js";
+import consola from "consola";
 
 interface EpicProfileResponse {
   accountId: string;
@@ -22,6 +23,17 @@ interface LinkedAccount {
   identityProviderId: string;
   displayName: string;
 }
+
+const ALLOWED_ORIGINS = [
+  "https://egdata.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:4000",
+  "https://user-reviews-pr.egdata.app/",
+  "https://egdata-370475041422.us-central1.run.app",
+  "https://store.epicgames.com",
+];
 
 const getEpicAccount = async (accessToken: string, accountId: string) => {
   const url = new URL("https://api.epicgames.dev/epic/id/v2/accounts");
@@ -38,7 +50,22 @@ const getEpicAccount = async (accessToken: string, accountId: string) => {
 
 const app = new Hono();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: (origin) => {
+      if (origin) {
+        if (ALLOWED_ORIGINS.includes(origin)) {
+          return origin;
+        }
+      }
+      return "https://egdata.app";
+    },
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH"],
+    credentials: true,
+    maxAge: 86400,
+  })
+);
 
 export interface EpicTokenInfo {
   active: boolean;
@@ -87,9 +114,9 @@ export const epic = createMiddleware<EpicAuthMiddleware>(async (c, next) => {
   try {
     const decoded = jwt.decode(epicAuth) as
       | ({
-        sub: string;
-        appid: string;
-      } & jwt.JwtHeader & { header: { kid: string } })
+          sub: string;
+          appid: string;
+        } & jwt.JwtHeader & { header: { kid: string } })
       | null;
 
     if (!decoded || !decoded.sub || !decoded.appid) {
@@ -155,9 +182,9 @@ export const epicInfo = createMiddleware<EpicAuthMiddleware>(
     try {
       const decoded = jwt.decode(epicAuth) as
         | ({
-          sub: string;
-          appid: string;
-        } & jwt.JwtHeader & { header: { kid: string } })
+            sub: string;
+            appid: string;
+          } & jwt.JwtHeader & { header: { kid: string } })
         | null;
 
       if (!decoded || !decoded.sub || !decoded.appid) {
@@ -249,21 +276,25 @@ app.post("/avatar", epic, async (c) => {
   const epicVar = c.var.epic;
   const session = c.var.session;
 
+  consola.info("Recieved request to change avatar");
+
   if ((!epicVar || !epicVar.account_id) && !session) {
     console.error("Missing EPIC_ACCOUNT_ID", epicVar);
     return c.json({ error: "Missing EPIC_ACCOUNT_ID" }, 401);
   }
 
-  console.log("Content type:", c.req.header("Content-Type"));
+  console.info("Content type:", c.req.header("Content-Type"));
 
   const body = await c.req.parseBody();
 
-  const file = body.file as File;
+  const file = body.avatar as File;
 
   if (!file) {
-    console.error("Missing file");
+    consola.error("Missing 'avatar' in body");
     return c.json({ error: "Missing file" }, 400);
   }
+
+  consola.success("Avatar exists in body");
 
   const cfImagesUrl =
     "https://api.cloudflare.com/client/v4/accounts/7da0b3179a5b5ef4f1a2d1189f072d0b/images/v1";
@@ -277,6 +308,8 @@ app.post("/avatar", epic, async (c) => {
       .split(".")
       .pop()}`
   );
+
+  consola.info("Form data for Cloudflare Images", formData);
 
   const response = await fetch(cfImagesUrl, {
     method: "POST",
@@ -293,6 +326,8 @@ app.post("/avatar", epic, async (c) => {
 
   const responseData = await response.json();
 
+  consola.success("Avatar uploaded to Cloudflare Images", responseData);
+
   await db.db.collection("epic").updateOne(
     {
       accountId: session.user?.email.split("@")[0] ?? epicVar.account_id,
@@ -303,6 +338,8 @@ app.post("/avatar", epic, async (c) => {
       },
     }
   );
+
+  consola.success("Avatar updated in database", responseData.result);
 
   return c.json(responseData.result);
 });
@@ -1103,7 +1140,7 @@ app.post("/v2/save-state", async (c) => {
   // Generate a random code
   const code = randomUUID().replaceAll("-", "").toUpperCase();
 
-  await client.set(`state-code:${code}`, "true", 'EX', 3600);
+  await client.set(`state-code:${code}`, "true", "EX", 3600);
 
   return c.json({
     state: code,
