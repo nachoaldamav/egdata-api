@@ -8,6 +8,7 @@ import { Offer } from "@egdata/core.schemas.offers";
 import { AchievementSet } from "@egdata/core.schemas.achievements";
 import { auth } from "../utils/auth.js";
 import { Queue } from "bullmq";
+import consola from "consola";
 
 export interface PlayerProductAchievements {
   _id: Id;
@@ -1210,7 +1211,13 @@ app.put("/:id/refresh", async (c) => {
     });
   }
 
-  await refreshAchievementsQueue.add(
+  const isDonor = await db.db.collection("key-codes").findOne({
+    accountId: id,
+  });
+
+  const ttl = !isDonor ? 15 * 60 * 1000 : 2 * 60 * 1000;
+
+  const job = await refreshAchievementsQueue.add(
     `refresh-achievements:${id}`,
     {
       accountId: id,
@@ -1218,14 +1225,60 @@ app.put("/:id/refresh", async (c) => {
     {
       deduplication: {
         id: `refresh-achievements:${id}`,
-        // 2 minutes
-        ttl: 2 * 60 * 1000,
+        ttl,
       },
     }
   );
 
+  consola.info("Job added", job.asJSON());
+
+  await client.set(
+    `refresh-achievements:${id}`,
+    JSON.stringify(job.asJSON()),
+    "EX",
+    ttl
+  );
+
   return c.json({
     message: "Refresh achievements job added",
+  });
+});
+
+app.get("/:id/refresh-status", async (c) => {
+  const { id } = c.req.param();
+
+  const isDonor = await db.db.collection("key-codes").findOne({
+    accountId: id,
+  });
+
+  const ttl = !isDonor ? 15 * 60 * 1000 : 2 * 60 * 1000;
+
+  const exists = await client.get(`refresh-achievements:${id}`);
+
+  if (!exists) {
+    return c.json({
+      canRefresh: true,
+      remainingTime: 0,
+    });
+  }
+
+  const job = JSON.parse(exists);
+
+  const remainingTime = Math.max(
+    0,
+    Math.ceil((ttl - (Date.now() - job.timestamp)) / 1000)
+  );
+
+  if (remainingTime > 0) {
+    return c.json({
+      canRefresh: false,
+      remainingTime,
+    });
+  }
+
+  return c.json({
+    canRefresh: true,
+    remainingTime: 0,
   });
 });
 
