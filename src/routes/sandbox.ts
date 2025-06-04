@@ -13,6 +13,7 @@ import { orderOffersObject } from "../utils/order-offers-object.js";
 import { Changelog } from "@egdata/core.schemas.changelog";
 import { ObjectId } from "mongodb";
 import { consola } from "../utils/logger.js";
+import { RootFilterQuery } from "mongoose";
 
 const app = new Hono();
 
@@ -165,7 +166,9 @@ app.get("/:sandboxId/items", async (ctx) => {
   );
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sandbox:${sandboxId}:items:${page}:${limit}:v0.1`;
+  const { entitlementType, status, platforms, title } = ctx.req.query();
+
+  const cacheKey = `sandbox:${sandboxId}:items:${page}:${limit}:${entitlementType}:${status}:${platforms}:${title}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -186,23 +189,40 @@ app.get("/:sandboxId/items", async (ctx) => {
     });
   }
 
-  const [items, count] = await Promise.all([
-    Item.find(
-      {
-        namespace: sandboxId,
+  const query: RootFilterQuery<typeof Item> = {
+    namespace: sandboxId,
+  };
+
+  // All the filters are comma separated arrays
+  if (entitlementType) {
+    query.entitlementType = { $in: entitlementType.split(",") };
+  }
+
+  if (status) {
+    query.status = { $in: status.split(",") };
+  }
+
+  if (platforms) {
+    query.releaseInfo = {
+      $elemMatch: {
+        platform: { $in: platforms.split(",") },
       },
-      undefined,
-      {
-        sort: {
-          lastModified: -1,
-        },
-        skip,
-        limit,
-      }
-    ),
-    Item.countDocuments({
-      namespace: sandboxId,
+    };
+  }
+
+  if (title) {
+    query.title = { $regex: title, $options: "i" };
+  }
+
+  const [items, count] = await Promise.all([
+    Item.find(query, undefined, {
+      sort: {
+        lastModified: -1,
+      },
+      skip,
+      limit,
     }),
+    Item.countDocuments(query),
   ]);
 
   const response = {
@@ -228,7 +248,9 @@ app.get("/:sandboxId/offers", async (ctx) => {
   );
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sandbox:${sandboxId}:offers:${page}:${limit}:v0.1`;
+  const { offerType, title } = ctx.req.query();
+
+  const cacheKey = `sandbox:${sandboxId}:offers:${page}:${limit}:${offerType}:${title}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -247,23 +269,27 @@ app.get("/:sandboxId/offers", async (ctx) => {
     });
   }
 
+  const query: RootFilterQuery<typeof Offer> = {
+    namespace: sandboxId,
+  };
+
+  if (offerType) {
+    query.offerType = { $in: offerType.split(",") };
+  }
+
+  if (title) {
+    query.title = { $regex: title, $options: "i" };
+  }
+
   const [offers, count] = await Promise.all([
-    Offer.find(
-      {
-        namespace: sandboxId,
+    Offer.find(query, undefined, {
+      sort: {
+        lastModified: -1,
       },
-      undefined,
-      {
-        sort: {
-          lastModified: -1,
-        },
-        skip,
-        limit,
-      }
-    ),
-    Offer.countDocuments({
-      namespace: sandboxId,
+      skip,
+      limit,
     }),
+    Offer.countDocuments(query),
   ]);
 
   const response = {
@@ -287,75 +313,55 @@ app.get("/:sandboxId/assets", async (ctx) => {
   );
   const skip = (page - 1) * limit;
 
-  const cacheKey = `${sandboxId}-assets-${page}-${limit}:v0.1`;
+  const { platform } = ctx.req.query();
 
+  const cacheKey = `sandbox:${sandboxId}:assets:${page}:${limit}:${platform}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
-    return ctx.json(JSON.parse(cached));
+    return ctx.json(JSON.parse(cached), 200, {
+      "Cache-Control": "public, max-age=60",
+    });
   }
 
-  let items: any[] = [];
-  let assets: any[] = [];
-  let allAssets: any[] = [];
-  let paginatedAssets: any[] = [];
+  const sandbox = await db.db.collection("sandboxes").findOne({
+    // @ts-ignore
+    _id: sandboxId,
+  });
+
+  if (!sandbox) {
+    ctx.status(404);
+    return ctx.json({
+      message: "Sandbox not found",
+    });
+  }
 
   try {
-    const sandbox = await db.db.collection("sandboxes").findOne({
-      // @ts-ignore
-      _id: sandboxId,
-    });
-
-    if (!sandbox) {
-      ctx.status(404);
-      return ctx.json({
-        message: "Sandbox not found",
-      });
-    }
-
-    // First get all items to find missing assets
-    items = await Item.find(
-      {
-        namespace: sandboxId,
-      },
-      {
-        id: 1,
-        namespace: 1,
-        releaseInfo: 1,
-        title: 1,
-      }
+    // Get all items with their releaseInfo
+    const items = await Item.find(
+      { namespace: sandboxId },
+      { id: 1, namespace: 1, releaseInfo: 1, title: 1 }
     ).lean();
 
-    // Get all assets for this namespace
-    const [assetsResult, totalCount] = await Promise.all([
-      Asset.find(
-        {
-          namespace: sandboxId,
-        },
-        undefined,
-        {
-          sort: {
-            updatedAt: -1,
-          },
-        }
-      ).lean(),
-      Asset.countDocuments({
-        namespace: sandboxId,
-      }),
+    // Get all real assets
+    const [realAssets, realAssetCount] = await Promise.all([
+      Asset.find({ namespace: sandboxId }, undefined, {
+        sort: { updatedAt: -1 },
+      }).lean(),
+      Asset.countDocuments({ namespace: sandboxId }),
     ]);
 
-    assets = assetsResult;
+    // Create a map of real assets for quick lookup
+    const realAssetsMap = new Map(realAssets.map((a) => [a.artifactId, a]));
 
-    // Create a map of all assets by artifactId for quick lookup
-    const assetsMap = new Map(assets.map((a) => [a.artifactId, a]));
+    // Generate virtual assets from items' releaseInfo
+    const virtualAssets = items.flatMap((item) =>
+      item.releaseInfo.flatMap((releaseInfo) => {
+        if (realAssetsMap.has(releaseInfo.appId as string)) return [];
 
-    // Add missing assets for items that have releaseInfo but no corresponding asset
-    allAssets = [...assets];
-    for (const item of items) {
-      for (const releaseInfo of item.releaseInfo) {
-        if (!assetsMap.has(releaseInfo.appId as string)) {
-          for (const platform of releaseInfo.platform) {
-            allAssets.push({
+        return releaseInfo.platform.map(
+          (platform) =>
+            ({
               artifactId: releaseInfo.appId as string,
               downloadSizeBytes: 0,
               installedSizeBytes: 0,
@@ -366,48 +372,46 @@ app.get("/:sandboxId/assets", async (ctx) => {
               title: item.title,
               __v: 0,
               updatedAt: new Date(0),
-            });
-          }
-        }
-      }
-    }
+            } as typeof Asset.prototype)
+        );
+      })
+    );
 
-    // Sort all assets by updatedAt
-    allAssets.sort((a, b) => {
-      const dateA = (a.updatedAt as Date) || new Date(0);
-      const dateB = (b.updatedAt as Date) || new Date(0);
+    // Combine and sort all assets
+    const allAssets = [...realAssets, ...virtualAssets].sort((a, b) => {
+      const dateA = a.updatedAt || new Date(0);
+      const dateB = b.updatedAt || new Date(0);
       return dateB.getTime() - dateA.getTime();
     });
 
-    // Get total count including virtual assets
-    const totalAssetCount = allAssets.length;
+    // Apply platform filter if specified
+    const filteredAssets = platform
+      ? allAssets.filter((asset) =>
+          platform.split(",").includes(asset.platform)
+        )
+      : allAssets;
 
-    // Apply pagination to the combined results
-    paginatedAssets = allAssets.slice(skip, skip + limit);
+    // Apply pagination
+    const paginatedAssets = filteredAssets.slice(skip, skip + limit);
 
     const response = {
       elements: paginatedAssets,
       page,
       limit,
-      count: totalAssetCount,
+      count: filteredAssets.length,
     };
 
-    // Set cache with a shorter TTL
-    await client.set(cacheKey, JSON.stringify(response), "EX", 300); // 5 minutes instead of 1 hour
+    await client.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
-    return ctx.json(response);
+    return ctx.json(response, 200, {
+      "Cache-Control": "public, max-age=60",
+    });
   } catch (error) {
     console.error("Error in assets endpoint:", error);
     ctx.status(500);
     return ctx.json({
       message: "Internal server error",
     });
-  } finally {
-    // Force garbage collection of large objects
-    items = [];
-    assets = [];
-    allAssets = [];
-    paginatedAssets = [];
   }
 });
 
@@ -767,7 +771,9 @@ app.get("/:sandboxId/builds", async (c) => {
   );
   const skip = (page - 1) * limit;
 
-  const cacheKey = `sandbox:${sandboxId}:builds:${page}:${limit}:v0.1`;
+  const { platform } = c.req.query();
+
+  const cacheKey = `sandbox:${sandboxId}:builds:${page}:${limit}:${platform}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -786,15 +792,20 @@ app.get("/:sandboxId/builds", async (c) => {
     });
   }
 
+  const query: RootFilterQuery<typeof Item> = {
+    namespace: sandboxId,
+  };
+
+  if (platform) {
+    query.releaseInfo = {
+      $elemMatch: { platform: { $in: platform.split(",") } },
+    };
+  }
+
   // First get all items to get the appIds
-  const items = await Item.find(
-    {
-      namespace: sandboxId,
-    },
-    {
-      releaseInfo: 1,
-    }
-  );
+  const items = await Item.find(query, {
+    releaseInfo: 1,
+  });
 
   const appIds = items.flatMap((i) => i.releaseInfo.map((r) => r.appId));
 
