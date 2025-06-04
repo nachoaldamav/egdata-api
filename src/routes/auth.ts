@@ -1225,6 +1225,28 @@ app.get("/discord/callback", epic, async (c) => {
     }
   );
 
+  // Revoke token
+  const revoke = await fetch(
+    "https://discord.com/api/v10/oauth2/token/revoke",
+    {
+      method: "POST",
+      body: new URLSearchParams({
+        token: data.access_token,
+        token_type_hint: "access_token",
+      }),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${Buffer.from(
+          `${process.env.DISCORD_CLIENT_ID}:${process.env.DISCORD_CLIENT_SECRET}`
+        ).toString("base64")}`,
+      },
+    }
+  );
+
+  if (!revoke.ok) {
+    return c.redirect("https://egdata.app/?error=discord-revoke-token-failed");
+  }
+
   return c.redirect("https://egdata.app/discord-linked");
 });
 
