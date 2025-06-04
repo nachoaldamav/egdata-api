@@ -24,6 +24,7 @@ app.get('/:id', async (c) => {
   const limit = Number.parseInt(c.req.query('limit') || '0');
   const page = Math.max(Number.parseInt(c.req.query('page') || '1'), 1);
   const offerType = c.req.query('offerType');
+  const ignoredSandboxes = (c.req.query('ignoredSandboxes') || '').split(',');
   const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
 
   const selectedCountry = country ?? cookieCountry ?? 'US';
@@ -39,8 +40,7 @@ app.get('/:id', async (c) => {
     });
   }
 
-  const cacheKey = `sellers:${id}:${region}:${page}:${limit}:${offerType}`;
-
+  const cacheKey = `sellers:${id}:${region}:${page}:${limit}:${offerType}:${ignoredSandboxes.join(',')}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -52,6 +52,10 @@ app.get('/:id', async (c) => {
   const offers = await Offer.find(
     {
       'seller.id': id,
+      namespace: {
+        // allow frontend to send internal sandboxes, which we dont want to get offers from
+        $nin: ignoredSandboxes,
+      },
       ...(offerType ? { offerType } : {}),
     },
     undefined,
