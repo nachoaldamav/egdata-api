@@ -86,7 +86,7 @@ app.get("/sitemap.xml", async (c) => {
       (profile) =>
         `<url>
           <loc>https://egdata.app/profile/${profile.accountId}</loc>
-        </url>`,
+        </url>`
     )
     .join("\n")}
 </urlset>`;
@@ -141,7 +141,7 @@ app.get("/me", async (c) => {
         $set: {
           creationDate: dbProfile.creationDate,
         },
-      },
+      }
     );
   }
 
@@ -163,7 +163,7 @@ app.get("/me", async (c) => {
     creationDate: dbProfile?.creationDate,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
   return c.json(result, {
     headers: {
@@ -210,7 +210,7 @@ app.get("/:id", async (c) => {
           $set: {
             creationDate: dbProfile.creationDate,
           },
-        },
+        }
       );
     }
 
@@ -279,18 +279,18 @@ app.get("/:id", async (c) => {
               productAchievements: {
                 totalAchievements: achievementsSets.reduce(
                   (acc, curr) => acc + curr.achievements.length,
-                  0,
+                  0
                 ),
                 totalProductXP: achievementsSets.reduce(
                   (acc, curr) =>
                     acc +
                     curr.achievements.reduce((acc, curr) => acc + curr.xp, 0),
-                  0,
+                  0
                 ),
               },
             },
           });
-        }),
+        })
       );
 
       const result = {
@@ -310,7 +310,7 @@ app.get("/:id", async (c) => {
         reviews: reviewsCount,
       };
 
-      await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+      await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
       return c.json(result, {
         headers: {
@@ -334,7 +334,7 @@ app.get("/:id", async (c) => {
       reviews: reviewsCount,
     };
 
-    await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+    await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
     return c.json(result, {
       headers: {
@@ -381,7 +381,7 @@ app.get("/:id/achievements/:sandboxId", async (c) => {
     .toArray();
 
   const achievementsSets = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId),
+    p.achievementSets.map((a) => a.achievementSetId)
   );
 
   const dedupedAchievementsSets = [...new Set(achievementsSets)];
@@ -429,7 +429,7 @@ app.get("/:id/rare-achievements", async (c) => {
     .toArray();
 
   const achievementsSetsIds = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId),
+    p.achievementSets.map((a) => a.achievementSetId)
   );
 
   const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
@@ -446,16 +446,16 @@ app.get("/:id/rare-achievements", async (c) => {
       ...achievement.toObject(),
       achievementSetId: set.achievementSetId, // Inject achievementSetId
       sandboxId: set.sandboxId, // Inject sandboxId
-    })),
+    }))
   );
 
   // Sort by rarity (completedPercent)
   const sortedAchievements = allAchievements.sort(
-    (a, b) => a.completedPercent - b.completedPercent,
+    (a, b) => a.completedPercent - b.completedPercent
   );
 
   const allPlayerAchievements = playerAchievements.flatMap(
-    (p) => p.playerAchievements,
+    (p) => p.playerAchievements
   );
 
   const result: (AchievementType & {
@@ -468,7 +468,7 @@ app.get("/:id/rare-achievements", async (c) => {
     const playerAchievement = allPlayerAchievements.find(
       (p) =>
         p.playerAchievement.achievementName === achievement.name &&
-        p.playerAchievement.achievementSetId === achievement.achievementSetId,
+        p.playerAchievement.achievementSetId === achievement.achievementSetId
     );
 
     if (!playerAchievement) {
@@ -502,7 +502,7 @@ app.get("/:id/rare-achievements", async (c) => {
     };
   });
 
-  await client.set(cacheKey, JSON.stringify(selectedAchievements), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(selectedAchievements), "EX", 3600);
 
   return c.json(selectedAchievements, {
     headers: {
@@ -543,7 +543,7 @@ app.get("/:id/rare-achievements/:sandboxId", async (c) => {
     .toArray();
 
   const achievementsSetsIds = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId),
+    p.achievementSets.map((a) => a.achievementSetId)
   );
 
   const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
@@ -563,22 +563,22 @@ app.get("/:id/rare-achievements/:sandboxId", async (c) => {
       unlocked: playerAchievements
         .find((p) =>
           p.playerAchievements.some(
-            (pa) => pa.playerAchievement.achievementName === achievement.name,
-          ),
+            (pa) => pa.playerAchievement.achievementName === achievement.name
+          )
         )
         ?.playerAchievements.find(
-          (pa) => pa.playerAchievement.achievementName === achievement.name,
+          (pa) => pa.playerAchievement.achievementName === achievement.name
         )?.playerAchievement.unlocked,
       unlockDate: playerAchievements
         .find((p) =>
           p.playerAchievements.some(
-            (pa) => pa.playerAchievement.achievementName === achievement.name,
-          ),
+            (pa) => pa.playerAchievement.achievementName === achievement.name
+          )
         )
         ?.playerAchievements.find(
-          (pa) => pa.playerAchievement.achievementName === achievement.name,
+          (pa) => pa.playerAchievement.achievementName === achievement.name
         )?.playerAchievement.unlockDate,
-    })),
+    }))
   );
 
   // Sort by rarity (completedPercent)
@@ -588,7 +588,7 @@ app.get("/:id/rare-achievements/:sandboxId", async (c) => {
 
   const selectedAchievements = sortedAchievements.slice(0, 3);
 
-  await client.set(cacheKey, JSON.stringify(selectedAchievements), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(selectedAchievements), "EX", 3600);
 
   return c.json(selectedAchievements, {
     headers: {
@@ -772,7 +772,7 @@ app.get("/:id/achievements", async (c) => {
     page,
   };
 
-  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+  await client.set(cacheKey, JSON.stringify(result), "EX", 3600);
 
   return c.json(result, {
     headers: {
@@ -791,20 +791,26 @@ app.get("/:id/information", async (c) => {
     });
   }
 
-  const cacheKey = `epic-profile:${id}:v0.3`;
-
-  const cached = await client.get(cacheKey);
-  if (cached) {
-    return c.json(JSON.parse(cached), {
-      headers: {
-        "Cache-Control": "public, max-age=60",
-      },
-    });
-  }
+  const epicProfileCacheKey = `epic-profile:${id}:epic-data`;
+  const statsCacheKey = `epic-profile:${id}:stats`;
 
   try {
-    // Fetch user profile from Epic Store client
-    const profile = await epicStoreClient.getUser(id);
+    // Fetch user profile from Epic Store client (with caching)
+    let profile;
+    const cachedEpicProfile = await client.get(epicProfileCacheKey);
+    if (cachedEpicProfile) {
+      profile = JSON.parse(cachedEpicProfile);
+    } else {
+      profile = await epicStoreClient.getUser(id);
+      if (profile) {
+        await client.set(
+          epicProfileCacheKey,
+          JSON.stringify(profile),
+          "EX",
+          3600
+        ); // Cache Epic profile for 1 hour
+      }
+    }
 
     if (!profile) {
       c.status(404);
@@ -813,7 +819,7 @@ app.get("/:id/information", async (c) => {
       });
     }
 
-    // Fetch user profile from the database
+    // Fetch user profile from the database (no caching)
     const dbProfile = await db.db.collection("epic").findOne({
       accountId: id,
     });
@@ -828,60 +834,70 @@ app.get("/:id/information", async (c) => {
           $set: {
             creationDate: dbProfile.creationDate,
           },
-        },
+        }
       );
     }
 
-    // Manually calculate stats by iterating through achievements
-    const playerAchievements = await db.db
-      .collection("player-achievements")
-      .find({ epicAccountId: id })
-      .toArray();
+    // Calculate stats (with caching)
+    let stats;
+    const cachedStats = await client.get(statsCacheKey);
+    if (cachedStats) {
+      stats = JSON.parse(cachedStats);
+    } else {
+      const playerAchievements = await db.db
+        .collection("player-achievements")
+        .find({ epicAccountId: id })
+        .toArray();
 
-    let totalGames = 0;
-    let totalPlayerAwards = 0;
-    let totalAchievements = 0;
-    let totalXP = 0;
+      let totalGames = 0;
+      let totalPlayerAwards = 0;
+      let totalAchievements = 0;
+      let totalXP = 0;
 
-    const singleAchievementsLists: WithId<AnyObject>[] = [];
+      const singleAchievementsLists: WithId<AnyObject>[] = [];
 
-    for (const achievement of playerAchievements) {
-      if (
-        !singleAchievementsLists.find(
-          (a) => a.sandboxId === achievement.sandboxId,
-        )
-      ) {
-        singleAchievementsLists.push(achievement);
+      for (const achievement of playerAchievements) {
+        if (
+          !singleAchievementsLists.find(
+            (a) => a.sandboxId === achievement.sandboxId
+          )
+        ) {
+          singleAchievementsLists.push(achievement);
+        }
       }
-    }
 
-    for (const achievement of singleAchievementsLists) {
-      totalGames += 1;
-      totalPlayerAwards += achievement.playerAwards
-        ? achievement.playerAwards.length
-        : 0;
-      totalAchievements += achievement.totalUnlocked || 0;
-      totalXP += achievement.totalXP || 0;
-    }
+      for (const achievement of singleAchievementsLists) {
+        totalGames += 1;
+        totalPlayerAwards += achievement.playerAwards
+          ? achievement.playerAwards.length
+          : 0;
+        totalAchievements += achievement.totalUnlocked || 0;
+        totalXP += achievement.totalXP || 0;
+      }
 
-    // Calculate the total XP with additional points for each platinum award
-    const calculatedXP = totalXP + totalPlayerAwards * 250;
+      // Calculate the total XP with additional points for each platinum award
+      const calculatedXP = totalXP + totalPlayerAwards * 250;
 
-    // Fetch reviews count
-    const reviewsCount = await db.db
-      .collection("reviews")
-      .countDocuments({ userId: id });
+      // Fetch reviews count
+      const reviewsCount = await db.db
+        .collection("reviews")
+        .countDocuments({ userId: id });
 
-    // Construct the result object
-    const result = {
-      ...profile,
-      stats: {
+      stats = {
         totalGames,
         totalAchievements,
         totalPlayerAwards,
         totalXP: calculatedXP,
         reviewsCount,
-      },
+      };
+
+      await client.set(statsCacheKey, JSON.stringify(stats), "EX", 300); // Cache stats for 5 minutes
+    }
+
+    // Construct the result object with fresh DB data
+    const result = {
+      ...profile,
+      stats,
       avatar: {
         small: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.small,
         medium: dbProfile?.avatarUrl?.variants[0] ?? profile?.avatar?.medium,
@@ -891,11 +907,9 @@ app.get("/:id/information", async (c) => {
       creationDate: dbProfile?.creationDate,
     };
 
-    await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
-
     return c.json(result, {
       headers: {
-        "Cache-Control": "public, max-age=60",
+        "Cache-Control": "no-cache",
       },
     });
   } catch (err) {
@@ -1005,24 +1019,24 @@ app.get("/:id/games", async (c) => {
             productAchievements: {
               totalAchievements: achievementsSets.reduce(
                 (acc, curr) => acc + curr.achievements.length,
-                0,
+                0
               ),
               totalProductXP: achievementsSets.reduce(
                 (acc, curr) =>
                   acc +
                   curr.achievements.reduce((acc, curr) => acc + curr.xp, 0),
-                0,
+                0
               ),
             },
           });
-        }),
+        })
       );
     }
 
     // Deduplicate based on sandboxId after assembling achievements
     const deduplicatedAchievements = achievements.filter(
       (achievement, index, self) =>
-        index === self.findIndex((t) => t.sandboxId === achievement.sandboxId),
+        index === self.findIndex((t) => t.sandboxId === achievement.sandboxId)
     );
 
     // Construct the result object
@@ -1036,7 +1050,7 @@ app.get("/:id/games", async (c) => {
       },
     };
 
-    await client.set(cacheKey, JSON.stringify(result), 'EX', 60);
+    await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
     return c.json(result, {
       headers: {
@@ -1154,7 +1168,7 @@ app.get("/:id/random-game", async (c) => {
     // Construct the result object
     const result = offer;
 
-    await client.set(cacheKey, JSON.stringify(result), 'EX', 360);
+    await client.set(cacheKey, JSON.stringify(result), "EX", 360);
 
     return c.json(result, {
       headers: {
