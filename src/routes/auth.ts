@@ -1153,7 +1153,7 @@ app.get("/discord/link", epic, async (c) => {
   url.searchParams.append("response_type", "code");
   url.searchParams.append(
     "redirect_uri",
-    "http://localhost:4000/auth/discord/callback"
+    "https://api-gcp.egdata.app/auth/discord/callback"
   );
   url.searchParams.append("scope", "identify");
 
@@ -1180,7 +1180,7 @@ app.get("/discord/callback", epic, async (c) => {
       client_secret: process.env.DISCORD_CLIENT_SECRET!,
       grant_type: "authorization_code",
       code,
-      redirect_uri: "http://localhost:4000/auth/discord/callback",
+      redirect_uri: "https://api-gcp.egdata.app/auth/discord/callback",
     }),
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
