@@ -1147,4 +1147,85 @@ app.post("/v2/save-state", async (c) => {
   });
 });
 
+app.get("/discord/link", epic, async (c) => {
+  const url = new URL("https://discord.com/oauth2/authorize");
+  url.searchParams.append("client_id", "1270522540992888832");
+  url.searchParams.append("response_type", "code");
+  url.searchParams.append(
+    "redirect_uri",
+    "http://localhost:4000/auth/discord/callback"
+  );
+  url.searchParams.append("scope", "identify");
+
+  return c.redirect(url.toString());
+});
+
+app.get("/discord/callback", epic, async (c) => {
+  const { session } = c.var;
+  const { code, error } = c.req.query();
+
+  if (error) {
+    return c.redirect("https://egdata.app/");
+  }
+
+  if (!session || !session.user) {
+    return c.redirect("https://egdata.app/");
+  }
+
+  const url = new URL("https://discord.com/api/v10/oauth2/token");
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    body: new URLSearchParams({
+      client_id: "1270522540992888832",
+      client_secret: process.env.DISCORD_CLIENT_SECRET!,
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: "http://localhost:4000/auth/discord/callback",
+    }),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+
+  if (!response.ok) {
+    return c.redirect("https://egdata.app/?error=discord-get-token-failed");
+  }
+
+  const data = (await response.json()) as {
+    access_token: string;
+    expires_in: number;
+    refresh_token: string;
+    scope: string;
+    token_type: string;
+  };
+
+  const user = await fetch("https://discord.com/api/v10/users/@me", {
+    headers: {
+      Authorization: `Bearer ${data.access_token}`,
+    },
+  });
+
+  if (!user.ok) {
+    return c.redirect("https://egdata.app/?error=discord-get-user-failed");
+  }
+
+  const userData = (await user.json()) as {
+    id: string;
+    username: string;
+  };
+
+  await db.db.collection("epic").updateOne(
+    {
+      accountId: session.user.email.split("@")[0],
+    },
+    {
+      $set: {
+        discordId: userData.id,
+      },
+    }
+  );
+
+  return c.redirect("https://egdata.app/discord-linked");
+});
+
 export default app;

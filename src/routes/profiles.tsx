@@ -920,6 +920,7 @@ app.get("/:id/information", async (c) => {
       linkedAccounts: dbProfile?.linkedAccounts,
       creationDate: dbProfile?.creationDate,
       donations: donations.flatMap((d) => d.details),
+      discord: dbProfile?.discordId ? true : false,
     };
 
     return c.json(result, {
