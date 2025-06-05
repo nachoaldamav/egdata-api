@@ -196,6 +196,82 @@ app.get("/me", async (c) => {
   });
 });
 
+app.get("/leaderboard", async (c) => {
+  const pipeline = [
+    /* 1️⃣  pick the fields we need only once ----------------------------- */
+    {
+      $project: {
+        epicAccountId: 1,
+        sandboxId: 1,
+        totalXP: 1,
+        totalUnlocked: 1,
+      },
+    },
+
+    /* 2️⃣  de-duplicate rows that might repeat the same sandbox ---------- */
+    {
+      $group: {
+        _id: { player: "$epicAccountId", sandbox: "$sandboxId" },
+        xpForSandbox: { $max: "$totalXP" }, // highest XP seen
+        unlockedForSandbox: { $max: "$totalUnlocked" }, // optional extra
+      },
+    },
+
+    /* 3️⃣  collapse to *one* row per player ----------------------------- */
+    {
+      $group: {
+        _id: "$_id.player",
+        xpEarned: { $sum: "$xpForSandbox" },
+        achievementsWon: { $sum: "$unlockedForSandbox" },
+      },
+    },
+
+    /* 4️⃣  pull the player’s display-name (if you keep it separately) ---- */
+    {
+      $lookup: {
+        from: "epic", //  ← your “accounts” collection
+        localField: "_id",
+        foreignField: "accountId",
+        as: "player",
+      },
+    },
+    { $unwind: { path: "$player", preserveNullAndEmptyArrays: true } },
+
+    /* 5️⃣  compute the ranking position (MongoDB 5.0+) ------------------ */
+    {
+      $setWindowFields: {
+        sortBy: { xpEarned: -1 },
+        output: {
+          rank: { $rank: {} },
+        },
+      },
+    },
+
+    /* 6️⃣  tidy up the final shape -------------------------------------- */
+    {
+      $project: {
+        _id: 0,
+        accountId: "$_id",
+        displayName: "$player.displayName",
+        xpEarned: 1,
+        achievementsWon: 1,
+        rank: 1,
+      },
+    },
+
+    /* 7️⃣  overall ordering (same as rank) ------------------------------ */
+    { $sort: { xpEarned: -1, accountId: 1 } },
+  ];
+
+  const leaderboard = await db.db
+    .collection("player-achievements")
+    .aggregate(pipeline)
+    .limit(10)
+    .toArray();
+
+  return c.json(leaderboard);
+});
+
 app.get("/:id", async (c) => {
   const { id } = c.req.param();
 
