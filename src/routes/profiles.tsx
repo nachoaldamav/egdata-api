@@ -54,8 +54,20 @@ interface PlayerAchievement2 {
   isBase: boolean;
 }
 
-type SingleAchievement = {
-  playerAwards: PlayerAward[];
+type AchievementType = {
+  achievementSetId: string;
+  sandboxId: string;
+  unlocked?: boolean;
+  unlockDate?: string;
+  deploymentId: string;
+  name: string;
+  hidden: boolean;
+  xp: number;
+  completedPercent: number;
+};
+
+interface SingleAchievement {
+  playerAwards: unknown[];
   totalXP: number;
   totalUnlocked: number;
   sandboxId: string;
@@ -72,7 +84,8 @@ type SingleAchievement = {
     totalAchievements: number;
     totalProductXP: number;
   };
-};
+  completionPercentage: number;
+}
 
 type RegenOfferQueueType = {
   accountId: string;
@@ -411,200 +424,191 @@ app.get("/:id/achievements/:sandboxId", async (c) => {
 
 app.get("/:id/rare-achievements", async (c) => {
   const { id } = c.req.param();
+  if (!id) return c.json({ message: "Missing id parameter" }, 400);
 
-  if (!id) {
-    c.status(400);
-    return c.json({
-      message: "Missing id parameter",
+  const cacheKey = `epic-profile:${id}:rare-achievements:v2`;
+  const hit = false; // await client.get(cacheKey);
+  if (hit) {
+    return c.json(JSON.parse(hit), {
+      headers: { "Cache-Control": "public, max-age=60" },
     });
   }
 
-  const cacheKey = `epic-profile:${id}:rare-achievements`;
+  const pipeline = [
+    { $match: { epicAccountId: id } },
+    { $unwind: "$playerAchievements" },
+    { $match: { "playerAchievements.playerAchievement.unlocked": true } },
 
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), {
-      headers: {
-        "Cache-Control": "public, max-age=60",
+    /* lookup achievement meta */
+    {
+      $lookup: {
+        from: "achievementsets",
+        let: {
+          setId: "$playerAchievements.playerAchievement.achievementSetId",
+          name: "$playerAchievements.playerAchievement.achievementName",
+        },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$achievementSetId", "$$setId"] } } },
+          { $unwind: "$achievements" },
+          { $match: { $expr: { $eq: ["$achievements.name", "$$name"] } } },
+          {
+            $project: {
+              _id: 0,
+              sandboxId: 1,
+              achievementSetId: 1,
+              achievement: "$achievements",
+            },
+          },
+        ],
+        as: "achDoc",
       },
-    });
-  }
+    },
+    { $unwind: "$achDoc" },
 
-  // Get all the achievements for the player
-  const playerAchievements = await db.db
+    /* merge player-data + meta */
+    {
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: [
+            "$achDoc.achievement",
+            {
+              sandboxId: "$achDoc.sandboxId",
+              achievementSetId: "$achDoc.achievementSetId",
+              unlocked: true,
+              unlockDate: "$playerAchievements.playerAchievement.unlockDate",
+            },
+          ],
+        },
+      },
+    },
+
+    /* ── attach ONE BASE_GAME offer for this sandbox ───────────────── */
+    {
+      $lookup: {
+        from: "offers",
+        let: { sbx: "$sandboxId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$namespace", "$$sbx"] },
+                  { $eq: ["$offerType", "BASE_GAME"] },
+                ],
+              },
+            },
+          },
+          { $sort: { isDisplayable: -1, title: 1 } },
+          { $limit: 1 },
+          {
+            $project: {
+              _id: 0,
+              id: 1,
+              namespace: 1,
+              keyImages: 1,
+              title: 1,
+              productSlug: 1,
+            },
+          },
+        ],
+        as: "offer",
+      },
+    },
+    { $unwind: { path: "$offer", preserveNullAndEmptyArrays: true } },
+
+    { $sort: { completedPercent: 1 } },
+    { $limit: 25 },
+  ];
+
+  const rare = await db.db
     .collection("player-achievements")
-    .find<PlayerProductAchievements>({
-      epicAccountId: id,
-    })
+    .aggregate(pipeline)
     .toArray();
 
-  const achievementsSetsIds = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId)
-  );
+  await client.set(cacheKey, JSON.stringify(rare), "EX", 3600);
 
-  const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
-
-  const sandboxAchievements = await AchievementSet.find({
-    achievementSetId: {
-      $in: dedupedAchievementsSets,
-    },
-  });
-
-  // Extract, inject achievementSetId and sandboxId, and flatten all achievements
-  const allAchievements = sandboxAchievements.flatMap((set) =>
-    set.achievements.map((achievement) => ({
-      ...achievement.toObject(),
-      achievementSetId: set.achievementSetId, // Inject achievementSetId
-      sandboxId: set.sandboxId, // Inject sandboxId
-    }))
-  );
-
-  // Sort by rarity (completedPercent)
-  const sortedAchievements = allAchievements.sort(
-    (a, b) => a.completedPercent - b.completedPercent
-  );
-
-  const allPlayerAchievements = playerAchievements.flatMap(
-    (p) => p.playerAchievements
-  );
-
-  const result: (AchievementType & {
-    unlocked: boolean;
-    unlockDate: string;
-    sandboxId: string; // Include sandboxId type in the result
-  })[] = [];
-
-  for (const achievement of sortedAchievements) {
-    const playerAchievement = allPlayerAchievements.find(
-      (p) =>
-        p.playerAchievement.achievementName === achievement.name &&
-        p.playerAchievement.achievementSetId === achievement.achievementSetId
-    );
-
-    if (!playerAchievement) {
-      continue;
-    }
-
-    result.push({
-      ...achievement,
-      unlocked: playerAchievement.playerAchievement.unlocked,
-      unlockDate: playerAchievement.playerAchievement.unlockDate,
-    });
-  }
-
-  const response = result.filter((a) => a.unlocked).slice(0, 25);
-
-  const offers = await Offer.find({
-    namespace: {
-      $in: response.map((r) => r.sandboxId),
-    },
-    offerType: ["BASE_GAME", "DLC"],
-    prePurchase: { $ne: true },
-  });
-
-  const selectedAchievements = response.map((r) => {
-    const offer = offers
-      .sort((a, b) => (a.offerType === "BASE_GAME" ? -1 : 1))
-      .find((o) => o.namespace === r.sandboxId);
-    return {
-      ...r,
-      offer: offer ?? null,
-    };
-  });
-
-  await client.set(cacheKey, JSON.stringify(selectedAchievements), "EX", 3600);
-
-  return c.json(selectedAchievements, {
-    headers: {
-      "Cache-Control": "public, max-age=60",
-    },
+  return c.json(rare, {
+    headers: { "Cache-Control": "public, max-age=60" },
   });
 });
 
 app.get("/:id/rare-achievements/:sandboxId", async (c) => {
   const { id, sandboxId } = c.req.param();
-
   if (!id || !sandboxId) {
-    c.status(400);
-    return c.json({
-      message: "Missing id or sandboxId parameter",
+    return c.json({ message: "Missing id or sandboxId parameter" }, 400);
+  }
+
+  const cacheKey = `epic-profile:${id}:${sandboxId}:rare-achievements:v2`;
+  const hit = await client.get(cacheKey);
+  if (hit) {
+    return c.json(JSON.parse(hit), {
+      headers: { "Cache-Control": "public, max-age=60" },
     });
   }
 
-  const cacheKey = `epic-profile:${id}:${sandboxId}:rare-achievements:v0.1`;
+  const pipeline = [
+    /* 1 – player + sandbox */
+    { $match: { epicAccountId: id, sandboxId } },
+    { $unwind: "$playerAchievements" },
+    { $match: { "playerAchievements.playerAchievement.unlocked": true } },
 
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), {
-      headers: {
-        "Cache-Control": "public, max-age=60",
+    /* 2 – join the achievement meta */
+    {
+      $lookup: {
+        from: "achievementsets",
+        let: {
+          setId: "$playerAchievements.playerAchievement.achievementSetId",
+          name: "$playerAchievements.playerAchievement.achievementName",
+        },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$achievementSetId", "$$setId"] } } },
+          { $unwind: "$achievements" },
+          { $match: { $expr: { $eq: ["$achievements.name", "$$name"] } } },
+          {
+            $project: {
+              _id: 0,
+              sandboxId: 1,
+              achievementSetId: 1,
+              achievement: "$achievements",
+            },
+          },
+        ],
+        as: "achDoc",
       },
-    });
-  }
+    },
+    { $unwind: "$achDoc" },
 
-  // Get all the achievements for the player
-  const playerAchievements = await db.db
+    /* 3 – merge & shape */
+    {
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: [
+            "$achDoc.achievement",
+            {
+              sandboxId: "$achDoc.sandboxId",
+              achievementSetId: "$achDoc.achievementSetId",
+              unlocked: true,
+              unlockDate: "$playerAchievements.playerAchievement.unlockDate",
+            },
+          ],
+        },
+      },
+    },
+
+    /* 4 – rarest three in this game */
+    { $sort: { completedPercent: 1 } },
+    { $limit: 3 },
+  ];
+
+  const rare = await db.db
     .collection("player-achievements")
-    .find<PlayerProductAchievements>({
-      epicAccountId: id,
-      sandboxId: sandboxId,
-    })
+    .aggregate(pipeline)
     .toArray();
 
-  const achievementsSetsIds = playerAchievements.flatMap((p) =>
-    p.achievementSets.map((a) => a.achievementSetId)
-  );
+  await client.set(cacheKey, JSON.stringify(rare), "EX", 3600);
 
-  const dedupedAchievementsSets = [...new Set(achievementsSetsIds)];
-
-  const sandboxAchievements = await AchievementSet.find({
-    achievementSetId: {
-      $in: dedupedAchievementsSets,
-    },
-  });
-
-  // Extract, inject achievementSetId and sandboxId, and flatten all achievements
-  const allAchievements = sandboxAchievements.flatMap((set) =>
-    set.achievements.map((achievement) => ({
-      ...achievement.toObject(),
-      achievementSetId: set.achievementSetId, // Inject achievementSetId
-      sandboxId: set.sandboxId, // Inject sandboxId
-      unlocked: playerAchievements
-        .find((p) =>
-          p.playerAchievements.some(
-            (pa) => pa.playerAchievement.achievementName === achievement.name
-          )
-        )
-        ?.playerAchievements.find(
-          (pa) => pa.playerAchievement.achievementName === achievement.name
-        )?.playerAchievement.unlocked,
-      unlockDate: playerAchievements
-        .find((p) =>
-          p.playerAchievements.some(
-            (pa) => pa.playerAchievement.achievementName === achievement.name
-          )
-        )
-        ?.playerAchievements.find(
-          (pa) => pa.playerAchievement.achievementName === achievement.name
-        )?.playerAchievement.unlockDate,
-    }))
-  );
-
-  // Sort by rarity (completedPercent)
-  const sortedAchievements = allAchievements
-    .filter((a) => a.unlocked)
-    .sort((a, b) => a.completedPercent - b.completedPercent);
-
-  const selectedAchievements = sortedAchievements.slice(0, 3);
-
-  await client.set(cacheKey, JSON.stringify(selectedAchievements), "EX", 3600);
-
-  return c.json(selectedAchievements, {
-    headers: {
-      "Cache-Control": "public, max-age=60",
-    },
+  return c.json(rare, {
+    headers: { "Cache-Control": "public, max-age=60" },
   });
 });
 
@@ -941,145 +945,234 @@ app.get("/:id/information", async (c) => {
 app.get("/:id/games", async (c) => {
   const { id } = c.req.param();
   const { page = "1", limit = "10" } = c.req.query();
-
   const pageNum = Number.parseInt(page, 10);
   const limitNum = Number.parseInt(limit, 10);
 
   if (!id) {
     c.status(400);
-    return c.json({
-      message: "Missing id parameter",
-    });
+    return c.json({ message: "Missing id parameter" });
   }
 
   const cacheKey = `epic-profile:${id}:games:page:${pageNum}:limit:${limitNum}`;
 
-  // const cached = await client.get(cacheKey);
-  // if (cached) {
-  //   return c.json(JSON.parse(cached), {
-  //     headers: {
-  //       "Cache-Control": "public, max-age=60",
-  //     },
-  //   });
-  // }
+  const cached = await client.get(cacheKey);
+  if (cached)
+    return c.json(JSON.parse(cached), {
+      headers: { "Cache-Control": "public, max-age=60" },
+    });
 
   try {
-    // Check if user exists
+    /** ─────────── ensure the user exists ─────────── */
     const profile = await epicStoreClient.getUser(id);
-
     if (!profile) {
       c.status(404);
-      return c.json({
-        message: "Profile not found",
-      });
+      return c.json({ message: "Profile not found" });
     }
 
-    // Fetch paginated achievements
-    const savedPlayerAchievementsCursor = db.db
+    /** ─────────── aggregation pipeline ───────────── */
+    const pipeline = [
+      /* 1️⃣  keep rows for this account only -------------------------------- */
+      { $match: { epicAccountId: id } },
+
+      /* 2️⃣  collapse possible duplicates per sandbox ---------------------- */
+      {
+        $group: {
+          _id: "$sandboxId",
+          totalUnlocked: { $max: "$totalUnlocked" },
+          totalXP: { $max: "$totalXP" },
+          playerAwards_arr: { $push: "$playerAwards" }, // later flattened
+        },
+      },
+
+      /* 3️⃣  flatten & dedupe the player-awards array ---------------------- */
+      {
+        $addFields: {
+          playerAwards: {
+            $reduce: {
+              input: "$playerAwards_arr",
+              initialValue: [],
+              in: { $setUnion: ["$$value", "$$this"] },
+            },
+          },
+        },
+      },
+      { $project: { playerAwards_arr: 0 } },
+
+      /* 4️⃣  join ONE BASE_GAME offer per sandbox -------------------------- */
+      {
+        $lookup: {
+          from: "offers",
+          let: { sbx: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$namespace", "$$sbx"] },
+                    { $eq: ["$offerType", "BASE_GAME"] },
+                    { $eq: ["$isCodeRedemptionOnly", false] },
+                  ],
+                },
+              },
+            },
+            { $sort: { isDisplayable: -1, title: 1, lastModifiedDate: -1 } },
+            { $limit: 1 },
+            {
+              $project: {
+                _id: 0,
+                id: 1,
+                namespace: 1,
+                keyImages: 1,
+                title: 1,
+                productSlug: 1,
+              },
+            },
+          ],
+          as: "offer",
+        },
+      },
+      { $unwind: { path: "$offer", preserveNullAndEmptyArrays: true } },
+
+      /* 5️⃣  pull every achievement-set living in that sandbox ------------- */
+      {
+        $lookup: {
+          from: "achievementsets",
+          localField: "_id",
+          foreignField: "sandboxId",
+          as: "achievementSets",
+        },
+      },
+
+      /* 6-A  compute grand totals across all sets ------------------------- */
+      {
+        $addFields: {
+          totalAchievements: {
+            $sum: {
+              $map: {
+                input: "$achievementSets",
+                as: "s",
+                in: { $size: "$$s.achievements" },
+              },
+            },
+          },
+          totalProductXP: {
+            $sum: {
+              $map: {
+                input: "$achievementSets",
+                as: "s",
+                in: {
+                  $reduce: {
+                    input: "$$s.achievements",
+                    initialValue: 0,
+                    in: { $add: ["$$value", "$$this.xp"] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+
+      /* 6-B  assemble final shape & completion % -------------------------- */
+      {
+        $addFields: {
+          productAchievements: {
+            totalAchievements: "$totalAchievements",
+            totalProductXP: "$totalProductXP",
+          },
+          completionPercentage: {
+            $cond: [
+              { $eq: ["$totalAchievements", 0] },
+              0,
+              { $divide: ["$totalUnlocked", "$totalAchievements"] },
+            ],
+          },
+          baseOfferForSandbox: {
+            id: "$offer.id",
+            namespace: "$offer.namespace",
+            keyImages: "$offer.keyImages",
+          },
+          product: {
+            name: "$offer.title",
+            slug: "$offer.productSlug",
+          },
+          sandboxId: "$_id",
+        },
+      },
+
+      /* 6-C  remove helper fields we no longer need ----------------------- */
+      {
+        $project: {
+          _id: 0,
+          offer: 0,
+          achievementSets: 0,
+          totalAchievements: 0,
+          totalProductXP: 0,
+        },
+      },
+
+      /* 7️⃣  sort: % complete ↓ ,   name ↑ ,   sandboxId ↑ ---------------- */
+      {
+        $sort: {
+          completionPercentage: -1,
+          "product.name": 1,
+          sandboxId: 1,
+        },
+      },
+
+      {
+        $sort: {
+          isComplete: -1,
+          totalXP: -1,
+          totalUnlocked: -1,
+          completionPercentage: -1,
+          "product.name": 1,
+          sandboxId: 1,
+        },
+      },
+
+      /* 8️⃣  facet for pagination + total count in one pass ---------------- */
+      {
+        $facet: {
+          paginated: [
+            { $skip: (pageNum - 1) * limitNum },
+            { $limit: limitNum },
+          ],
+          total: [{ $count: "value" }],
+        },
+      },
+      {
+        $addFields: {
+          total: { $ifNull: [{ $arrayElemAt: ["$total.value", 0] }, 0] },
+        },
+      },
+    ];
+
+    const [{ paginated, total = 0 }] = await db.db
       .collection("player-achievements")
-      .find({ epicAccountId: id })
-      .sort({ totalXP: -1, _id: 1 })
-      .skip((pageNum - 1) * limitNum)
-      .limit(limitNum);
+      .aggregate(pipeline)
+      .toArray();
 
-    const savedPlayerAchievements =
-      await savedPlayerAchievementsCursor.toArray();
-
-    // Fetch total number of games for pagination
-    const totalGames = await db.db
-      .collection("player-achievements")
-      .countDocuments({ epicAccountId: id });
-
-    const achievements: SingleAchievement[] = [];
-
-    if (savedPlayerAchievements && savedPlayerAchievements.length > 0) {
-      await Promise.all(
-        savedPlayerAchievements.map(async (entry) => {
-          const sandbox = await Sandbox.findOne({ _id: entry.sandboxId });
-
-          if (!sandbox) {
-            console.error("Sandbox not found", entry.sandboxId);
-            return;
-          }
-
-          const [product, offer, achievementsSets] = await Promise.all([
-            db.db
-              .collection("products")
-              .findOne({ _id: sandbox?.parent as unknown as Id }),
-            Offer.findOne({
-              namespace: entry.sandboxId,
-              offerType: "BASE_GAME",
-            }),
-            AchievementSet.find({
-              sandboxId: entry.sandboxId,
-            }),
-          ]);
-
-          if (!product || !offer) {
-            return;
-          }
-
-          achievements.push({
-            playerAwards: entry.playerAwards,
-            totalXP: entry.totalXP,
-            totalUnlocked: entry.totalUnlocked,
-            sandboxId: entry.sandboxId,
-            baseOfferForSandbox: {
-              id: offer.id,
-              namespace: offer.namespace,
-              keyImages: offer.keyImages,
-            },
-            product: {
-              name: offer.title,
-              slug: offer.productSlug as string,
-            },
-            productAchievements: {
-              totalAchievements: achievementsSets.reduce(
-                (acc, curr) => acc + curr.achievements.length,
-                0
-              ),
-              totalProductXP: achievementsSets.reduce(
-                (acc, curr) =>
-                  acc +
-                  curr.achievements.reduce((acc, curr) => acc + curr.xp, 0),
-                0
-              ),
-            },
-          });
-        })
-      );
-    }
-
-    // Deduplicate based on sandboxId after assembling achievements
-    const deduplicatedAchievements = achievements.filter(
-      (achievement, index, self) =>
-        index === self.findIndex((t) => t.sandboxId === achievement.sandboxId)
-    );
-
-    // Construct the result object
+    /** ─────────── build & cache response ─────────── */
     const result = {
-      achievements: deduplicatedAchievements,
+      achievements: paginated,
       pagination: {
-        total: totalGames,
+        total,
         page: pageNum,
         limit: limitNum,
-        totalPages: Math.ceil(totalGames / limitNum),
+        totalPages: Math.ceil(total / limitNum),
       },
     };
 
     await client.set(cacheKey, JSON.stringify(result), "EX", 60);
 
     return c.json(result, {
-      headers: {
-        "Cache-Control": "public, max-age=60",
-      },
+      headers: { "Cache-Control": "public, max-age=60" },
     });
   } catch (err) {
-    console.error("Error fetching achievements", err);
+    console.error("aggregation error", err);
     c.status(400);
-    return c.json({
-      message: "Failed to fetch achievements",
-    });
+    return c.json({ message: "Failed to fetch achievements" });
   }
 });
 
