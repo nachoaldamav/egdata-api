@@ -198,38 +198,117 @@ app.get("/me", async (c) => {
 
 app.get("/leaderboard", async (c) => {
   const pipeline = [
-    /* 1️⃣  pick the fields we need only once ----------------------------- */
+    /* 1️⃣  keep only what we need --------------------------------------- */
     {
       $project: {
         epicAccountId: 1,
         sandboxId: 1,
         totalXP: 1,
         totalUnlocked: 1,
+        playerAwards: 1, //  ← NEW
       },
     },
 
-    /* 2️⃣  de-duplicate rows that might repeat the same sandbox ---------- */
+    /* 2️⃣  one row / player + sandbox, max XP/achievements, **union awards** */
     {
       $group: {
         _id: { player: "$epicAccountId", sandbox: "$sandboxId" },
-        xpForSandbox: { $max: "$totalXP" }, // highest XP seen
-        unlockedForSandbox: { $max: "$totalUnlocked" }, // optional extra
+
+        xpForSandbox: { $max: "$totalXP" },
+        unlockedForSandbox: { $max: "$totalUnlocked" },
+
+        /* pull together all award arrays that belonged to that sandbox */
+        awardsForSandbox_arr: { $push: "$playerAwards" },
       },
     },
+    /* flatten the nested arrays & dedupe inside the sandbox ------------- */
+    {
+      $addFields: {
+        awardsForSandbox: {
+          $reduce: {
+            input: "$awardsForSandbox_arr",
+            initialValue: [],
+            in: { $setUnion: ["$$value", "$$this"] },
+          },
+        },
+      },
+    },
+    { $project: { awardsForSandbox_arr: 0 } },
 
-    /* 3️⃣  collapse to *one* row per player ----------------------------- */
+    /* 3️⃣  collapse to one row per player, summing XP & achievements ----- */
     {
       $group: {
         _id: "$_id.player",
         xpEarned: { $sum: "$xpForSandbox" },
         achievementsWon: { $sum: "$unlockedForSandbox" },
+
+        /* combine all awards the player has, dedup across sandboxes */
+        awards_arr: { $push: "$awardsForSandbox" },
+      },
+    },
+    {
+      $addFields: {
+        /* 3-A  flatten + dedupe the player’s award list */
+        awards: {
+          $reduce: {
+            input: "$awards_arr",
+            initialValue: [],
+            in: { $setUnion: ["$$value", "$$this"] },
+          },
+        },
+
+        /* 3-B  convenient overall count */
+        awardsEarned: {
+          $size: {
+            $reduce: {
+              input: "$awards_arr",
+              initialValue: [],
+              in: { $setUnion: ["$$value", "$$this"] },
+            },
+          },
+        },
+      },
+    },
+    { $project: { awards_arr: 0 } },
+
+    /* 3-C  count awards per type (requires Mongo 5.2 +) ----------------- */
+    {
+      $addFields: {
+        awardsByType: {
+          $arrayToObject: {
+            $map: {
+              input: {
+                $setUnion: {
+                  $map: {
+                    input: "$awards",
+                    as: "a",
+                    in: "$$a.awardType",
+                  },
+                },
+              },
+              as: "type",
+              in: {
+                k: "$$type",
+                v: {
+                  $size: {
+                    $filter: {
+                      input: "$awards",
+                      as: "a",
+                      cond: { $eq: ["$$a.awardType", "$$type"] },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
 
-    /* 4️⃣  pull the player’s display-name (if you keep it separately) ---- */
+    /* 4️⃣  OPTIONAL  join player profile collection --------------------- */
     {
       $lookup: {
-        from: "epic", //  ← your “accounts” collection
+        from: "epic", // or whatever your accounts coll. is
         localField: "_id",
         foreignField: "accountId",
         as: "player",
@@ -237,29 +316,29 @@ app.get("/leaderboard", async (c) => {
     },
     { $unwind: { path: "$player", preserveNullAndEmptyArrays: true } },
 
-    /* 5️⃣  compute the ranking position (MongoDB 5.0+) ------------------ */
+    /* 5️⃣  rank by XP ---------------------------------------------------- */
     {
       $setWindowFields: {
         sortBy: { xpEarned: -1 },
-        output: {
-          rank: { $rank: {} },
-        },
+        output: { rank: { $rank: {} } },
       },
     },
 
-    /* 6️⃣  tidy up the final shape -------------------------------------- */
+    /* 6️⃣  final shape --------------------------------------------------- */
     {
       $project: {
         _id: 0,
+        rank: 1,
         accountId: "$_id",
         displayName: "$player.displayName",
         xpEarned: 1,
         achievementsWon: 1,
-        rank: 1,
+        awardsEarned: 1,
+        awardsByType: 1,
       },
     },
 
-    /* 7️⃣  overall ordering (same as rank) ------------------------------ */
+    /* 7️⃣  deterministic order (same as rank) --------------------------- */
     { $sort: { xpEarned: -1, accountId: 1 } },
   ];
 
@@ -503,7 +582,7 @@ app.get("/:id/rare-achievements", async (c) => {
   if (!id) return c.json({ message: "Missing id parameter" }, 400);
 
   const cacheKey = `epic-profile:${id}:rare-achievements:v2`;
-  const hit = false; // await client.get(cacheKey);
+  const hit = await client.get(cacheKey);
   if (hit) {
     return c.json(JSON.parse(hit), {
       headers: { "Cache-Control": "public, max-age=60" },
@@ -511,11 +590,21 @@ app.get("/:id/rare-achievements", async (c) => {
   }
 
   const pipeline = [
-    { $match: { epicAccountId: id } },
+    /* 0️⃣  one index–friendly filter ---------------------------------- */
+    {
+      $match: {
+        epicAccountId: id,
+        playerAchievements: {
+          $elemMatch: { "playerAchievement.unlocked": true },
+        },
+      },
+    },
+
+    /* 1️⃣  flatten only the unlocked rows ----------------------------- */
     { $unwind: "$playerAchievements" },
     { $match: { "playerAchievements.playerAchievement.unlocked": true } },
 
-    /* lookup achievement meta */
+    /* 2️⃣  join the achievement meta to get completedPercent ---------- */
     {
       $lookup: {
         from: "achievementsets",
@@ -541,7 +630,7 @@ app.get("/:id/rare-achievements", async (c) => {
     },
     { $unwind: "$achDoc" },
 
-    /* merge player-data + meta */
+    /* 3️⃣  glue player-data + meta, keep only fields we need ---------- */
     {
       $replaceRoot: {
         newRoot: {
@@ -558,7 +647,23 @@ app.get("/:id/rare-achievements", async (c) => {
       },
     },
 
-    /* ── attach ONE BASE_GAME offer for this sandbox ───────────────── */
+    /* 4️⃣  ✨ TOP 25 rarest, heap-based — NO big sort ------------------ */
+    {
+      $group: {
+        _id: null,
+        rare25: {
+          $topN: {
+            n: 25,
+            sortBy: { completedPercent: 1 },
+            output: "$$ROOT",
+          },
+        },
+      },
+    },
+    { $unwind: "$rare25" },
+    { $replaceRoot: { newRoot: "$rare25" } },
+
+    /* 5️⃣  only now fetch the BASE_GAME offer (<= 25 lookups) ---------- */
     {
       $lookup: {
         from: "offers",
@@ -570,11 +675,12 @@ app.get("/:id/rare-achievements", async (c) => {
                 $and: [
                   { $eq: ["$namespace", "$$sbx"] },
                   { $eq: ["$offerType", "BASE_GAME"] },
+                  { $eq: ["$isCodeRedemptionOnly", false] },
                 ],
               },
             },
           },
-          { $sort: { isDisplayable: -1, title: 1 } },
+          { $sort: { isDisplayable: -1, title: 1, lastModifiedDate: -1 } },
           { $limit: 1 },
           {
             $project: {
@@ -591,17 +697,15 @@ app.get("/:id/rare-achievements", async (c) => {
       },
     },
     { $unwind: { path: "$offer", preserveNullAndEmptyArrays: true } },
-
-    { $sort: { completedPercent: 1 } },
-    { $limit: 25 },
   ];
 
   const rare = await db.db
     .collection("player-achievements")
-    .aggregate(pipeline)
+    .aggregate(pipeline, { allowDiskUse: true })
     .toArray();
 
-  await client.set(cacheKey, JSON.stringify(rare), "EX", 3600);
+  // Cache for 1 day
+  await client.set(cacheKey, JSON.stringify(rare), "EX", 86400);
 
   return c.json(rare, {
     headers: { "Cache-Control": "public, max-age=60" },
