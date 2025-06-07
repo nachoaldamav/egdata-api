@@ -1454,6 +1454,13 @@ app.get("/:id/changelog", async (c) => {
     ...items.map((i) => i.id).concat(assets.map((a) => a.artifactId)),
   ];
 
+  // Get total count first
+  const totalCount = await db.db.collection("changelogs_v2").countDocuments({
+    "metadata.contextId": { $in: allIds },
+  });
+
+  const totalPages = Math.ceil(totalCount / limit);
+
   // Use aggregation pipeline for better performance
   const changelog = await db.db
     .collection("changelogs_v2")
@@ -1532,10 +1539,20 @@ app.get("/:id/changelog", async (c) => {
     ])
     .toArray();
 
-  // Cache the results
-  await client.set(cacheKey, JSON.stringify(changelog), "EX", 60);
+  const response = {
+    elements: changelog,
+    page,
+    limit,
+    totalCount,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
 
-  return c.json(changelog, 200, {
+  // Cache the results
+  await client.set(cacheKey, JSON.stringify(response), "EX", 60);
+
+  return c.json(response, 200, {
     "Cache-Control": "public, max-age=60",
   });
 });
