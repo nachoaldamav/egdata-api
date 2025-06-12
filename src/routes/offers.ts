@@ -566,7 +566,7 @@ app.get("/featured-discounts", async (c) => {
     });
   }
 
-  const cacheKey = `featured-discounts:${region}:v0.2`;
+  const cacheKey = `featured-discounts:${region}:v0.3`;
   const cached = await client.get(cacheKey);
   if (cached) {
     return c.json(JSON.parse(cached), 200, {
@@ -579,7 +579,7 @@ app.get("/featured-discounts", async (c) => {
     position: { $gt: 0 },
   })
     .sort({ position: 1 })
-    .limit(50) // Limit early to reduce data processing
+    .limit(200) // Limit early to reduce data processing
     .lean();
 
   if (!featuredOffers.length) {
