@@ -107,7 +107,11 @@ app.get("/releases/monthly", async (c) => {
       $match: {
         prePurchase: { $ne: true }, // keep null/false/missing
         isCodeRedemptionOnly: { $ne: true }, // keep null/false/missing
-        releaseDate: { $ne: null, $lte: new Date() }, // exclude future releases
+        releaseDate: {
+          $ne: null,
+          $lte: new Date(),
+          $gte: new Date("2018-12-06"),
+        },
         offerType: { $eq: "BASE_GAME" },
       },
     },
@@ -156,7 +160,11 @@ app.get("/releases/yearly", async (c) => {
       $match: {
         prePurchase: { $ne: true }, // keep null/false/missing
         isCodeRedemptionOnly: { $ne: true }, // keep null/false/missing
-        releaseDate: { $ne: null, $lte: new Date() }, // exclude future releases
+        releaseDate: {
+          $ne: null,
+          $lte: new Date(),
+          $gte: new Date("2018-12-06"),
+        },
         offerType: { $eq: "BASE_GAME" },
       },
     },
