@@ -38,16 +38,15 @@ import AssetsRoute from "./routes/assets.js";
 import BuildsRoute from "./routes/builds.js";
 import LauncherRoute from "./routes/launcher.js";
 import UsersServiceRoute from "./routes/users-service.js";
+import StatsRoute from "./routes/stats.js";
 import { config } from "dotenv";
 import { gaClient } from "./clients/ga.js";
 import { Event } from "./db/schemas/events.js";
 import { meiliSearchClient } from "./clients/meilisearch.js";
 import { Seller } from "@egdata/core.schemas.sellers";
-import jwt from "jsonwebtoken";
-import { readFileSync } from "node:fs";
 import chalk from "chalk";
 import { rateLimiter } from "hono-rate-limiter";
-import { OpenAPIV3 } from "openapi-types";
+import type { OpenAPIV3 } from "openapi-types";
 import { consola } from "./utils/logger.js";
 import { discord } from "./clients/discord.js";
 import { Routes } from "discord-api-types/v10";
@@ -1091,87 +1090,6 @@ app.get("/changelist/:id", async (ctx) => {
   });
 });
 
-app.get("/stats", async (c) => {
-  const cacheKey = "stats:v0.3";
-
-  const cached = await client.get(cacheKey);
-
-  if (cached) {
-    return c.json(JSON.parse(cached), 200, {
-      "Cache-Control": "public, max-age=60",
-    });
-  }
-
-  const [
-    offersData,
-    itemsData,
-    tagsData,
-    assetsData,
-    priceEngineData,
-    changelogData,
-    sandboxData,
-    productsData,
-    offersYearData,
-    itemsYearData,
-  ] = await Promise.allSettled([
-    Offer.countDocuments(),
-    Item.countDocuments(),
-    Tags.countDocuments(),
-    Asset.countDocuments(),
-    PriceEngine.countDocuments(),
-    Changelog.countDocuments(),
-    db.db.collection("sandboxes").countDocuments(),
-    db.db.collection("products").countDocuments(),
-    Offer.countDocuments({
-      creationDate: {
-        $gte: new Date(new Date().getFullYear(), 0, 1),
-        $lt: new Date(new Date().getFullYear() + 1, 0, 1),
-      },
-    }),
-    Item.countDocuments({
-      creationDate: {
-        $gte: new Date(new Date().getFullYear(), 0, 1),
-        $lt: new Date(new Date().getFullYear() + 1, 0, 1),
-      },
-    }),
-  ]);
-
-  const offers = offersData.status === "fulfilled" ? offersData.value : 0;
-  const items = itemsData.status === "fulfilled" ? itemsData.value : 0;
-  const tags = tagsData.status === "fulfilled" ? tagsData.value : 0;
-  const assets = assetsData.status === "fulfilled" ? assetsData.value : 0;
-  const priceEngine =
-    priceEngineData.status === "fulfilled" ? priceEngineData.value : 0;
-  const changelog =
-    changelogData.status === "fulfilled" ? changelogData.value : 0;
-  const sandboxes = sandboxData.status === "fulfilled" ? sandboxData.value : 0;
-  // @ts-ignore-next-line
-  const products = productsData.status === "fulfilled" ? sandboxData.value : 0;
-  const offersYear =
-    offersYearData.status === "fulfilled" ? offersYearData.value : 0;
-  const itemsYear =
-    itemsYearData.status === "fulfilled" ? itemsYearData.value : 0;
-
-  const res = {
-    offers,
-    items,
-    tags,
-    assets,
-    priceEngine,
-    changelog,
-    sandboxes,
-    products,
-    offersYear,
-    itemsYear,
-  };
-
-  await client.set(cacheKey, JSON.stringify(res), "EX", 3600);
-
-  return c.json(res, 200, {
-    "Cache-Control": "public, max-age=60",
-  });
-});
-
 app.get("/tags", async (c) => {
   const group = c.req.query("group");
 
@@ -1682,6 +1600,8 @@ app.route("/builds", BuildsRoute);
 app.route("/launcher", LauncherRoute);
 
 app.route("/users-service", UsersServiceRoute);
+
+app.route("/stats", StatsRoute);
 
 app.get("/items-sitemap.xml", async (c) => {
   const cacheKey = "items-sitemap-index";
