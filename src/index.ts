@@ -123,10 +123,50 @@ app.get(
   }),
 );
 
-app.get("/health", (c) => {
-  return c.json({
-    status: "ok",
-  });
+app.get("/health", async (c) => {
+  function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), ms),
+      ),
+    ]);
+  }
+
+  const startRedis = Date.now();
+  let redisStatus = "ok";
+  let redisLatency = null;
+  try {
+    await withTimeout(client.ping(), 5_000);
+    redisLatency = Date.now() - startRedis;
+  } catch (e) {
+    redisStatus = "error";
+    redisLatency = null;
+  }
+
+  const startMongo = Date.now();
+  let mongoStatus = "ok";
+  let mongoLatency = null;
+  try {
+    await withTimeout(db.db.listCollections(), 5_000);
+    mongoLatency = Date.now() - startMongo;
+  } catch (e) {
+    mongoStatus = "error";
+    mongoLatency = null;
+  }
+
+  const allOk = redisStatus === "ok" && mongoStatus === "ok";
+
+  return c.json(
+    {
+      status: allOk ? "ok" : "error",
+      services: {
+        redis: { status: redisStatus, latency: redisLatency },
+        mongodb: { status: mongoStatus, latency: mongoLatency },
+      },
+    },
+    allOk ? 200 : 500,
+  );
 });
 
 app.get("/", (c) => {

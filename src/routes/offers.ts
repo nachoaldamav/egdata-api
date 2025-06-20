@@ -962,9 +962,8 @@ app.get("/:id/price-history", async (c) => {
     Object.keys(regions).find((r) => regions[r].countries.includes(country));
 
   if (region) {
-    const cacheKey = `price-history:${id}:${region}:${
-      since ?? "unlimited"
-    }:v0.1`;
+    const cacheKey = `price-history:${id}:${region}:${since ?? "unlimited"
+      }:v0.1`;
     const cached = await client.get(cacheKey);
 
     if (cached) {
@@ -2208,9 +2207,9 @@ app.get("/:id/reviews", epicInfo, async (c) => {
 
   const userReview = currentUser
     ? await Review.findOne({
-        userId: currentUser,
-        id,
-      })
+      userId: currentUser,
+      id,
+    })
     : null;
 
   if (userReview) {
@@ -2311,9 +2310,9 @@ app.post("/:id/reviews", epic, async (c) => {
   const isOwned =
     session?.user?.email.split("@")[0] ?? epic?.account_id
       ? await verifyGameOwnership(
-          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
-          product._id as unknown as string
-        )
+        session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+        product._id as unknown as string
+      )
       : false;
 
   const review: IReview = {
@@ -2371,9 +2370,9 @@ app.patch("/:id/reviews", epic, async (c) => {
   const isOwned = ((session?.user?.email.split("@")[0] ??
     epic?.account_id) as string)
     ? await verifyGameOwnership(
-        (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
-        product._id as unknown as string
-      )
+      (session?.user?.email.split("@")[0] ?? epic?.account_id) as string,
+      product._id as unknown as string
+    )
     : false;
 
   const oldReview = await Review.findOne({
@@ -2571,9 +2570,9 @@ app.get("/:id/ownership", epic, async (c) => {
   const isOwned =
     session?.user?.email.split("@")[0] ?? epic?.account_id
       ? await verifyGameOwnership(
-          session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
-          product._id as unknown as string
-        )
+        session?.user?.email.split("@")[0] ?? (epic?.account_id as string),
+        product._id as unknown as string
+      )
       : false;
 
   return c.json({
@@ -3488,6 +3487,20 @@ app.get("/:id/builds", async (c) => {
   return c.json(builds, 200, {
     "Cache-Control": `public, max-age=${cacheTTL}`,
   });
+});
+
+app.get("/:id/igdb", async (c) => {
+  const { id } = c.req.param();
+
+  const igdb = await db.db.collection("igdb").findOne({
+    offerId: id,
+  });
+
+  if (!igdb) {
+    return c.json({ error: "IGDB data not found" }, 404);
+  }
+
+  return c.json(igdb);
 });
 
 export default app;
