@@ -1405,8 +1405,11 @@ app.get("/:id/changelog", async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query("limit") || "10"), 50);
   const page = Math.max(Number.parseInt(c.req.query("page") || "1"), 1);
   const skip = (page - 1) * limit;
+  const query = c.req.query("query");
+  const changeType = c.req.query("type");
+  const field = c.req.query("field");
 
-  const cacheKey = `changelog:${id}:${page}:${limit}`;
+  const cacheKey = `changelog:${id}:${page}:${limit}:${query}:${changeType}:${field}`;
   const cached = await client.get(cacheKey);
 
   if (cached) {
@@ -1453,10 +1456,26 @@ app.get("/:id/changelog", async (c) => {
     ...items.map((i) => i.id).concat(assets.map((a) => a.artifactId)),
   ];
 
-  // Get total count first
-  const totalCount = await db.db.collection("changelogs_v2").countDocuments({
+  const matchQuery: Record<string, unknown> = {
     "metadata.contextId": { $in: allIds },
-  });
+  };
+
+  if (query) {
+    matchQuery.$text = { $search: query };
+  }
+
+  if (changeType) {
+    matchQuery["metadata.changes.changeType"] = changeType;
+  }
+
+  if (field) {
+    matchQuery["metadata.changes.field"] = field;
+  }
+
+  // Get total count first
+  const totalCount = await db.db
+    .collection("changelogs_v2")
+    .countDocuments(matchQuery);
 
   const totalPages = Math.ceil(totalCount / limit);
 
@@ -1465,9 +1484,7 @@ app.get("/:id/changelog", async (c) => {
     .collection("changelogs_v2")
     .aggregate([
       {
-        $match: {
-          "metadata.contextId": { $in: allIds },
-        },
+        $match: matchQuery,
       },
       {
         $sort: { timestamp: -1 },
