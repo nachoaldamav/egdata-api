@@ -5,8 +5,6 @@ ENV PATH="$PNPM_HOME:$PATH"
 
 RUN corepack enable
 
-FROM base AS builder
-
 # Install build tools required for node-gyp
 RUN apk add --no-cache \
         curl \
@@ -15,6 +13,7 @@ RUN apk add --no-cache \
         g++ \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
+FROM base AS builder
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
