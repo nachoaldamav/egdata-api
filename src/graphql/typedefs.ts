@@ -1,4 +1,6 @@
 export const typeDefs = `#graphql
+    scalar Date
+
     type Query {
         offer(id: ID!): Offer
     }
@@ -72,9 +74,9 @@ export const typeDefs = `#graphql
         description: String
         longDescription: String
         offerType: String
-        effectiveDate: String
-        creationDate: String
-        lastModifiedDate: String
+        effectiveDate: Date
+        creationDate: Date
+        lastModifiedDate: Date
         isCodeRedemptionOnly: Boolean
         productSlug: String
         urlSlug: String
@@ -82,9 +84,9 @@ export const typeDefs = `#graphql
         developerDisplayName: String
         publisherDisplayName: String
         prePurchase: String
-        releaseDate: String
-        pcReleaseDate: String
-        viewableDate: String
+        releaseDate: Date
+        pcReleaseDate: Date
+        viewableDate: Date
         countriesBlacklist: String
         countriesWhitelist: String
         refundType: String

@@ -3,6 +3,11 @@ import { typeDefs } from "./typedefs.js";
 import offers from "./resolvers/offer.js";
 import type { Connection } from "mongoose";
 import type { ConsolaInstance } from "consola";
+import { GraphQLDateTime } from 'graphql-scalars';
+
+const resolvers = {
+    Date: GraphQLDateTime
+};
 
 export type Context = {
     db: Connection
@@ -11,5 +16,5 @@ export type Context = {
 
 export const server = new ApolloServer<Context>({
     typeDefs,
-    resolvers: [offers],
+    resolvers: [offers, resolvers],
 });

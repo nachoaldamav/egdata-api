@@ -140,6 +140,9 @@ importers:
       graphql-request:
         specifier: ^7.1.0
         version: 7.1.2(graphql@16.11.0)
+      graphql-scalars:
+        specifier: ^1.24.2
+        version: 1.24.2(graphql@16.11.0)
       heapdump:
         specifier: ^0.3.15
         version: 0.3.15
@@ -2813,6 +2816,12 @@ packages:
 
   graphql-request@7.1.2:
     resolution: {integrity: sha512-+XE3iuC55C2di5ZUrB4pjgwe+nIQBuXVIK9J98wrVwojzDW3GMdSBZfxUk8l4j9TieIpjpggclxhNEU9ebGF8w==}
+    peerDependencies:
+      graphql: 16.11.0
+
+  graphql-scalars@1.24.2:
+    resolution: {integrity: sha512-FoZ11yxIauEnH0E5rCUkhDXHVn/A6BBfovJdimRZCQlFCl+h7aVvarKmI15zG4VtQunmCDdqdtNs6ixThy3uAg==}
+    engines: {node: '>=10'}
     peerDependencies:
       graphql: 16.11.0
 
@@ -7473,6 +7482,11 @@ snapshots:
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.11.0)
       graphql: 16.11.0
+
+  graphql-scalars@1.24.2(graphql@16.11.0):
+    dependencies:
+      graphql: 16.11.0
+      tslib: 2.8.1
 
   graphql@16.11.0: {}
 
