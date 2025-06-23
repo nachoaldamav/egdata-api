@@ -6,6 +6,8 @@
   },
   "type": "module",
   "dependencies": {
+    "@apollo/server": "^4.12.2",
+    "@apollo/utils.withrequired": "^3.0.0",
     "@aws-sdk/client-s3": "^3.799.0",
     "@discordjs/rest": "^2.5.0",
     "@egdata/core.schemas.achievements": "^2.0.2",
@@ -27,6 +29,8 @@
     "@egdata/core.schemas.sellers": "latest",
     "@egdata/core.schemas.subitems": "^0.0.1",
     "@egdata/core.schemas.tags": "latest",
+    "@graphql-tools/schema": "^10.0.23",
+    "@graphql-tools/utils": "^10.8.6",
     "@hono/node-server": "1.12.0",
     "@hono/swagger-ui": "0.4.0",
     "@libsql/kysely-libsql": "^0.4.1",
@@ -42,6 +46,8 @@
     "consola": "^3.4.2",
     "discord-api-types": "^0.38.11",
     "dotenv": "16.4.5",
+    "graphql": "^16.11.0",
+    "graphql-parse-resolve-info": "^4.14.1",
     "graphql-request": "^7.1.0",
     "heapdump": "^0.3.15",
     "hono": "4.7.8",
@@ -81,7 +87,19 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "heapdump"
-    ]
+      "@apollo/protobufjs",
+      "@biomejs/biome",
+      "esbuild",
+      "heapdump",
+      "sharp"
+    ],
+    "ignoredBuiltDependencies": [
+      "core-js",
+      "msgpackr-extract",
+      "protobufjs"
+    ],
+    "overrides": {
+      "graphql": "16.11.0"
+    }
   }
 }

@@ -50,6 +50,8 @@ import type { OpenAPIV3 } from "openapi-types";
 import { consola } from "./utils/logger.js";
 import { discord } from "./clients/discord.js";
 import { Routes } from "discord-api-types/v10";
+import { honoMiddleware } from './middlewares/apollo.js';
+import { server } from "./graphql/index.js";
 
 config();
 
@@ -70,6 +72,19 @@ const ALLOWED_ORIGINS = [
 ];
 
 const app = new Hono();
+
+await server.start().then(() => {
+  consola.success("GraphQL server started");
+}).catch((e) => {
+  consola.error("GraphQL server failed to start", e);
+});
+
+app.use('/graphql', honoMiddleware(server, {
+  context: async () => ({
+    db: db.db,
+    logger: consola,
+  }),
+}));
 
 app.use(
   "/*",
@@ -92,8 +107,7 @@ app.use("/*", etag());
 app.use("/*", (c, next) => {
   const memoryUsage = process.memoryUsage();
   consola.debug(
-    `[${c.req.method}] ${c.req.path} - Memory Usage: ${
-      memoryUsage.heapUsed / 1024 / 1024
+    `[${c.req.method}] ${c.req.path} - Memory Usage: ${memoryUsage.heapUsed / 1024 / 1024
     }MB`,
   );
   return next();
@@ -324,12 +338,11 @@ app.get("/sitemap.xml", async (c) => {
       siteMapIndex = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${Array.from(
-    { length: Math.ceil(count / limit) },
-    (_, i) =>
-      `<sitemap><loc>https://api.egdata.app/sitemap.xml?page=${
-        i + 1
-      }</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`,
-  ).join("")}
+        { length: Math.ceil(count / limit) },
+        (_, i) =>
+          `<sitemap><loc>https://api.egdata.app/sitemap.xml?page=${i + 1
+          }</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`,
+      ).join("")}
 </sitemapindex>`;
 
       await client.set(cacheKey, siteMapIndex, "EX", cacheTimeInSec);
@@ -372,25 +385,25 @@ app.get("/sitemap.xml", async (c) => {
     siteMap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${offers
-    .map((offer) => {
-      const url = `https://egdata.app/offers/${offer.id}`;
-      return `<url>
+        .map((offer) => {
+          const url = `https://egdata.app/offers/${offer.id}`;
+          return `<url>
         <loc>${url}</loc>
         <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       ${sections
-        .map(
-          (section) => `
+              .map(
+                (section) => `
       <url>
         <loc>${url}/${section}</loc>
         <lastmod>${(offer.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       `,
-        )
-        .join("\n")}
+              )
+              .join("\n")}
       `;
-    })
-    .join("\n")}
+        })
+        .join("\n")}
 </urlset>`;
 
     await client.set(cacheKeyPage, siteMap, "EX", cacheTimeInSec);
@@ -681,9 +694,8 @@ app.get("/featured", async (c) => {
     200,
     {
       "Cache-Control": "public, max-age=60",
-      "Server-Timing": `db;dur=${
-        GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
-      }`,
+      "Server-Timing": `db;dur=${GET_FEATURED_GAMES_END.getTime() - GET_FEATURED_GAMES_START.getTime()
+        }`,
     },
   );
 });
@@ -1329,8 +1341,7 @@ async function refreshSellersIndex() {
 
     totalSellers += sellers.length;
     console.log(
-      `Processing sellers ${
-        totalSellers - sellers.length + 1
+      `Processing sellers ${totalSellers - sellers.length + 1
       } to ${totalSellers}`,
     );
 
@@ -1662,12 +1673,11 @@ app.get("/items-sitemap.xml", async (c) => {
       siteMapIndex = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${Array.from(
-    { length: Math.ceil(count / limit) },
-    (_, i) =>
-      `<sitemap><loc>https://api.egdata.app/items-sitemap.xml?page=${
-        i + 1
-      }</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`,
-  ).join("")}
+        { length: Math.ceil(count / limit) },
+        (_, i) =>
+          `<sitemap><loc>https://api.egdata.app/items-sitemap.xml?page=${i + 1
+          }</loc><lastmod>${new Date().toISOString()}</lastmod></sitemap>`,
+      ).join("")}
 </sitemapindex>`;
 
       await client.set(cacheKey, siteMapIndex, "EX", cacheTimeInSec);
@@ -1710,25 +1720,25 @@ app.get("/items-sitemap.xml", async (c) => {
     siteMap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${items
-    .map((item) => {
-      const url = `https://egdata.app/items/${item.id}`;
-      return `<url>
+        .map((item) => {
+          const url = `https://egdata.app/items/${item.id}`;
+          return `<url>
         <loc>${url}</loc>
         <lastmod>${(item.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       ${sections
-        .map(
-          (section) => `
+              .map(
+                (section) => `
       <url>
         <loc>${url}/${section}</loc>
         <lastmod>${(item.lastModifiedDate as Date).toISOString()}</lastmod>
       </url>
       `,
-        )
-        .join("\n")}
+              )
+              .join("\n")}
       `;
-    })
-    .join("\n")}
+        })
+        .join("\n")}
 </urlset>`;
 
     await client.set(cacheKeyPage, siteMap, "EX", cacheTimeInSec);
