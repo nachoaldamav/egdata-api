@@ -16,6 +16,7 @@ RUN pnpm build
 FROM base AS runner
 WORKDIR /app
 COPY --from=build /app/ /app/
+COPY src/static/ /app/src/static/
 EXPOSE 4000
 
 CMD [ "node", "--enable-source-maps" ,"dist/index.js" ]
