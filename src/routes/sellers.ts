@@ -197,33 +197,25 @@ app.get('/:id/stats', async (c) => {
     });
   }
 
-  const [offers, items, games, offersList] = await Promise.all([
-    Offer.countDocuments({
-      'seller.id': id,
-    }),
-    Item.countDocuments({
-      developerId: id,
-    }),
-    Offer.countDocuments({
-      'seller.id': id,
-      offerType: 'BASE_GAME',
-    }),
+  const [offers, items, gamesAgg, offersList] = await Promise.all([
+    Offer.countDocuments({ 'seller.id': id }),
+    Item.countDocuments({ developerId: id }),
     Offer.aggregate([
-      {
-        $match: {
-          'seller.id': id,
-        },
-      },
+      { $match: { 'seller.id': id, offerType: 'BASE_GAME' } },
       { $sort: { lastModifiedDate: -1 } },
-      {
-        $group: {
-          _id: '$namespace',
-          offer: { $first: '$$ROOT' },
-        },
-      },
+      { $group: { _id: '$namespace', offer: { $first: '$$ROOT' } } },
+      { $replaceRoot: { newRoot: '$offer' } },
+      { $count: 'count' },
+    ]),
+    Offer.aggregate([
+      { $match: { 'seller.id': id } },
+      { $sort: { lastModifiedDate: -1 } },
+      { $group: { _id: '$namespace', offer: { $first: '$$ROOT' } } },
       { $replaceRoot: { newRoot: '$offer' } },
     ])
   ]);
+
+  const games = Array.isArray(gamesAgg) && gamesAgg[0]?.count ? gamesAgg[0].count : 0;
 
   const freegames = await FreeGames.countDocuments({
     id: {
