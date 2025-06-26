@@ -9,6 +9,7 @@ import { GamePosition } from '@egdata/core.schemas.collections';
 import { Item } from '@egdata/core.schemas.items';
 import { FreeGames } from '@egdata/core.schemas.free-games';
 import { Seller } from '@egdata/core.schemas.sellers';
+import { db } from '../db/index.js';
 
 const app = new Hono();
 
@@ -207,9 +208,21 @@ app.get('/:id/stats', async (c) => {
       'seller.id': id,
       offerType: 'BASE_GAME',
     }),
-    Offer.find({
-      'seller.id': id,
-    }),
+    Offer.aggregate([
+      {
+        $match: {
+          'seller.id': id,
+        },
+      },
+      { $sort: { lastModifiedDate: -1 } },
+      {
+        $group: {
+          _id: '$namespace',
+          offer: { $first: '$$ROOT' },
+        },
+      },
+      { $replaceRoot: { newRoot: '$offer' } },
+    ])
   ]);
 
   const freegames = await FreeGames.countDocuments({
@@ -218,11 +231,19 @@ app.get('/:id/stats', async (c) => {
     },
   });
 
+  const mobileFreeGames = await db
+    .db.collection('mobile-freebies')
+    .countDocuments({
+      offerId: {
+        $in: offersList.map((o) => o.id),
+      },
+    });
+
   const result = {
     offers,
     items,
     games,
-    freegames,
+    freegames: freegames + mobileFreeGames,
     seller,
   };
 
