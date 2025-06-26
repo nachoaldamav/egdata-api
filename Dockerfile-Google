@@ -26,6 +26,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src/static ./src/static
 
 EXPOSE 4000
 EXPOSE 9229
