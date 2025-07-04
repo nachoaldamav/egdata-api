@@ -79,13 +79,6 @@ await server.start().then(() => {
   consola.error("GraphQL server failed to start", e);
 });
 
-app.use('/graphql', honoMiddleware(server, {
-  context: async () => ({
-    db: db.db,
-    logger: consola,
-  }),
-}));
-
 app.use(
   "/*",
   cors({
@@ -103,6 +96,13 @@ app.use(
 );
 
 app.use("/*", etag());
+
+app.use('/graphql', honoMiddleware(server, {
+  context: async () => ({
+    db: db.db,
+    logger: consola,
+  }),
+}));
 
 app.use("/*", (c, next) => {
   const memoryUsage = process.memoryUsage();
