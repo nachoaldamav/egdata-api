@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import jwt from "jsonwebtoken";
 import { db } from "../db/index.js";
+import { epicStoreClient } from "../clients/epic.js";
 
 interface Playtime {
   accountId: string;
@@ -28,6 +29,7 @@ const middleware = createMiddleware<{
       iat: number;
       jti: string;
     };
+    access_token: string;
   };
 }>(async (c, next) => {
   // Check if the user is authenticated
@@ -73,6 +75,7 @@ const middleware = createMiddleware<{
   }
 
   c.set("jwt", decoded);
+  c.set("access_token", `eg1~${token}`);
 
   await next();
 });
@@ -112,6 +115,23 @@ app.post("/playtime", middleware, async (c) => {
   );
 
   return c.json({ message: "ok" });
+});
+
+interface Ownership {
+  id: string;
+  namespace: string;
+}
+
+app.post("/ownership", middleware, async (c) => {
+  const body = await c.req.json<Ownership[]>();
+
+  const correctEntries = body.filter((o) => o.id && o.namespace);
+
+  const client = epicStoreClient;
+
+  const ownership = await client.checkOwnership(correctEntries, c.var.access_token);
+
+  return c.json(ownership);
 });
 
 export default app;

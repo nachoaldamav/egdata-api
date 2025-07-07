@@ -2,6 +2,7 @@ import { gql, GraphQLClient } from "graphql-request";
 import type { PlayerProfileQuery } from "../types/get-epic-user.js";
 import type { PlayerProfileAchievementsByProductIdQuery } from "../types/get-user-product-achievements.js";
 import type { PlayerProfilePrivateResponse } from "../types/get-user-achievements.js";
+import type { GetOffersValidationQueryVariables, GetOffersValidationQuery } from "./queries/get-owned-offers.js";
 
 export class EpicStoreClient {
   private client: GraphQLClient;
@@ -187,6 +188,72 @@ export class EpicStoreClient {
     } catch (err) {
       console.error("Error fetching Epic user data", err);
       return null;
+    }
+  }
+
+  async checkOwnership(offers: { id: string, namespace: string }[], authToken: string) {
+    try {
+      const query = gql`
+        query getOffersValidation($offers: [OfferToValidate]!) {
+          Entitlements {
+            cartOffersValidation(offerParams: $offers) {
+              conflictingOffers {
+                offerId
+                namespace
+                conflictingOffers {
+                  namespace
+                  offerId
+                }
+              }
+              missingPrerequisites {
+                namespace
+                offerId
+                missingPrerequisiteItems {
+                  itemId
+                  namespace
+                }
+              }
+              fullyOwnedOffers {
+                namespace
+                offerId
+              }
+              possiblePartialUpgradeOffers {
+                namespace
+                offerId
+              }
+              unablePartiallyUpgradeOffers {
+                namespace
+                offerId
+              }
+            }
+          }
+        }
+      `;
+
+      const client = new GraphQLClient("https://store.epicgames.com/graphql", {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "User-Agent": "EpicGames/16.11.0-35427934+++Portal+Release-Live-Windows",
+          Origin: "https://store.epicgames.com",
+          Referer: "https://store.epicgames.com/en-US",
+        }
+      });
+
+      const data = await client
+        .request<GetOffersValidationQuery, GetOffersValidationQueryVariables>(
+          query,
+          {
+            offers: offers.map((o) => ({ offerId: o.id, namespace: o.namespace })),
+          },
+        );
+      return data?.Entitlements?.cartOffersValidation ?? null;
+    } catch (err) {
+      // graphql-request error objects often have a 'response' property with more info
+      if (err.response) {
+        console.error("GraphQL error response:", err.response);
+      }
+      console.error("Error checking ownership", err);
+      return err.response.errors;
     }
   }
 }
