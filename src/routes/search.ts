@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import client from "../clients/redis.js";
-import { Offer } from "@egdata/core.schemas.offers";
+import { Offer, type OfferType } from "@egdata/core.schemas.offers";
 import { Tags } from "@egdata/core.schemas.tags";
 import type { PipelineStage } from "mongoose";
 import { regions } from "../utils/countries.js";
@@ -13,6 +13,10 @@ import { Item } from "@egdata/core.schemas.items";
 import { Asset } from "@egdata/core.schemas.assets";
 import { ObjectId } from "mongodb";
 import type { Filter } from "meilisearch";
+import { opensearch } from "../clients/opensearch.js";
+import type { PriceEngineType } from "@egdata/core.schemas.price";
+import type { AggregationContainer } from '@opensearch-project/opensearch/api/types';
+import { orderOffersObject } from "../utils/order-offers-object.js";
 
 interface SearchBody {
   title?: string;
@@ -671,6 +675,158 @@ app.get("/changelog", async (c) => {
   return c.json(changelogs, 200, {
     "Cache-Control": "public, max-age=60",
   });
+});
+
+app.post('/v2/search', async (c) => {
+  const country = c.req.query('country');
+  const cookieCountry = getCookie(c, 'EGDATA_COUNTRY');
+  const selectedCountry = country ?? cookieCountry ?? 'US';
+  const region =
+    Object.keys(regions).find((r) =>
+      regions[r].countries.includes(selectedCountry)
+    ) ?? 'US';
+
+  const body = await c.req.json().catch(() => null);
+  if (!body) {
+    return c.json({ message: 'Invalid body' }, 400);
+  }
+  const q = body as SearchBody;
+
+  const limit = Math.min(q.limit ?? 10, 100);
+  const page = Math.max(q.page ?? 1, 1);
+  const from = (page - 1) * limit;
+
+  const must: Array<Record<string, unknown>> = [];
+  const filter: Array<Record<string, unknown>> = [];
+
+  if (q.title) must.push({ match: { title: q.title } });
+  if (q.offerType) filter.push({ term: { 'offerType.keyword': q.offerType } });
+  if (q.tags?.length) filter.push({ terms: { 'tags.name.keyword': q.tags } });
+  if (q.categories?.length) filter.push({ terms: { 'categories.keyword': q.categories } });
+  if (q.customAttributes?.length) filter.push({ terms: { 'customAttributes.keyword': q.customAttributes } });
+  if (q.seller) filter.push({ term: { 'seller.keyword': q.seller } });
+  if (q.developerDisplayName) filter.push({ term: { 'developerDisplayName.keyword': q.developerDisplayName } });
+  if (q.publisherDisplayName) filter.push({ term: { 'publisherDisplayName.keyword': q.publisherDisplayName } });
+  if (q.refundType) filter.push({ term: { 'refundType.keyword': q.refundType } });
+  if (q.isCodeRedemptionOnly) filter.push({ term: { isCodeRedemptionOnly: true } });
+  if (q.excludeBlockchain) {
+    filter.push({
+      bool: {
+        must_not: [
+          { term: { 'customAttributes.isBlockchainUsed': true } }
+        ]
+      }
+    });
+  }
+
+  if (q.pastGiveaways) filter.push({ term: { isPastGiveaway: true } });
+
+  if (q.price) {
+    const range: { gte?: number; lte?: number } = {};
+    if (q.price.min != null) range.gte = q.price.min;
+    if (q.price.max != null) range.lte = q.price.max;
+    filter.push({ range: { [`prices.${region}.price.discountPrice`]: range } });
+  }
+
+  if (q.onSale !== undefined) {
+    filter.push({
+      range: { [`prices.${region}.price.discount`]: { gt: q.onSale ? 0 : 0 } }
+    });
+  }
+
+  const sort: Array<Record<string, { order: 'asc' | 'desc' }>> = [];
+  if (q.sortBy) {
+    const dir = q.sortDir ?? 'desc';
+    switch (q.sortBy) {
+      case 'priceAsc':
+      case 'priceDesc':
+      case 'price':
+        sort.push({
+          [`prices.${region}.price.discountPrice`]: {
+            order: q.sortBy === 'priceDesc' ? 'desc' : 'asc'
+          }
+        });
+        break;
+      case 'discount':
+      case 'discountPercent':
+        sort.push({
+          [`prices.${region}.price.${q.sortBy}`]: { order: dir }
+        });
+        break;
+      default:
+        sort.push({ [q.sortBy]: { order: dir } });
+    }
+  } else {
+    if (q.title) {
+      sort.push({ _score: { order: 'desc' } });
+    } else {
+      sort.push({ 'lastModifiedDate': { order: 'desc' } });
+    }
+  }
+
+  const aggregations: Record<string, AggregationContainer> = {
+    "offerType": { terms: { field: 'offerType.keyword' } },
+    "tags": { terms: { field: 'tags.name.keyword' } },
+    "developer": { terms: { field: 'developerDisplayName.keyword' } },
+    "publisher": { terms: { field: 'publisherDisplayName.keyword' } },
+    "seller": { terms: { field: 'seller.name.keyword' } },
+    "price_stats": { stats: { field: `prices.${region}.price.discountPrice` } }
+  };
+
+  const hash = createHash('sha256').update(JSON.stringify({
+    must,
+    filter,
+    sort,
+    aggregations
+  })).digest('hex');
+
+  const cacheKey = `search:v2:${hash}`;
+
+  const cached = false; //await client.get(cacheKey);
+
+  if (cached) {
+    const result = JSON.parse(cached);
+    result.meta.cached = true;
+    return c.json(result, 200, {
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+
+  const osResponse = await opensearch.search({
+    index: 'egdata.offers',
+    body: {
+      from,
+      size: limit,
+      query: { bool: { must, filter } },
+      sort,
+      aggregations
+    }
+  });
+
+  const hits = osResponse.body.hits.hits;
+  const total = typeof osResponse.body.hits.total === 'number' ? osResponse.body.hits.total : osResponse.body.hits.total?.value;
+
+  const offers = hits.map(hit => {
+    const doc = hit._source as OfferType & { prices: Record<string, PriceEngineType> | undefined };
+    const regionalPrice: PriceEngineType | null = doc.prices?.[region] ?? null;
+    doc.prices = undefined;
+    return {
+      ...orderOffersObject(doc),
+      price: regionalPrice
+    };
+  });
+
+  const result = {
+    total, offers, page, limit, aggregations: osResponse.body.aggregations, meta: {
+      ms: osResponse.body.took,
+      timed_out: osResponse.body.timed_out,
+      cached: false,
+    }
+  };
+
+  await client.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+
+  return c.json(result, 200, { 'Cache-Control': 'public, max-age=60' });
 });
 
 app.get("/:id", async (c) => {

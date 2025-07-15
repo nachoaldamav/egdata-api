@@ -26,17 +26,13 @@ export class DB {
     }
 
     await mongoose.connect(
-      `mongodb://${process.env['MONGO_URL']}/egdata`,
+      `mongodb+srv://${process.env['MONGO_URL']}/egdata`,
       {
         tls: true,
         authMechanism: 'MONGODB-X509',
         authSource: '$external',
-        replicaSet: 'rs0',
         tlsCAFile: process.env.MONGO_CA,
         tlsCertificateKeyFile: process.env.MONGO_CERT,
-        tlsAllowInvalidHostnames: true,
-        tlsAllowInvalidCertificates: true,
-        directConnection: true,
       }
     );
     console.log('Connected to MongoDB');
