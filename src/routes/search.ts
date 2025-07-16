@@ -775,7 +775,7 @@ app.post('/v2/search', async (c) => {
       case 'price':
         sort.push({
           [`prices.${region}.price.discountPrice`]: {
-            order: q.sortBy === 'priceDesc' ? 'desc' : 'asc'
+            order: dir ?? q.sortBy === 'priceDesc' ? 'desc' : 'asc'
           }
         });
         break;
