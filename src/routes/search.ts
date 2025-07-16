@@ -772,13 +772,15 @@ app.post('/v2/search', async (c) => {
     switch (q.sortBy) {
       case 'priceAsc':
       case 'priceDesc':
-      case 'price':
+      case 'price': {
+        const direction = dir || (q.sortBy === 'priceDesc' ? 'desc' : 'asc');
         sort.push({
           [`prices.${region}.price.discountPrice`]: {
-            order: dir ?? q.sortBy === 'priceDesc' ? 'desc' : 'asc'
+            order: direction
           }
         });
         break;
+      }
       case 'discount':
       case 'discountPercent':
         sort.push({
@@ -823,6 +825,8 @@ app.post('/v2/search', async (c) => {
       "Cache-Control": "public, max-age=60",
     });
   }
+
+  console.log(must, filter, sort, aggregations);
 
   const osResponse = await opensearch.search({
     index: 'egdata.offers',
