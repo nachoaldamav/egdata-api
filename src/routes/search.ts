@@ -782,9 +782,13 @@ app.post('/v2/search', async (c) => {
         break;
       }
       case 'discount':
+        sort.push({
+          [`prices.${region}.price.discount`]: { order: dir }
+        });
+        break;
       case 'discountPercent':
         sort.push({
-          [`prices.${region}.price.${q.sortBy}`]: { order: dir }
+          [`prices.${region}.discountSetting.discountPercentage`]: { order: dir }
         });
         break;
       default:
@@ -795,6 +799,13 @@ app.post('/v2/search', async (c) => {
       sort.push({ _score: { order: 'desc' } });
     } else {
       sort.push({ 'lastModifiedDate': { order: 'desc' } });
+    }
+  }
+
+  if (sort.length > 0) {
+    // If there is a title query, sort by _score as secondary sort
+    if (q.title) {
+      sort.push({ _score: { order: 'desc' } });
     }
   }
 
