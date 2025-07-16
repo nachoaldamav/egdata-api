@@ -15,8 +15,10 @@ import { ObjectId } from "mongodb";
 import type { Filter } from "meilisearch";
 import { opensearch } from "../clients/opensearch.js";
 import type { PriceEngineType } from "@egdata/core.schemas.price";
-import type { AggregationContainer } from '@opensearch-project/opensearch/api/types';
+import type { Types } from '@opensearch-project/opensearch';
 import { orderOffersObject } from "../utils/order-offers-object.js";
+
+type AggregationContainer = Types.Common_Aggregations.AggregationContainer;
 
 interface SearchBody {
   title?: string;
@@ -699,12 +701,40 @@ app.post('/v2/search', async (c) => {
   const must: Array<Record<string, unknown>> = [];
   const filter: Array<Record<string, unknown>> = [];
 
-  if (q.title) must.push({ match: { title: q.title } });
+  if (q.title) {
+    must.push({
+      bool: {
+        should: [
+          { match_phrase: { title: q.title } },
+          {
+            match: {
+              title: {
+                query: q.title,
+                minimum_should_match: "90%"
+              }
+            }
+          }
+        ],
+        minimum_should_match: 1
+      }
+    });
+  }
   if (q.offerType) filter.push({ term: { 'offerType.keyword': q.offerType } });
-  if (q.tags?.length) filter.push({ terms: { 'tags.name.keyword': q.tags } });
+  if (q.tags?.length) {
+    filter.push({
+      terms_set: {
+        'tags.id.keyword': {
+          terms: q.tags,
+          minimum_should_match_script: {
+            source: q.tags.length.toString()
+          }
+        }
+      }
+    });
+  }
   if (q.categories?.length) filter.push({ terms: { 'categories.keyword': q.categories } });
   if (q.customAttributes?.length) filter.push({ terms: { 'customAttributes.keyword': q.customAttributes } });
-  if (q.seller) filter.push({ term: { 'seller.keyword': q.seller } });
+  if (q.seller) filter.push({ term: { 'seller.id.keyword': q.seller } });
   if (q.developerDisplayName) filter.push({ term: { 'developerDisplayName.keyword': q.developerDisplayName } });
   if (q.publisherDisplayName) filter.push({ term: { 'publisherDisplayName.keyword': q.publisherDisplayName } });
   if (q.refundType) filter.push({ term: { 'refundType.keyword': q.refundType } });
@@ -719,7 +749,9 @@ app.post('/v2/search', async (c) => {
     });
   }
 
-  if (q.pastGiveaways) filter.push({ term: { isPastGiveaway: true } });
+  if (q.pastGiveaways) {
+    filter.push({ exists: { field: 'freeEntries' } });
+  }
 
   if (q.price) {
     const range: { gte?: number; lte?: number } = {};
@@ -765,11 +797,11 @@ app.post('/v2/search', async (c) => {
   }
 
   const aggregations: Record<string, AggregationContainer> = {
-    "offerType": { terms: { field: 'offerType.keyword' } },
-    "tags": { terms: { field: 'tags.name.keyword' } },
-    "developer": { terms: { field: 'developerDisplayName.keyword' } },
-    "publisher": { terms: { field: 'publisherDisplayName.keyword' } },
-    "seller": { terms: { field: 'seller.name.keyword' } },
+    "offerType": { terms: { field: 'offerType.keyword', size: 100 } },
+    "tags": { terms: { field: 'tags.name.keyword', size: 10_000 } },
+    "developer": { terms: { field: 'developerDisplayName.keyword', size: 1000 } },
+    "publisher": { terms: { field: 'publisherDisplayName.keyword', size: 1000 } },
+    "seller": { terms: { field: 'seller.name.keyword', size: 1000 } },
     "price_stats": { stats: { field: `prices.${region}.price.discountPrice` } }
   };
 
