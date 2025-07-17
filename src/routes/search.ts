@@ -792,8 +792,8 @@ app.post('/v2/search', async (c) => {
         });
         break;
       case 'upcoming':
-        // Release date that is in the future
-        sort.push({ 'releaseDate': { order: 'asc' } });
+        // Release date that is in the future (inverted direction, asc = desc, desc = asc)
+        sort.push({ 'releaseDate': { order: dir === 'asc' ? 'desc' : 'asc' } });
         filter.push({
           range: {
             'releaseDate': {
