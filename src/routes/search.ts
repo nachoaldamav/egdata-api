@@ -54,7 +54,7 @@ interface SearchBody {
   | "price"
   | "discount"
   | "discountPercent"
-  | "giveawayDay";
+  | "giveawayDate";
   sortDir?: "asc" | "desc";
   limit?: number;
   page?: number;
@@ -803,7 +803,7 @@ app.post('/v2/search', async (c) => {
           }
         });
         break;
-      case 'giveawayDay':
+      case 'giveawayDate':
         sort.push({ 'freeEntries.endDate': { order: dir } });
         // Check if freeEntries is an array and has at least one element
         filter.push({
