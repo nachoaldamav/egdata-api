@@ -791,6 +791,17 @@ app.post('/v2/search', async (c) => {
           [`prices.${region}.discountSetting.discountPercentage`]: { order: dir }
         });
         break;
+      case 'upcoming':
+        // Release date that is in the future
+        sort.push({ 'releaseDate': { order: 'asc' } });
+        filter.push({
+          range: {
+            'releaseDate': {
+              gte: new Date().toISOString()
+            }
+          }
+        });
+        break;
       default:
         sort.push({ [q.sortBy]: { order: dir } });
     }
