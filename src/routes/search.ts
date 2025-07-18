@@ -789,7 +789,7 @@ app.post('/v2/search', async (c) => {
         break;
       case 'discountPercent':
         sort.push({
-          [`prices.${region}.discountSetting.discountPercentage`]: { order: dir }
+          [`prices.${region}.appliedRules.discountSetting.discountPercentage`]: { order: dir }
         });
         break;
       case 'upcoming':
